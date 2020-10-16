@@ -7,7 +7,7 @@ Maybe you need a `ctlptl`.
 
 ## What is ctlptl?
 
-`ctlptl` (pronounced "cuddle puddle") is a CLI for declaratively setting up
+`ctlptl` (pronounced "control pedal") is a CLI for declaratively setting up
 local Kubernetes clusters.
 
 Inspired by `kubectl` and
