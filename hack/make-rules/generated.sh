@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 REPO_ROOT=$(dirname $(dirname $(dirname "$0")))
 cd "${REPO_ROOT}"
 
