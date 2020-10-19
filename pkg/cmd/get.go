@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/tilt-dev/ctlptl/pkg/api"
+	"github.com/tilt-dev/ctlptl/pkg/cluster"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -47,7 +48,12 @@ func (o *GetOptions) Run(cmd *cobra.Command, args []string) {
 	var resources []runtime.Object
 	switch t {
 	case "cluster", "clusters":
-		resources = o.clustersAsResources(o.clusters())
+		clusters, err := o.clusters()
+		if err != nil {
+			_, _ = fmt.Fprintf(o.ErrOut, "Loading clusters: %v\n", err)
+			os.Exit(1)
+		}
+		resources = o.clustersAsResources(clusters)
 	default:
 		_, _ = fmt.Fprintf(o.ErrOut, "Unrecognized type: %s\n", t)
 		os.Exit(1)
@@ -86,12 +92,12 @@ func (o *GetOptions) OutputFlagSpecified() bool {
 	return o.PrintFlags.OutputFlagSpecified != nil && o.PrintFlags.OutputFlagSpecified()
 }
 
-func (o *GetOptions) clusters() []*api.Cluster {
-	m := api.TypeMeta{Kind: "Cluster", APIVersion: "ctlptl.dev/v1alpha1"}
-	return []*api.Cluster{
-		&api.Cluster{TypeMeta: m, Name: "microk8s", Product: "microk8s"},
-		&api.Cluster{TypeMeta: m, Name: "kind-kind", Product: "KIND"},
+func (o *GetOptions) clusters() ([]*api.Cluster, error) {
+	c, err := cluster.DefaultController()
+	if err != nil {
+		return nil, err
 	}
+	return c.List()
 }
 
 func (o *GetOptions) clustersAsResources(clusters []*api.Cluster) []runtime.Object {
