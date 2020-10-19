@@ -26,11 +26,12 @@ func NewGetOptions() *GetOptions {
 
 func (o *GetOptions) Command() *cobra.Command {
 	var getCmd = &cobra.Command{
-		Use:     "get [type]",
-		Short:   "Mess around with local Kubernetes clusters without consequences",
-		Example: "ctlptl get clusters",
-		Run:     o.Run,
-		Args:    cobra.ExactArgs(1),
+		Use:   "get [type]",
+		Short: "Read the currently running clusters",
+		Example: "  ctlptl get\n" +
+			"  ctlptl get -o yaml",
+		Run:  o.Run,
+		Args: cobra.MaximumNArgs(1),
 	}
 
 	o.PrintFlags.AddFlags(getCmd)
@@ -39,7 +40,10 @@ func (o *GetOptions) Command() *cobra.Command {
 }
 
 func (o *GetOptions) Run(cmd *cobra.Command, args []string) {
-	t := args[0]
+	t := "cluster"
+	if len(args) >= 1 {
+		t = args[0]
+	}
 	var resources []runtime.Object
 	switch t {
 	case "cluster", "clusters":
