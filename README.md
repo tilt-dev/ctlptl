@@ -1,5 +1,8 @@
 # ctlptl
 
+[![Build Status](https://circleci.com/gh/tilt-dev/ctlptl/tree/main.svg?style=shield)](https://circleci.com/gh/tilt-dev/ctlptl)
+[![GoDoc](https://godoc.org/github.com/tilt-dev/ctlptl?status.svg)](https://pkg.go.dev/github.com/tilt-dev/ctlptl)
+
 Want to mess around with Kubernetes, but don't want to spend an ocean on
 hardware?
 
