@@ -1,14 +1,17 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/cluster"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 )
@@ -16,12 +19,14 @@ import (
 type GetOptions struct {
 	*genericclioptions.PrintFlags
 	genericclioptions.IOStreams
+	StartTime time.Time
 }
 
 func NewGetOptions() *GetOptions {
 	return &GetOptions{
 		PrintFlags: genericclioptions.NewPrintFlags(""),
 		IOStreams:  genericclioptions.IOStreams{Out: os.Stdout, ErrOut: os.Stderr, In: os.Stdin},
+		StartTime:  time.Now(),
 	}
 }
 
@@ -97,7 +102,7 @@ func (o *GetOptions) clusters() ([]*api.Cluster, error) {
 	if err != nil {
 		return nil, err
 	}
-	return c.List()
+	return c.List(context.TODO())
 }
 
 func (o *GetOptions) clustersAsResources(clusters []*api.Cluster) []runtime.Object {
@@ -120,14 +125,25 @@ func (o *GetOptions) clustersAsResources(clusters []*api.Cluster) []runtime.Obje
 				Name: "Product",
 				Type: "string",
 			},
+			metav1.TableColumnDefinition{
+				Name: "Age",
+				Type: "string",
+			},
 		},
 	}
 
 	for _, cluster := range clusters {
+		age := "unknown"
+		cTime := cluster.Status.CreationTimestamp.Time
+		if !cTime.IsZero() {
+			age = duration.ShortHumanDuration(o.StartTime.Sub(cTime))
+		}
+
 		table.Rows = append(table.Rows, metav1.TableRow{
 			Cells: []interface{}{
 				cluster.Name,
 				cluster.Product,
+				age,
 			},
 		})
 	}
