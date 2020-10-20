@@ -1,5 +1,9 @@
 package api
 
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
 // TypeMeta partially copies apimachinery/pkg/apis/meta/v1.TypeMeta
 // No need for a direct dependence; the fields are stable.
 type TypeMeta struct {
@@ -17,4 +21,12 @@ type Cluster struct {
 
 	// The name of the tool used to create this cluster.
 	Product string `json:"product,omitempty" yaml:"product,omitempty"`
+
+	// Runtime state of the cluster that cannot be explicitly set.
+	Status ClusterStatus `json:"status,omitempty" yaml:"status,omitempty"`
+}
+
+type ClusterStatus struct {
+	// When the cluster was first created.
+	CreationTimestamp metav1.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
 }
