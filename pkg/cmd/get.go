@@ -129,6 +129,10 @@ func (o *GetOptions) clustersAsResources(clusters []*api.Cluster) []runtime.Obje
 				Name: "Age",
 				Type: "string",
 			},
+			metav1.TableColumnDefinition{
+				Name: "Registry",
+				Type: "string",
+			},
 		},
 	}
 
@@ -139,11 +143,20 @@ func (o *GetOptions) clustersAsResources(clusters []*api.Cluster) []runtime.Obje
 			age = duration.ShortHumanDuration(o.StartTime.Sub(cTime))
 		}
 
+		rHost := ""
+		if cluster.Status.LocalRegistryHosting != nil {
+			rHost = cluster.Status.LocalRegistryHosting.Host
+		}
+		if rHost == "" {
+			rHost = "none"
+		}
+
 		table.Rows = append(table.Rows, metav1.TableRow{
 			Cells: []interface{}{
 				cluster.Name,
 				cluster.Product,
 				age,
+				rHost,
 			},
 		})
 	}

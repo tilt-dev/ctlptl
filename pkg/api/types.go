@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/tilt-dev/localregistry-go"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -22,11 +23,16 @@ type Cluster struct {
 	// The name of the tool used to create this cluster.
 	Product string `json:"product,omitempty" yaml:"product,omitempty"`
 
-	// Runtime state of the cluster that cannot be explicitly set.
+	// Most recently observed status of the cluster.
+	// Populated by the system.
+	// Read-only.
 	Status ClusterStatus `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
 type ClusterStatus struct {
 	// When the cluster was first created.
 	CreationTimestamp metav1.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
+
+	// Local registry status documented on the cluster itself.
+	LocalRegistryHosting *localregistry.LocalRegistryHostingV1 `json:"localRegistryHosting,omitempty" yaml:"localRegistryHosting,omitempty"`
 }

@@ -21,6 +21,7 @@ limitations under the License.
 package api
 
 import (
+	localregistrygo "github.com/tilt-dev/localregistry-go"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -54,6 +55,11 @@ func (in *Cluster) DeepCopyObject() runtime.Object {
 func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 	*out = *in
 	in.CreationTimestamp.DeepCopyInto(&out.CreationTimestamp)
+	if in.LocalRegistryHosting != nil {
+		in, out := &in.LocalRegistryHosting, &out.LocalRegistryHosting
+		*out = new(localregistrygo.LocalRegistryHostingV1)
+		**out = **in
+	}
 	return
 }
 

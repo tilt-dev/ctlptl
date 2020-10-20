@@ -5,6 +5,8 @@ import (
 	"sync"
 
 	"github.com/tilt-dev/ctlptl/pkg/api"
+	"github.com/tilt-dev/localregistry-go"
+	"golang.org/x/sync/errgroup"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -64,12 +66,7 @@ func (c *Controller) client(name string) (kubernetes.Interface, error) {
 	return client, nil
 }
 
-func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) error {
-	client, err := c.client(cluster.Name)
-	if err != nil {
-		return err
-	}
-
+func (c *Controller) populateCreationTimestamp(ctx context.Context, cluster *api.Cluster, client kubernetes.Interface) error {
 	nodes, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return err
@@ -84,7 +81,36 @@ func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) 
 	}
 
 	cluster.Status.CreationTimestamp = minTime
+
 	return nil
+}
+
+func (c *Controller) populateLocalRegistryHosting(ctx context.Context, cluster *api.Cluster, client kubernetes.Interface) error {
+	hosting, err := localregistry.Discover(ctx, client.CoreV1())
+	if err != nil {
+		return err
+	}
+
+	cluster.Status.LocalRegistryHosting = &hosting
+	return nil
+}
+
+func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) error {
+	client, err := c.client(cluster.Name)
+	if err != nil {
+		return err
+	}
+
+	g, ctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		return c.populateCreationTimestamp(ctx, cluster, client)
+	})
+
+	g.Go(func() error {
+		return c.populateLocalRegistryHosting(ctx, cluster, client)
+	})
+
+	return g.Wait()
 }
 
 func (c *Controller) List(ctx context.Context) ([]*api.Cluster, error) {
