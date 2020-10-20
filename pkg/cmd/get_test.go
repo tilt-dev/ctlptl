@@ -4,16 +4,23 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/tilt-dev/ctlptl/pkg/api"
 	"gotest.tools/assert"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
+
+var clusterType = api.TypeMeta{Kind: "Cluster", APIVersion: "ctlptl.dev/v1alpha1"}
+var clusters = []*api.Cluster{
+	&api.Cluster{TypeMeta: clusterType, Name: "microk8s", Product: "microk8s"},
+	&api.Cluster{TypeMeta: clusterType, Name: "kind-kind", Product: "KIND"},
+}
 
 func TestDefaultPrint(t *testing.T) {
 	streams, _, out, _ := genericclioptions.NewTestIOStreams()
 	o := NewGetOptions()
 	o.IOStreams = streams
 
-	err := o.Print(o.clustersAsResources(o.clusters()))
+	err := o.Print(o.clustersAsResources(clusters))
 	require.NoError(t, err)
 	assert.Equal(t, out.String(), `NAME        PRODUCT
 microk8s    microk8s
@@ -28,7 +35,7 @@ func TestYAML(t *testing.T) {
 
 	o.Command().Flags().Set("output", "yaml")
 
-	err := o.Print(o.clustersAsResources(o.clusters()))
+	err := o.Print(o.clustersAsResources(clusters))
 	require.NoError(t, err)
 	assert.Equal(t, out.String(), `apiVersion: ctlptl.dev/v1alpha1
 kind: Cluster

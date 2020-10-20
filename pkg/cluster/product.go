@@ -1,0 +1,97 @@
+package cluster
+
+import (
+	"path/filepath"
+	"strings"
+
+	"github.com/mitchellh/go-homedir"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+)
+
+// Enum of possible values for ctlptl.dev Cluster.product
+//
+// Named in honor of the product component of the user-agent string,
+// which we hope isn't foreshadowing.
+type Product string
+
+func (p Product) String() string { return string(p) }
+
+const (
+	ProductUnknown       Product = "unknown"
+	ProductGKE           Product = "gke"
+	ProductMinikube      Product = "minikube"
+	ProductDockerDesktop Product = "docker-for-desktop"
+	ProductMicroK8s      Product = "microk8s"
+	ProductCRC           Product = "crc"
+	ProductKrucible      Product = "krucible"
+	ProductKIND          Product = "kind"
+	ProductK3D           Product = "k3d"
+)
+
+func (e Product) UsesLocalDockerRegistry() bool {
+	return e == ProductMinikube ||
+		e == ProductDockerDesktop ||
+		e == ProductMicroK8s
+}
+
+func (e Product) IsDevCluster() bool {
+	return e == ProductMinikube ||
+		e == ProductDockerDesktop ||
+		e == ProductMicroK8s ||
+		e == ProductCRC ||
+		e == ProductKIND ||
+		e == ProductK3D ||
+		e == ProductKrucible
+}
+
+func productFromContext(c *clientcmdapi.Context) Product {
+	cn := c.Cluster
+	if strings.HasPrefix(cn, string(ProductMinikube)) {
+		return ProductMinikube
+	} else if strings.HasPrefix(cn, "docker-for-desktop-cluster") || strings.HasPrefix(cn, "docker-desktop") {
+		return ProductDockerDesktop
+	} else if strings.HasPrefix(cn, string(ProductGKE)) {
+		// GKE cluster strings look like:
+		// gke_blorg-dev_us-central1-b_blorg
+		return ProductGKE
+	} else if cn == "kind" {
+		return ProductKIND
+	} else if strings.HasPrefix(cn, "kind-") {
+		// As of KinD 0.6.0, KinD uses a context name prefix
+		// https://github.com/kubernetes-sigs/kind/issues/1060
+		return ProductKIND
+	} else if strings.HasPrefix(cn, "microk8s-cluster") {
+		return ProductMicroK8s
+	} else if strings.HasPrefix(cn, "api-crc-testing") {
+		return ProductCRC
+	} else if strings.HasPrefix(cn, "krucible-") {
+		return ProductKrucible
+	}
+
+	loc := c.LocationOfOrigin
+	homedir, err := homedir.Dir()
+	if err != nil {
+		return ProductUnknown
+	}
+
+	k3dDir := filepath.Join(homedir, ".config", "k3d")
+	if strings.HasPrefix(loc, k3dDir+string(filepath.Separator)) {
+		return ProductK3D
+	}
+
+	// NOTE(nick): Users can set the KIND cluster name with `kind create cluster
+	// --name`.  This makes the KIND cluster really hard to detect.
+	//
+	// We currently do it by assuming that KIND configs are always stored in a
+	// file named kind-config-*.
+	//
+	// KIND internally looks for its clusters with `docker ps` + filters,
+	// which might be a route to explore if this isn't robust enough.
+	//
+	// This is for old pre-0.6.0 versions of KinD
+	if strings.HasPrefix(filepath.Base(loc), "kind-config-") {
+		return ProductKIND
+	}
+
+	return ProductUnknown
+}
