@@ -11,8 +11,9 @@ import (
 )
 
 type expectedConfig struct {
-	expected Product
-	input    *api.Context
+	expected     Product
+	input        *api.Context
+	inputCluster *api.Cluster
 }
 
 func TestProductFromContext(t *testing.T) {
@@ -69,28 +70,37 @@ func TestProductFromContext(t *testing.T) {
 	kind6Context := &api.Context{
 		Cluster: "kind-custom-name",
 	}
+	minikubeRandomName := &api.Context{
+		Cluster: "custom-name",
+	}
+	defaultCluster := &api.Cluster{}
+	minikubeRandomNameCluster := &api.Cluster{
+		CertificateAuthority: filepath.Join(homedir, ".minikube", "ca.crt"),
+	}
 	table := []expectedConfig{
-		{ProductMinikube, minikubeContext},
-		{ProductMinikube, minikubePrefixContext},
-		{ProductDockerDesktop, dockerDesktopContext},
-		{ProductDockerDesktop, dockerDesktopPrefixContext},
-		{ProductDockerDesktop, dockerDesktopEdgeContext},
-		{ProductDockerDesktop, dockerDesktopEdgePrefixContext},
-		{ProductGKE, gkeContext},
-		{ProductKIND, kind5Context},
-		{ProductMicroK8s, microK8sContext},
-		{ProductMicroK8s, microK8sPrefixContext},
-		{ProductCRC, crcContext},
-		{ProductCRC, crcPrefixContext},
-		{ProductKrucible, krucibleContext},
-		{ProductK3D, k3dContext},
-		{ProductKIND, kind5NamedClusterContext},
-		{ProductKIND, kind6Context},
+		{ProductMinikube, minikubeContext, defaultCluster},
+		{ProductMinikube, minikubePrefixContext, defaultCluster},
+		{ProductDockerDesktop, dockerDesktopContext, defaultCluster},
+		{ProductDockerDesktop, dockerDesktopPrefixContext, defaultCluster},
+		{ProductDockerDesktop, dockerDesktopEdgeContext, defaultCluster},
+		{ProductDockerDesktop, dockerDesktopEdgePrefixContext, defaultCluster},
+		{ProductGKE, gkeContext, defaultCluster},
+		{ProductKIND, kind5Context, defaultCluster},
+		{ProductMicroK8s, microK8sContext, defaultCluster},
+		{ProductMicroK8s, microK8sPrefixContext, defaultCluster},
+		{ProductCRC, crcContext, defaultCluster},
+		{ProductCRC, crcPrefixContext, defaultCluster},
+		{ProductKrucible, krucibleContext, defaultCluster},
+		{ProductK3D, k3dContext, defaultCluster},
+		{ProductKIND, kind5NamedClusterContext, defaultCluster},
+		{ProductKIND, kind6Context, defaultCluster},
+		{ProductUnknown, minikubeRandomName, defaultCluster},
+		{ProductMinikube, minikubeRandomName, minikubeRandomNameCluster},
 	}
 
 	for i, tt := range table {
 		t.Run(fmt.Sprintf("product %d", i), func(t *testing.T) {
-			actual := productFromContext(tt.input)
+			actual := productFromContext(tt.input, tt.inputCluster)
 			if actual != tt.expected {
 				t.Errorf("Expected %s, actual %s", tt.expected, actual)
 			}
