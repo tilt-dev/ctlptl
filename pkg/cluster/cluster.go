@@ -7,7 +7,10 @@ import (
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/localregistry-go"
 	"golang.org/x/sync/errgroup"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -16,6 +19,9 @@ import (
 	// Client auth plugins! They will auto-init if we import them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
+
+var typeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "Cluster"}
+var groupResource = schema.GroupResource{"ctlptl.dev", "clusters"}
 
 type Controller struct {
 	config  clientcmdapi.Config
@@ -113,13 +119,38 @@ func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) 
 	return g.Wait()
 }
 
-func (c *Controller) List(ctx context.Context) ([]*api.Cluster, error) {
+func (c *Controller) Get(ctx context.Context, name string) (*api.Cluster, error) {
+	ct, ok := c.config.Contexts[name]
+	if !ok {
+		return nil, errors.NewNotFound(groupResource, name)
+	}
+	cluster := &api.Cluster{
+		TypeMeta: typeMeta,
+		Name:     name,
+		Product:  productFromContext(ct).String(),
+	}
+	err := c.populateCluster(ctx, cluster)
+	if err != nil {
+		klog.V(4).Infof("WARNING: reading info off cluster %s: %v", name, err)
+	}
+	return cluster, nil
+}
+
+func (c *Controller) List(ctx context.Context, options ListOptions) ([]*api.Cluster, error) {
+	selector, err := fields.ParseSelector(options.FieldSelector)
+	if err != nil {
+		return nil, err
+	}
+
 	result := []*api.Cluster{}
 	for name, ct := range c.config.Contexts {
 		cluster := &api.Cluster{
-			TypeMeta: api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "Cluster"},
+			TypeMeta: typeMeta,
 			Name:     name,
 			Product:  productFromContext(ct).String(),
+		}
+		if !selector.Matches((*clusterFields)(cluster)) {
+			continue
 		}
 		result = append(result, cluster)
 

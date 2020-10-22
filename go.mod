@@ -14,14 +14,15 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.6.1
 	github.com/tilt-dev/localregistry-go v0.0.0-20201021185044-ffc4c827f097
+	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a // indirect
+	golang.org/x/net v0.0.0-20200904194848-62affa334b73 // indirect
 	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a
 	golang.org/x/sys v0.0.0-20200916030750-2334cc1a136f // indirect
-	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
+	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b // indirect
 	gotest.tools v2.2.0+incompatible
 	k8s.io/apimachinery v0.19.2
 	k8s.io/cli-runtime v0.19.2
 	k8s.io/client-go v0.19.2
-	k8s.io/code-generator v0.19.3 // indirect
 	k8s.io/klog/v2 v2.2.0
 	k8s.io/utils v0.0.0-20201015054608-420da100c033 // indirect
 )
