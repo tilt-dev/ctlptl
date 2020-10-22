@@ -133,7 +133,7 @@ func (c *Controller) Get(ctx context.Context, name string) (*api.Cluster, error)
 	cluster := &api.Cluster{
 		TypeMeta: typeMeta,
 		Name:     name,
-		Product:  productFromContext(ct).String(),
+		Product:  productFromContext(ct, c.config.Clusters[ct.Cluster]).String(),
 	}
 	err := c.populateCluster(ctx, cluster)
 	if err != nil {
@@ -153,7 +153,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) ([]*api.Clus
 		cluster := &api.Cluster{
 			TypeMeta: typeMeta,
 			Name:     name,
-			Product:  productFromContext(ct).String(),
+			Product:  productFromContext(ct, c.config.Clusters[ct.Cluster]).String(),
 		}
 		if !selector.Matches((*clusterFields)(cluster)) {
 			continue

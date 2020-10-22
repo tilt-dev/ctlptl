@@ -44,7 +44,7 @@ func (e Product) IsDevCluster() bool {
 		e == ProductKrucible
 }
 
-func productFromContext(c *clientcmdapi.Context) Product {
+func productFromContext(c *clientcmdapi.Context, cl *clientcmdapi.Cluster) Product {
 	cn := c.Cluster
 	if strings.HasPrefix(cn, string(ProductMinikube)) {
 		return ProductMinikube
@@ -77,6 +77,12 @@ func productFromContext(c *clientcmdapi.Context) Product {
 	k3dDir := filepath.Join(homedir, ".config", "k3d")
 	if strings.HasPrefix(loc, k3dDir+string(filepath.Separator)) {
 		return ProductK3D
+	}
+
+	minikubeDir := filepath.Join(homedir, ".minikube")
+	if cl != nil && cl.CertificateAuthority != "" &&
+		strings.HasPrefix(cl.CertificateAuthority, minikubeDir+string(filepath.Separator)) {
+		return ProductMinikube
 	}
 
 	// NOTE(nick): Users can set the KIND cluster name with `kind create cluster
