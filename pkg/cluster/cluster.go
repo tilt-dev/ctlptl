@@ -7,7 +7,6 @@ import (
 
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/localregistry-go"
-	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -25,9 +24,10 @@ var typeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "Cluster"}
 var groupResource = schema.GroupResource{"ctlptl.dev", "clusters"}
 
 type Controller struct {
-	config  clientcmdapi.Config
-	clients map[string]kubernetes.Interface
-	mu      sync.Mutex
+	config   clientcmdapi.Config
+	clients  map[string]kubernetes.Interface
+	dmachine *dockerMachine
+	mu       sync.Mutex
 }
 
 func ControllerWithConfig(config clientcmdapi.Config) *Controller {
@@ -48,6 +48,28 @@ func DefaultController() (*Controller, error) {
 		return nil, err
 	}
 	return ControllerWithConfig(rawConfig), nil
+}
+
+func (c *Controller) machine(ctx context.Context, name string, product Product) (Machine, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	switch product {
+	case ProductDockerDesktop, ProductKIND, ProductK3D:
+		if c.dmachine == nil {
+			machine, err := NewDockerMachine(ctx)
+			if err != nil {
+				return nil, err
+			}
+			c.dmachine = machine
+		}
+		return c.dmachine, nil
+
+	case ProductMinikube:
+		return minikubeMachine{name: name}, nil
+	}
+
+	return unknownMachine{product: product}, nil
 }
 
 func (c *Controller) client(name string) (kubernetes.Interface, error) {
@@ -102,22 +124,59 @@ func (c *Controller) populateLocalRegistryHosting(ctx context.Context, cluster *
 	return nil
 }
 
-func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) error {
-	client, err := c.client(cluster.Name)
+func (c *Controller) populateMachineStatus(ctx context.Context, cluster *api.Cluster) error {
+	machine, err := c.machine(ctx, cluster.Name, Product(cluster.Product))
 	if err != nil {
 		return err
 	}
 
-	g, ctx := errgroup.WithContext(ctx)
-	g.Go(func() error {
-		return c.populateCreationTimestamp(ctx, cluster, client)
-	})
+	cpu, err := machine.CPUs(ctx)
+	if err != nil {
+		return err
+	}
+	cluster.Status.CPUs = cpu
+	return nil
+}
 
-	g.Go(func() error {
-		return c.populateLocalRegistryHosting(ctx, cluster, client)
-	})
+func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) {
+	name := cluster.Name
+	client, err := c.client(cluster.Name)
+	if err != nil {
+		klog.V(4).Infof("WARNING: creating cluster %s client: %v", name, err)
+		return
+	}
+	wg := sync.WaitGroup{}
 
-	return g.Wait()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		err := c.populateCreationTimestamp(ctx, cluster, client)
+		if err != nil {
+			klog.V(4).Infof("WARNING: reading cluster %s creation time: %v", name, err)
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		err := c.populateLocalRegistryHosting(ctx, cluster, client)
+		if err != nil {
+			klog.V(4).Infof("WARNING: reading cluster %s registry: %v", name, err)
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := c.populateMachineStatus(ctx, cluster)
+		if err != nil {
+			klog.V(4).Infof("WARNING: reading cluster %s machine: %v", name, err)
+		}
+	}()
+
+	wg.Wait()
 }
 
 func (c *Controller) Apply(ctx context.Context, cluster *api.Cluster) (*api.Cluster, error) {
@@ -135,10 +194,7 @@ func (c *Controller) Get(ctx context.Context, name string) (*api.Cluster, error)
 		Name:     name,
 		Product:  productFromContext(ct, c.config.Clusters[ct.Cluster]).String(),
 	}
-	err := c.populateCluster(ctx, cluster)
-	if err != nil {
-		klog.V(4).Infof("WARNING: reading info off cluster %s: %v", name, err)
-	}
+	c.populateCluster(ctx, cluster)
 	return cluster, nil
 }
 
@@ -158,12 +214,8 @@ func (c *Controller) List(ctx context.Context, options ListOptions) ([]*api.Clus
 		if !selector.Matches((*clusterFields)(cluster)) {
 			continue
 		}
+		c.populateCluster(ctx, cluster)
 		result = append(result, cluster)
-
-		err := c.populateCluster(ctx, cluster)
-		if err != nil {
-			klog.V(4).Infof("WARNING: reading info off cluster %s: %v", name, err)
-		}
 	}
 	return result, nil
 }
