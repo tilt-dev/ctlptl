@@ -102,7 +102,7 @@ func (o *GetOptions) ToPrinter() (printers.ResourcePrinter, error) {
 	if !o.OutputFlagSpecified() {
 		return printers.NewTablePrinter(printers.PrintOptions{}), nil
 	}
-	return o.PrintFlags.ToPrinter()
+	return toPrinter(o.PrintFlags)
 }
 
 func (o *GetOptions) Print(objs []runtime.Object) error {
