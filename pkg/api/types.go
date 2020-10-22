@@ -35,4 +35,7 @@ type ClusterStatus struct {
 
 	// Local registry status documented on the cluster itself.
 	LocalRegistryHosting *localregistry.LocalRegistryHostingV1 `json:"localRegistryHosting,omitempty" yaml:"localRegistryHosting,omitempty"`
+
+	// The number of CPU. Only applicable to local clusters.
+	CPUs int `json:"cpus,omitempty" yaml:"cpus,omitempty"`
 }
