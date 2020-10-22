@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/tilt-dev/ctlptl/pkg/api"
+	"github.com/tilt-dev/localregistry-go"
 	"gotest.tools/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -29,6 +30,9 @@ var clusters = []*api.Cluster{
 		Product:  "KIND",
 		Status: api.ClusterStatus{
 			CreationTimestamp: metav1.Time{Time: createTime},
+			LocalRegistryHosting: &localregistry.LocalRegistryHostingV1{
+				Host: "localhost:5000",
+			},
 		},
 	},
 }
@@ -41,9 +45,9 @@ func TestDefaultPrint(t *testing.T) {
 
 	err := o.Print(o.clustersAsResources(clusters))
 	require.NoError(t, err)
-	assert.Equal(t, out.String(), `NAME        PRODUCT    AGE
-microk8s    microk8s   3y
-kind-kind   KIND       3y
+	assert.Equal(t, out.String(), `NAME        PRODUCT    AGE   REGISTRY
+microk8s    microk8s   3y    none
+kind-kind   KIND       3y    localhost:5000
 `)
 }
 
@@ -70,5 +74,7 @@ name: kind-kind
 product: KIND
 status:
   creationTimestamp: "2017-07-14T02:40:00Z"
+  localRegistryHosting:
+    host: localhost:5000
 `)
 }
