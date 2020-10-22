@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/cluster"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/duration"
@@ -19,7 +20,9 @@ import (
 type GetOptions struct {
 	*genericclioptions.PrintFlags
 	genericclioptions.IOStreams
-	StartTime time.Time
+	StartTime      time.Time
+	IgnoreNotFound bool
+	FieldSelector  string
 }
 
 func NewGetOptions() *GetOptions {
@@ -31,21 +34,25 @@ func NewGetOptions() *GetOptions {
 }
 
 func (o *GetOptions) Command() *cobra.Command {
-	var getCmd = &cobra.Command{
-		Use:   "get [type]",
+	var cmd = &cobra.Command{
+		Use:   "get [type] [name]",
 		Short: "Read the currently running clusters",
 		Example: "  ctlptl get\n" +
-			"  ctlptl get -o yaml",
+			"  ctlptl get microk8s -o yaml",
 		Run:  o.Run,
-		Args: cobra.MaximumNArgs(1),
+		Args: cobra.MaximumNArgs(2),
 	}
 
-	o.PrintFlags.AddFlags(getCmd)
+	o.PrintFlags.AddFlags(cmd)
 
-	return getCmd
+	cmd.Flags().BoolVar(&o.IgnoreNotFound, "ignore-not-found", o.IgnoreNotFound, "If the requested object does not exist the command will return exit code 0.")
+	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
+
+	return cmd
 }
 
 func (o *GetOptions) Run(cmd *cobra.Command, args []string) {
+	ctx := context.TODO()
 	t := "cluster"
 	if len(args) >= 1 {
 		t = args[0]
@@ -53,11 +60,31 @@ func (o *GetOptions) Run(cmd *cobra.Command, args []string) {
 	var resources []runtime.Object
 	switch t {
 	case "cluster", "clusters":
-		clusters, err := o.clusters()
+		c, err := cluster.DefaultController()
 		if err != nil {
-			_, _ = fmt.Fprintf(o.ErrOut, "Loading clusters: %v\n", err)
+			_, _ = fmt.Fprintf(o.ErrOut, "Loading controller: %v\n", err)
 			os.Exit(1)
 		}
+
+		var clusters []*api.Cluster
+		if len(args) >= 2 {
+			cluster, err := c.Get(ctx, args[1])
+			if err != nil {
+				if errors.IsNotFound(err) && o.IgnoreNotFound {
+					os.Exit(0)
+				}
+				_, _ = fmt.Fprintf(o.ErrOut, "%v\n", err)
+				os.Exit(1)
+			}
+			clusters = []*api.Cluster{cluster}
+		} else {
+			clusters, err = c.List(ctx, cluster.ListOptions{FieldSelector: o.FieldSelector})
+			if err != nil {
+				_, _ = fmt.Fprintf(o.ErrOut, "List clusters: %v\n", err)
+				os.Exit(1)
+			}
+		}
+
 		resources = o.clustersAsResources(clusters)
 	default:
 		_, _ = fmt.Fprintf(o.ErrOut, "Unrecognized type: %s\n", t)
@@ -79,6 +106,11 @@ func (o *GetOptions) ToPrinter() (printers.ResourcePrinter, error) {
 }
 
 func (o *GetOptions) Print(objs []runtime.Object) error {
+	if len(objs) == 0 {
+		fmt.Println("No resources found")
+		return nil
+	}
+
 	printer, err := o.ToPrinter()
 	if err != nil {
 		return err
@@ -95,14 +127,6 @@ func (o *GetOptions) Print(objs []runtime.Object) error {
 
 func (o *GetOptions) OutputFlagSpecified() bool {
 	return o.PrintFlags.OutputFlagSpecified != nil && o.PrintFlags.OutputFlagSpecified()
-}
-
-func (o *GetOptions) clusters() ([]*api.Cluster, error) {
-	c, err := cluster.DefaultController()
-	if err != nil {
-		return nil, err
-	}
-	return c.List(context.TODO())
 }
 
 func (o *GetOptions) clustersAsResources(clusters []*api.Cluster) []runtime.Object {
