@@ -20,7 +20,7 @@ const (
 	ProductUnknown       Product = "unknown"
 	ProductGKE           Product = "gke"
 	ProductMinikube      Product = "minikube"
-	ProductDockerDesktop Product = "docker-for-desktop"
+	ProductDockerDesktop Product = "docker-desktop"
 	ProductMicroK8s      Product = "microk8s"
 	ProductCRC           Product = "crc"
 	ProductKrucible      Product = "krucible"

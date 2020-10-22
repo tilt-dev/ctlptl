@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/tilt-dev/ctlptl/pkg/api"
@@ -117,6 +118,11 @@ func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) 
 	})
 
 	return g.Wait()
+}
+
+func (c *Controller) Apply(ctx context.Context, cluster *api.Cluster) (*api.Cluster, error) {
+	fmt.Printf("Cluster Apply is currently a stub! You applied:\n%+v\n", cluster)
+	return cluster, nil
 }
 
 func (c *Controller) Get(ctx context.Context, name string) (*api.Cluster, error) {
