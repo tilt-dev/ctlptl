@@ -64,7 +64,7 @@ func (o *ApplyOptions) run() error {
 	ctx := context.TODO()
 	c, err := cluster.DefaultController()
 
-	printer, err := o.PrintFlags.ToPrinter()
+	printer, err := toPrinter(o.PrintFlags)
 	if err != nil {
 		return err
 	}
