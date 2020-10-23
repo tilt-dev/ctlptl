@@ -23,6 +23,12 @@ type Cluster struct {
 	// The name of the tool used to create this cluster.
 	Product string `json:"product,omitempty" yaml:"product,omitempty"`
 
+	// Make sure that the cluster has access to at least this many
+	// CPUs. This is mostly helpful for ensuring that your Docker Desktop
+	// VM has enough CPU. If ctlptl can't guarantee this many
+	// CPU, it will return an error.
+	MinCPUs int `json:"minCPUs,omitempty" yaml:"minCPUs,omitempty"`
+
 	// Most recently observed status of the cluster.
 	// Populated by the system.
 	// Read-only.
