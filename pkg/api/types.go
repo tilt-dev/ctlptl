@@ -39,3 +39,41 @@ type ClusterStatus struct {
 	// The number of CPU. Only applicable to local clusters.
 	CPUs int `json:"cpus,omitempty" yaml:"cpus,omitempty"`
 }
+
+// Cluster contains registry configuration.
+//
+// Currently designed for local registries on the host machine, but
+// may eventually expand to support remote registries.
+//
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type Registry struct {
+	TypeMeta `yaml:",inline"`
+
+	// The registry name. Get/set from the Docker container name.
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
+
+	// The desired host port. Set to 0 to choose a random port.
+	Port int `json:"port,omitempty" yaml:"port,omitempty"`
+
+	// Most recently observed status of the registry.
+	// Populated by the system.
+	// Read-only.
+	Status RegistryStatus `json:"status,omitempty" yaml:"status,omitempty"`
+}
+
+type RegistryStatus struct {
+	// When the registry was first created.
+	CreationTimestamp metav1.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
+
+	// The IPv4 address for the registry network.
+	IPAddress string `json:"ipAddress,omitempty" yaml:"ipAddress,omitempty"`
+
+	// The public port that the registry is listening on on the host machine.
+	HostPort int `json:"hostPort,omitempty" yaml:"hostPort,omitempty"`
+
+	// The private port that the registry is listening on inside the registry network.
+	//
+	// We try to make this not configurable, because there's no real reason not
+	// to use the default registry port 5000.
+	ContainerPort int `json:"containerPort,omitempty" yaml:containerPort,omitempty"`
+}
