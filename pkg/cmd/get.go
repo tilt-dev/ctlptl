@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/cluster"
+	"github.com/tilt-dev/ctlptl/pkg/registry"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -59,6 +60,34 @@ func (o *GetOptions) Run(cmd *cobra.Command, args []string) {
 	}
 	var resources []runtime.Object
 	switch t {
+	case "registry", "registries":
+		c, err := registry.DefaultController(ctx)
+		if err != nil {
+			_, _ = fmt.Fprintf(o.ErrOut, "Loading controller: %v\n", err)
+			os.Exit(1)
+		}
+
+		var registries []*api.Registry
+		if len(args) >= 2 {
+			registry, err := c.Get(ctx, args[1])
+			if err != nil {
+				if errors.IsNotFound(err) && o.IgnoreNotFound {
+					os.Exit(0)
+				}
+				_, _ = fmt.Fprintf(o.ErrOut, "%v\n", err)
+				os.Exit(1)
+			}
+			registries = []*api.Registry{registry}
+		} else {
+			registries, err = c.List(ctx, registry.ListOptions{FieldSelector: o.FieldSelector})
+			if err != nil {
+				_, _ = fmt.Fprintf(o.ErrOut, "List registries: %v\n", err)
+				os.Exit(1)
+			}
+		}
+
+		resources = o.registriesAsResources(registries)
+
 	case "cluster", "clusters":
 		c, err := cluster.DefaultController()
 		if err != nil {
@@ -181,6 +210,67 @@ func (o *GetOptions) clustersAsResources(clusters []*api.Cluster) []runtime.Obje
 				cluster.Product,
 				age,
 				rHost,
+			},
+		})
+	}
+
+	return []runtime.Object{&table}
+}
+
+func (o *GetOptions) registriesAsResources(registries []*api.Registry) []runtime.Object {
+	if o.OutputFlagSpecified() {
+		result := []runtime.Object{}
+		for _, registry := range registries {
+			result = append(result, registry)
+		}
+		return result
+	}
+
+	table := metav1.Table{
+		TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "metav1.k8s.io"},
+		ColumnDefinitions: []metav1.TableColumnDefinition{
+			metav1.TableColumnDefinition{
+				Name: "Name",
+				Type: "string",
+			},
+			metav1.TableColumnDefinition{
+				Name: "Host Address",
+				Type: "int",
+			},
+			metav1.TableColumnDefinition{
+				Name: "Container Address",
+				Type: "string",
+			},
+			metav1.TableColumnDefinition{
+				Name: "Age",
+				Type: "string",
+			},
+		},
+	}
+
+	for _, registry := range registries {
+		age := "unknown"
+		cTime := registry.Status.CreationTimestamp.Time
+		if !cTime.IsZero() {
+			age = duration.ShortHumanDuration(o.StartTime.Sub(cTime))
+		}
+
+		hostAddress := "none"
+		if registry.Status.HostPort != 0 {
+			hostAddress = fmt.Sprintf("localhost:%d", registry.Status.HostPort)
+		}
+
+		containerAddress := "none"
+		if registry.Status.ContainerPort != 0 && registry.Status.IPAddress != "" {
+			containerAddress = fmt.Sprintf("%s:%d", registry.Status.IPAddress, registry.Status.ContainerPort)
+		}
+
+		table.Rows = append(table.Rows, metav1.TableRow{
+			Cells: []interface{}{
+				registry.Name,
+				hostAddress,
+				containerAddress,
+				age,
 			},
 		})
 	}
