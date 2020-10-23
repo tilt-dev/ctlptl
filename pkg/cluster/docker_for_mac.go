@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -46,6 +48,23 @@ func NewDockerForMacClient() (DockerForMacClient, error) {
 		httpClient: httpClient,
 		socketPath: socketPath,
 	}, nil
+}
+
+func (c DockerForMacClient) start(ctx context.Context) error {
+	_, err := os.Stat("/Applications/Docker.app")
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("Please install Docker for Desktop: https://www.docker.com/products/docker-desktop")
+		}
+		return err
+	}
+
+	cmd := exec.Command("open", "/Applications/Docker.app")
+	err = cmd.Run()
+	if err != nil {
+		return errors.Wrap(err, "starting Docker")
+	}
+	return err
 }
 
 func (c DockerForMacClient) writeSettings(ctx context.Context, settings map[string]interface{}) error {
