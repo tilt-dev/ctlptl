@@ -14,3 +14,13 @@ func (obj *Cluster) GroupVersionKind() schema.GroupVersionKind {
 }
 
 var _ runtime.Object = &Cluster{}
+
+func (obj *Registry) GetObjectKind() schema.ObjectKind { return obj }
+func (obj *Registry) SetGroupVersionKind(gvk schema.GroupVersionKind) {
+	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
+}
+func (obj *Registry) GroupVersionKind() schema.GroupVersionKind {
+	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+}
+
+var _ runtime.Object = &Registry{}
