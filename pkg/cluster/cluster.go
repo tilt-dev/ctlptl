@@ -179,9 +179,53 @@ func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) 
 	wg.Wait()
 }
 
-func (c *Controller) Apply(ctx context.Context, cluster *api.Cluster) (*api.Cluster, error) {
-	fmt.Printf("Cluster Apply is currently a stub! You applied:\n%+v\n", cluster)
-	return cluster, nil
+// Compare the desired cluster against the existing cluster, and reconcile
+// the two to match.
+func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Cluster, error) {
+	if desired.Product == "" {
+		return nil, fmt.Errorf("product field must be non-empty")
+	}
+
+	// Create a default name if one isn't in the YAML.
+	// The default name is determiend by the underlying product.
+	if desired.Name == "" {
+		desired.Name = Product(desired.Product).DefaultClusterName()
+	}
+
+	// Fetch the machine driver for this product and cluster name,
+	// and use it to apply the constraints to the underlying VM.
+	machine, err := c.machine(ctx, desired.Name, Product(desired.Product))
+	if err != nil {
+		return nil, err
+	}
+
+	// First, we have to make sure the machine driver has started, so that we can
+	// query it at all for the existing configuration.
+	err = machine.EnsureExists(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	existingCluster, err := c.Get(ctx, desired.Name)
+	if err != nil && !errors.IsNotFound(err) {
+		return nil, err
+	}
+
+	if existingCluster == nil {
+		existingCluster = &api.Cluster{}
+	}
+
+	existingStatus := existingCluster.Status
+	needsRestart := existingStatus.CreationTimestamp.Time.IsZero() ||
+		existingStatus.CPUs < desired.MinCPUs
+	if needsRestart {
+		err := machine.Restart(ctx, desired, existingCluster)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return c.Get(ctx, desired.Name)
 }
 
 func (c *Controller) Get(ctx context.Context, name string) (*api.Cluster, error) {

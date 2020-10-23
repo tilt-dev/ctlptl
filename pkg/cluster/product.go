@@ -28,6 +28,13 @@ const (
 	ProductK3D           Product = "k3d"
 )
 
+func (e Product) DefaultClusterName() string {
+	if e == ProductKIND {
+		return "kind-kind"
+	}
+	return string(e)
+}
+
 func (e Product) UsesLocalDockerRegistry() bool {
 	return e == ProductMinikube ||
 		e == ProductDockerDesktop ||
