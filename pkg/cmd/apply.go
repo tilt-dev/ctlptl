@@ -58,7 +58,7 @@ func (o *ApplyOptions) Run(cmd *cobra.Command, args []string) {
 
 func (o *ApplyOptions) run() error {
 	ctx := context.TODO()
-	c, err := cluster.DefaultController()
+	c, err := cluster.DefaultController(o.IOStreams)
 	if err != nil {
 		return err
 	}
