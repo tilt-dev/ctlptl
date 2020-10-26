@@ -7,9 +7,9 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/network"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tilt-dev/ctlptl/pkg/api"
-	"gotest.tools/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -31,6 +31,9 @@ var kindRegistry = types.Container{
 		Networks: map[string]*network.EndpointSettings{
 			"bridge": &network.EndpointSettings{
 				IPAddress: "172.0.1.2",
+			},
+			"kind": &network.EndpointSettings{
+				IPAddress: "172.0.1.3",
 			},
 		},
 	},
@@ -54,6 +57,7 @@ func TestListRegistries(t *testing.T) {
 			HostPort:          5001,
 			ContainerPort:     5000,
 			IPAddress:         "172.0.1.2",
+			Networks:          []string{"bridge", "kind"},
 		},
 	})
 }
@@ -74,6 +78,7 @@ func TestGetRegistry(t *testing.T) {
 			HostPort:          5001,
 			ContainerPort:     5000,
 			IPAddress:         "172.0.1.2",
+			Networks:          []string{"bridge", "kind"},
 		},
 	})
 }
