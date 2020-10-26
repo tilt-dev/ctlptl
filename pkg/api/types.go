@@ -65,7 +65,7 @@ type RegistryStatus struct {
 	// When the registry was first created.
 	CreationTimestamp metav1.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
 
-	// The IPv4 address for the registry network.
+	// The IPv4 address for the bridge network.
 	IPAddress string `json:"ipAddress,omitempty" yaml:"ipAddress,omitempty"`
 
 	// The public port that the registry is listening on on the host machine.
@@ -76,4 +76,7 @@ type RegistryStatus struct {
 	// We try to make this not configurable, because there's no real reason not
 	// to use the default registry port 5000.
 	ContainerPort int `json:"containerPort,omitempty" yaml:containerPort,omitempty"`
+
+	// Networks that the registry container is connected to.
+	Networks []string `json:"networks,omitempty" yaml:"networks,omitempty"`
 }

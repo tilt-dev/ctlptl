@@ -103,6 +103,11 @@ func (in *Registry) DeepCopyObject() runtime.Object {
 func (in *RegistryStatus) DeepCopyInto(out *RegistryStatus) {
 	*out = *in
 	in.CreationTimestamp.DeepCopyInto(&out.CreationTimestamp)
+	if in.Networks != nil {
+		in, out := &in.Networks, &out.Networks
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -88,12 +89,17 @@ func (c *Controller) List(ctx context.Context, options ListOptions) ([]*api.Regi
 
 		netSummary := container.NetworkSettings
 		ipAddress := ""
+		networks := []string{}
 		if netSummary != nil {
+			for network := range netSummary.Networks {
+				networks = append(networks, network)
+			}
 			bridge, ok := netSummary.Networks["bridge"]
 			if ok && bridge != nil {
 				ipAddress = bridge.IPAddress
 			}
 		}
+		sort.Strings(networks)
 
 		hostPort, containerPort := c.portsFrom(container.Ports)
 
@@ -105,6 +111,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) ([]*api.Regi
 				IPAddress:         ipAddress,
 				HostPort:          hostPort,
 				ContainerPort:     containerPort,
+				Networks:          networks,
 			},
 		}
 
