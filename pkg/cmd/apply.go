@@ -3,12 +3,8 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"net/url"
 	"os"
-	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/cluster"
@@ -63,13 +59,16 @@ func (o *ApplyOptions) Run(cmd *cobra.Command, args []string) {
 func (o *ApplyOptions) run() error {
 	ctx := context.TODO()
 	c, err := cluster.DefaultController()
+	if err != nil {
+		return err
+	}
 
 	printer, err := toPrinter(o.PrintFlags)
 	if err != nil {
 		return err
 	}
 
-	visitors, err := o.visitors()
+	visitors, err := visitor.FromStrings(o.Filenames, o.In)
 	if err != nil {
 		return err
 	}
@@ -92,27 +91,4 @@ func (o *ApplyOptions) run() error {
 		}
 	}
 	return nil
-}
-
-func (o *ApplyOptions) visitors() ([]visitor.Interface, error) {
-	result := []visitor.Interface{}
-	for _, f := range o.Filenames {
-
-		switch {
-		case f == "-":
-			result = append(result, visitor.Stdin(o.In))
-
-		case strings.Index(f, "http://") == 0 || strings.Index(f, "https://") == 0:
-			url, err := url.Parse(f)
-			if err != nil {
-				return nil, errors.Wrapf(err, "invalid URL %s", url)
-			}
-			result = append(result, visitor.URL(http.DefaultClient, f))
-
-		default:
-			result = append(result, visitor.File(f))
-
-		}
-	}
-	return result, nil
 }

@@ -23,6 +23,10 @@ import (
 var typeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "Cluster"}
 var groupResource = schema.GroupResource{"ctlptl.dev", "clusters"}
 
+func TypeMeta() api.TypeMeta {
+	return typeMeta
+}
+
 type Controller struct {
 	config   clientcmdapi.Config
 	clients  map[string]kubernetes.Interface
@@ -182,6 +186,16 @@ func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) 
 func (c *Controller) Apply(ctx context.Context, cluster *api.Cluster) (*api.Cluster, error) {
 	fmt.Printf("Cluster Apply is currently a stub! You applied:\n%+v\n", cluster)
 	return cluster, nil
+}
+
+func (c *Controller) Delete(ctx context.Context, name string) error {
+	_, ok := c.config.Contexts[name]
+	if !ok {
+		return errors.NewNotFound(groupResource, name)
+	}
+
+	fmt.Printf("Cluster Delete is currently a stub! You deleted: %s\n", name)
+	return nil
 }
 
 func (c *Controller) Get(ctx context.Context, name string) (*api.Cluster, error) {
