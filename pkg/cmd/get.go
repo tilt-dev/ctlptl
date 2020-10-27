@@ -89,7 +89,7 @@ func (o *GetOptions) Run(cmd *cobra.Command, args []string) {
 		resources = o.registriesAsResources(registries)
 
 	case "cluster", "clusters":
-		c, err := cluster.DefaultController()
+		c, err := cluster.DefaultController(o.IOStreams)
 		if err != nil {
 			_, _ = fmt.Fprintf(o.ErrOut, "Loading controller: %v\n", err)
 			os.Exit(1)

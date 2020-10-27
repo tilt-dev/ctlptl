@@ -14,6 +14,13 @@ import (
 // which we hope isn't foreshadowing.
 type Product string
 
+func (p Product) DefaultClusterName() string {
+	if p == ProductKIND {
+		return "kind-kind"
+	}
+	return string(p)
+}
+
 func (p Product) String() string { return string(p) }
 
 const (

@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/mitchellh/go-homedir"
 	"github.com/tilt-dev/ctlptl/pkg/api"
@@ -29,8 +31,14 @@ func (m unknownMachine) Apply(ctx context.Context, c *api.Cluster) (*api.Cluster
 	return nil, fmt.Errorf("cluster type %s not configurable", c.Product)
 }
 
+type dockerClient interface {
+	ServerVersion(ctx context.Context) (types.Version, error)
+	Info(ctx context.Context) (types.Info, error)
+}
+
 type dockerMachine struct {
-	dockerClient *client.Client
+	dockerClient dockerClient
+	os           string
 }
 
 func NewDockerMachine(ctx context.Context) (*dockerMachine, error) {
@@ -43,6 +51,7 @@ func NewDockerMachine(ctx context.Context) (*dockerMachine, error) {
 
 	return &dockerMachine{
 		dockerClient: client,
+		os:           runtime.GOOS,
 	}, nil
 }
 
