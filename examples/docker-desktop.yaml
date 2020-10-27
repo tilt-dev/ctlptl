@@ -2,3 +2,4 @@ apiVersion: ctlptl.dev/v1alpha1
 kind: Cluster
 name: docker-desktop
 product: docker-desktop
+minCPUs: 4
