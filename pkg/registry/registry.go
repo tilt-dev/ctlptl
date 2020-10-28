@@ -18,7 +18,16 @@ import (
 )
 
 var typeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "Registry"}
+var listTypeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "RegistryList"}
 var groupResource = schema.GroupResource{"ctlptl.dev", "registries"}
+
+func TypeMeta() api.TypeMeta {
+	return typeMeta
+}
+
+func ListTypeMeta() api.TypeMeta {
+	return listTypeMeta
+}
 
 type ContainerClient interface {
 	ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error)
@@ -51,19 +60,20 @@ func (c *Controller) Apply(ctx context.Context, registry *api.Registry) (*api.Re
 }
 
 func (c *Controller) Get(ctx context.Context, name string) (*api.Registry, error) {
-	registries, err := c.List(ctx, ListOptions{FieldSelector: fmt.Sprintf("name=%s", name)})
+	list, err := c.List(ctx, ListOptions{FieldSelector: fmt.Sprintf("name=%s", name)})
 	if err != nil {
 		return nil, err
 	}
 
-	if len(registries) == 0 {
+	if len(list.Items) == 0 {
 		return nil, errors.NewNotFound(groupResource, name)
 	}
 
-	return registries[0], nil
+	item := list.Items[0]
+	return &item, nil
 }
 
-func (c *Controller) List(ctx context.Context, options ListOptions) ([]*api.Registry, error) {
+func (c *Controller) List(ctx context.Context, options ListOptions) (*api.RegistryList, error) {
 	selector, err := fields.ParseSelector(options.FieldSelector)
 	if err != nil {
 		return nil, err
@@ -79,7 +89,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) ([]*api.Regi
 		return nil, err
 	}
 
-	result := []*api.Registry{}
+	result := []api.Registry{}
 	for _, container := range containers {
 		if len(container.Names) == 0 {
 			continue
@@ -118,9 +128,12 @@ func (c *Controller) List(ctx context.Context, options ListOptions) ([]*api.Regi
 		if !selector.Matches((*registryFields)(registry)) {
 			continue
 		}
-		result = append(result, registry)
+		result = append(result, *registry)
 	}
-	return result, nil
+	return &api.RegistryList{
+		TypeMeta: listTypeMeta,
+		Items:    result,
+	}, nil
 }
 
 func (c *Controller) portsFrom(ports []types.Port) (hostPort int, containerPort int) {

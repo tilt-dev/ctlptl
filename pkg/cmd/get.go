@@ -58,7 +58,7 @@ func (o *GetOptions) Run(cmd *cobra.Command, args []string) {
 	if len(args) >= 1 {
 		t = args[0]
 	}
-	var resources []runtime.Object
+	var resource runtime.Object
 	switch t {
 	case "registry", "registries":
 		c, err := registry.DefaultController(ctx)
@@ -67,9 +67,8 @@ func (o *GetOptions) Run(cmd *cobra.Command, args []string) {
 			os.Exit(1)
 		}
 
-		var registries []*api.Registry
 		if len(args) >= 2 {
-			registry, err := c.Get(ctx, args[1])
+			resource, err = c.Get(ctx, args[1])
 			if err != nil {
 				if errors.IsNotFound(err) && o.IgnoreNotFound {
 					os.Exit(0)
@@ -77,16 +76,13 @@ func (o *GetOptions) Run(cmd *cobra.Command, args []string) {
 				_, _ = fmt.Fprintf(o.ErrOut, "%v\n", err)
 				os.Exit(1)
 			}
-			registries = []*api.Registry{registry}
 		} else {
-			registries, err = c.List(ctx, registry.ListOptions{FieldSelector: o.FieldSelector})
+			resource, err = c.List(ctx, registry.ListOptions{FieldSelector: o.FieldSelector})
 			if err != nil {
 				_, _ = fmt.Fprintf(o.ErrOut, "List registries: %v\n", err)
 				os.Exit(1)
 			}
 		}
-
-		resources = o.registriesAsResources(registries)
 
 	case "cluster", "clusters":
 		c, err := cluster.DefaultController(o.IOStreams)
@@ -95,9 +91,8 @@ func (o *GetOptions) Run(cmd *cobra.Command, args []string) {
 			os.Exit(1)
 		}
 
-		var clusters []*api.Cluster
 		if len(args) >= 2 {
-			cluster, err := c.Get(ctx, args[1])
+			resource, err = c.Get(ctx, args[1])
 			if err != nil {
 				if errors.IsNotFound(err) && o.IgnoreNotFound {
 					os.Exit(0)
@@ -105,22 +100,20 @@ func (o *GetOptions) Run(cmd *cobra.Command, args []string) {
 				_, _ = fmt.Fprintf(o.ErrOut, "%v\n", err)
 				os.Exit(1)
 			}
-			clusters = []*api.Cluster{cluster}
 		} else {
-			clusters, err = c.List(ctx, cluster.ListOptions{FieldSelector: o.FieldSelector})
+			resource, err = c.List(ctx, cluster.ListOptions{FieldSelector: o.FieldSelector})
 			if err != nil {
 				_, _ = fmt.Fprintf(o.ErrOut, "List clusters: %v\n", err)
 				os.Exit(1)
 			}
 		}
 
-		resources = o.clustersAsResources(clusters)
 	default:
 		_, _ = fmt.Fprintf(o.ErrOut, "Unrecognized type: %s\n", t)
 		os.Exit(1)
 	}
 
-	err := o.Print(resources)
+	err := o.Print(resource)
 	if err != nil {
 		_, _ = fmt.Fprintf(o.ErrOut, "Error: %s\n", err)
 		os.Exit(1)
@@ -134,8 +127,8 @@ func (o *GetOptions) ToPrinter() (printers.ResourcePrinter, error) {
 	return toPrinter(o.PrintFlags)
 }
 
-func (o *GetOptions) Print(objs []runtime.Object) error {
-	if len(objs) == 0 {
+func (o *GetOptions) Print(obj runtime.Object) error {
+	if obj == nil {
 		fmt.Println("No resources found")
 		return nil
 	}
@@ -145,11 +138,9 @@ func (o *GetOptions) Print(objs []runtime.Object) error {
 		return err
 	}
 
-	for _, obj := range objs {
-		err = printer.PrintObj(obj, o.Out)
-		if err != nil {
-			return err
-		}
+	err = printer.PrintObj(o.transformForOutput(obj), o.Out)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -158,15 +149,26 @@ func (o *GetOptions) OutputFlagSpecified() bool {
 	return o.PrintFlags.OutputFlagSpecified != nil && o.PrintFlags.OutputFlagSpecified()
 }
 
-func (o *GetOptions) clustersAsResources(clusters []*api.Cluster) []runtime.Object {
+func (o *GetOptions) transformForOutput(obj runtime.Object) runtime.Object {
 	if o.OutputFlagSpecified() {
-		result := []runtime.Object{}
-		for _, cluster := range clusters {
-			result = append(result, cluster)
-		}
-		return result
+		return obj
 	}
 
+	switch r := obj.(type) {
+	case *api.Registry:
+		return o.registriesAsTable([]api.Registry{*r})
+	case *api.RegistryList:
+		return o.registriesAsTable(r.Items)
+	case *api.Cluster:
+		return o.clustersAsTable([]api.Cluster{*r})
+	case *api.ClusterList:
+		return o.clustersAsTable(r.Items)
+	default:
+		return obj
+	}
+}
+
+func (o *GetOptions) clustersAsTable(clusters []api.Cluster) runtime.Object {
 	table := metav1.Table{
 		TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "metav1.k8s.io"},
 		ColumnDefinitions: []metav1.TableColumnDefinition{
@@ -214,18 +216,10 @@ func (o *GetOptions) clustersAsResources(clusters []*api.Cluster) []runtime.Obje
 		})
 	}
 
-	return []runtime.Object{&table}
+	return &table
 }
 
-func (o *GetOptions) registriesAsResources(registries []*api.Registry) []runtime.Object {
-	if o.OutputFlagSpecified() {
-		result := []runtime.Object{}
-		for _, registry := range registries {
-			result = append(result, registry)
-		}
-		return result
-	}
-
+func (o *GetOptions) registriesAsTable(registries []api.Registry) runtime.Object {
 	table := metav1.Table{
 		TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "metav1.k8s.io"},
 		ColumnDefinitions: []metav1.TableColumnDefinition{
@@ -275,5 +269,5 @@ func (o *GetOptions) registriesAsResources(registries []*api.Registry) []runtime
 		})
 	}
 
-	return []runtime.Object{&table}
+	return &table
 }

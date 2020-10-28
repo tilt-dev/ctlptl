@@ -23,10 +23,14 @@ import (
 )
 
 var typeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "Cluster"}
+var listTypeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "ClusterList"}
 var groupResource = schema.GroupResource{"ctlptl.dev", "clusters"}
 
 func TypeMeta() api.TypeMeta {
 	return typeMeta
+}
+func ListTypeMeta() api.TypeMeta {
+	return listTypeMeta
 }
 
 type configLoader func() (clientcmdapi.Config, error)
@@ -309,13 +313,13 @@ func (c *Controller) Get(ctx context.Context, name string) (*api.Cluster, error)
 	return cluster, nil
 }
 
-func (c *Controller) List(ctx context.Context, options ListOptions) ([]*api.Cluster, error) {
+func (c *Controller) List(ctx context.Context, options ListOptions) (*api.ClusterList, error) {
 	selector, err := fields.ParseSelector(options.FieldSelector)
 	if err != nil {
 		return nil, err
 	}
 
-	result := []*api.Cluster{}
+	result := []api.Cluster{}
 	names := make([]string, 0, len(c.config.Contexts))
 	for name := range c.config.Contexts {
 		names = append(names, name)
@@ -333,7 +337,11 @@ func (c *Controller) List(ctx context.Context, options ListOptions) ([]*api.Clus
 			continue
 		}
 		c.populateCluster(ctx, cluster)
-		result = append(result, cluster)
+		result = append(result, *cluster)
 	}
-	return result, nil
+
+	return &api.ClusterList{
+		TypeMeta: listTypeMeta,
+		Items:    result,
+	}, nil
 }

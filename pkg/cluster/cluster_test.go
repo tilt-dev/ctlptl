@@ -29,24 +29,24 @@ func TestClusterList(t *testing.T) {
 	c := newFakeController(t)
 	clusters, err := c.List(context.Background(), ListOptions{})
 	assert.NoError(t, err)
-	require.Equal(t, 2, len(clusters))
-	assert.Equal(t, "docker-desktop", clusters[0].Name)
-	assert.Equal(t, "microk8s", clusters[1].Name)
+	require.Equal(t, 2, len(clusters.Items))
+	assert.Equal(t, "docker-desktop", clusters.Items[0].Name)
+	assert.Equal(t, "microk8s", clusters.Items[1].Name)
 }
 
 func TestClusterListSelectorMatch(t *testing.T) {
 	c := newFakeController(t)
 	clusters, err := c.List(context.Background(), ListOptions{FieldSelector: "product=microk8s"})
 	assert.NoError(t, err)
-	require.Equal(t, 1, len(clusters))
-	assert.Equal(t, "microk8s", clusters[0].Name)
+	require.Equal(t, 1, len(clusters.Items))
+	assert.Equal(t, "microk8s", clusters.Items[0].Name)
 }
 
 func TestClusterListSelectorNoMatch(t *testing.T) {
 	c := newFakeController(t)
 	clusters, err := c.List(context.Background(), ListOptions{FieldSelector: "product=kind"})
 	assert.NoError(t, err)
-	assert.Equal(t, 0, len(clusters))
+	assert.Equal(t, 0, len(clusters.Items))
 }
 
 func TestClusterGetMissing(t *testing.T) {

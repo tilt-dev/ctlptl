@@ -45,11 +45,11 @@ func TestListRegistries(t *testing.T) {
 
 	f.docker.containers = []types.Container{kindRegistry}
 
-	registries, err := f.c.List(context.Background(), ListOptions{})
+	list, err := f.c.List(context.Background(), ListOptions{})
 	require.NoError(t, err)
 
-	require.Equal(t, 1, len(registries))
-	assert.Equal(t, *registries[0], api.Registry{
+	require.Equal(t, 1, len(list.Items))
+	assert.Equal(t, list.Items[0], api.Registry{
 		TypeMeta: typeMeta,
 		Name:     "kind-registry",
 		Status: api.RegistryStatus{
