@@ -113,6 +113,7 @@ func (o *DeleteOptions) run(cd clusterDeleter, args []string) error {
 	for _, resource := range resources {
 		switch resource := resource.(type) {
 		case *api.Cluster:
+			cluster.FillDefaults(resource)
 			err := cd.Delete(ctx, resource.Name)
 			if err != nil {
 				if o.IgnoreNotFound && errors.IsNotFound(err) {
