@@ -57,8 +57,10 @@ func determineObj(tm api.TypeMeta) (runtime.Object, error) {
 		switch tm.Kind {
 		case "Cluster":
 			return &api.Cluster{}, nil
+		case "Registry":
+			return &api.Registry{}, nil
 		default:
-			return nil, fmt.Errorf("ctlptl config must contain: `kind: Cluster`")
+			return nil, fmt.Errorf("ctlptl config must contain: `kind: Cluster` or `kind: Registry`")
 		}
 	default:
 		return nil, fmt.Errorf("ctlptl config must contain: `apiVersion: ctlptl.dev/v1alpha1`")

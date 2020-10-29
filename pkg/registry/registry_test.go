@@ -2,6 +2,7 @@ package registry
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 var kindRegistry = types.Container{
@@ -58,6 +60,7 @@ func TestListRegistries(t *testing.T) {
 			ContainerPort:     5000,
 			IPAddress:         "172.0.1.2",
 			Networks:          []string{"bridge", "kind"},
+			ContainerID:       "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
 		},
 	})
 }
@@ -79,16 +82,23 @@ func TestGetRegistry(t *testing.T) {
 			ContainerPort:     5000,
 			IPAddress:         "172.0.1.2",
 			Networks:          []string{"bridge", "kind"},
+			ContainerID:       "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
 		},
 	})
 }
 
 type fakeDocker struct {
-	containers []types.Container
+	containers           []types.Container
+	lastRemovedContainer string
 }
 
 func (d *fakeDocker) ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error) {
 	return d.containers, nil
+}
+
+func (d *fakeDocker) ContainerRemove(ctx context.Context, id string, options types.ContainerRemoveOptions) error {
+	d.lastRemovedContainer = id
+	return nil
 }
 
 type fixture struct {
@@ -99,7 +109,8 @@ type fixture struct {
 
 func newFixture(t *testing.T) *fixture {
 	d := &fakeDocker{}
-	controller, err := NewController(d)
+	controller, err := NewController(
+		genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}, d)
 	require.NoError(t, err)
 	return &fixture{
 		t:      t,

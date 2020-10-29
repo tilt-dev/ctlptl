@@ -16,8 +16,9 @@ func TestDeleteByName(t *testing.T) {
 	o := NewDeleteOptions()
 	o.IOStreams = streams
 
-	cd := &fakeClusterDeleter{}
-	err := o.run(cd, []string{"cluster", "kind-kind"})
+	cd := &fakeDeleter{}
+	o.clusterDeleter = cd
+	err := o.run([]string{"cluster", "kind-kind"})
 	require.NoError(t, err)
 	assert.Equal(t, "cluster.ctlptl.dev/kind-kind deleted\n", out.String())
 	assert.Equal(t, "kind-kind", cd.lastName)
@@ -33,9 +34,10 @@ kind: Cluster
 name: kind-kind
 `))
 
-	cd := &fakeClusterDeleter{}
+	cd := &fakeDeleter{}
+	o.clusterDeleter = cd
 	o.Filenames = []string{"-"}
-	err := o.run(cd, []string{})
+	err := o.run([]string{})
 	require.NoError(t, err)
 	assert.Equal(t, "cluster.ctlptl.dev/kind-kind deleted\n", out.String())
 	assert.Equal(t, "kind-kind", cd.lastName)
@@ -51,9 +53,10 @@ kind: Cluster
 product: kind
 `))
 
-	cd := &fakeClusterDeleter{}
+	cd := &fakeDeleter{}
+	o.clusterDeleter = cd
 	o.Filenames = []string{"-"}
-	err := o.run(cd, []string{})
+	err := o.run([]string{})
 	require.NoError(t, err)
 	assert.Equal(t, "cluster.ctlptl.dev/kind-kind deleted\n", out.String())
 	assert.Equal(t, "kind-kind", cd.lastName)
@@ -64,9 +67,10 @@ func TestDeleteNotFound(t *testing.T) {
 	o := NewDeleteOptions()
 	o.IOStreams = streams
 
-	cd := &fakeClusterDeleter{nextError: errors.NewNotFound(
+	cd := &fakeDeleter{nextError: errors.NewNotFound(
 		schema.GroupResource{"ctlptl.dev", "clusters"}, "garbage")}
-	err := o.run(cd, []string{"cluster", "garbage"})
+	o.clusterDeleter = cd
+	err := o.run([]string{"cluster", "garbage"})
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), `clusters.ctlptl.dev "garbage" not found`)
 	}
@@ -77,20 +81,40 @@ func TestDeleteIgnoreNotFound(t *testing.T) {
 	o := NewDeleteOptions()
 	o.IOStreams = streams
 
-	cd := &fakeClusterDeleter{nextError: errors.NewNotFound(
+	cd := &fakeDeleter{nextError: errors.NewNotFound(
 		schema.GroupResource{"ctlptl.dev", "clusters"}, "garbage")}
+	o.clusterDeleter = cd
 	o.IgnoreNotFound = true
-	err := o.run(cd, []string{"cluster", "garbage"})
+	err := o.run([]string{"cluster", "garbage"})
 	require.NoError(t, err)
 	assert.Equal(t, "", out.String())
 }
 
-type fakeClusterDeleter struct {
+func TestDeleteRegistryByFile(t *testing.T) {
+	streams, in, out, _ := genericclioptions.NewTestIOStreams()
+	o := NewDeleteOptions()
+	o.IOStreams = streams
+
+	_, _ = in.Write([]byte(`apiVersion: ctlptl.dev/v1alpha1
+kind: Registry
+port: 5002
+`))
+
+	rd := &fakeDeleter{}
+	o.registryDeleter = rd
+	o.Filenames = []string{"-"}
+	err := o.run([]string{})
+	require.NoError(t, err)
+	assert.Equal(t, "registry.ctlptl.dev/ctlptl-registry deleted\n", out.String())
+	assert.Equal(t, "ctlptl-registry", rd.lastName)
+}
+
+type fakeDeleter struct {
 	lastName  string
 	nextError error
 }
 
-func (cd *fakeClusterDeleter) Delete(ctx context.Context, name string) error {
+func (cd *fakeDeleter) Delete(ctx context.Context, name string) error {
 	if cd.nextError != nil {
 		return cd.nextError
 	}

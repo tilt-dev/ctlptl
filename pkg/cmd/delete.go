@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/cluster"
+	"github.com/tilt-dev/ctlptl/pkg/registry"
 	"github.com/tilt-dev/ctlptl/pkg/visitor"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -21,6 +22,9 @@ type DeleteOptions struct {
 
 	IgnoreNotFound bool
 	Filenames      []string
+
+	clusterDeleter  deleter
+	registryDeleter deleter
 }
 
 func NewDeleteOptions() *DeleteOptions {
@@ -49,24 +53,18 @@ func (o *DeleteOptions) Command() *cobra.Command {
 }
 
 func (o *DeleteOptions) Run(cmd *cobra.Command, args []string) {
-	cluster, err := cluster.DefaultController(o.IOStreams)
-	if err != nil {
-		_, _ = fmt.Fprintf(o.ErrOut, "%v\n", err)
-		os.Exit(1)
-	}
-
-	err = o.run(cluster, args)
+	err := o.run(args)
 	if err != nil {
 		_, _ = fmt.Fprintf(o.ErrOut, "%v\n", err)
 		os.Exit(1)
 	}
 }
 
-type clusterDeleter interface {
+type deleter interface {
 	Delete(ctx context.Context, name string) error
 }
 
-func (o *DeleteOptions) run(cd clusterDeleter, args []string) error {
+func (o *DeleteOptions) run(args []string) error {
 	hasFiles := len(o.Filenames) > 0
 	hasNames := len(args) >= 2
 	if !(hasFiles || hasNames) {
@@ -98,6 +96,13 @@ func (o *DeleteOptions) run(cd clusterDeleter, args []string) error {
 					Name:     name,
 				})
 			}
+		case "registry", "registries":
+			for _, name := range names {
+				resources = append(resources, &api.Registry{
+					TypeMeta: registry.TypeMeta(),
+					Name:     name,
+				})
+			}
 		default:
 			return fmt.Errorf("Unrecognized type: %s", t)
 		}
@@ -113,8 +118,35 @@ func (o *DeleteOptions) run(cd clusterDeleter, args []string) error {
 	for _, resource := range resources {
 		switch resource := resource.(type) {
 		case *api.Cluster:
+			if o.clusterDeleter == nil {
+				o.clusterDeleter, err = cluster.DefaultController(o.IOStreams)
+				if err != nil {
+					return err
+				}
+			}
+
 			cluster.FillDefaults(resource)
-			err := cd.Delete(ctx, resource.Name)
+			err := o.clusterDeleter.Delete(ctx, resource.Name)
+			if err != nil {
+				if o.IgnoreNotFound && errors.IsNotFound(err) {
+					continue
+				}
+				return err
+			}
+			err = printer.PrintObj(resource, o.Out)
+			if err != nil {
+				return err
+			}
+		case *api.Registry:
+			if o.registryDeleter == nil {
+				o.registryDeleter, err = registry.DefaultController(ctx, o.IOStreams)
+				if err != nil {
+					return err
+				}
+			}
+
+			registry.FillDefaults(resource)
+			err := o.registryDeleter.Delete(ctx, resource.Name)
 			if err != nil {
 				if o.IgnoreNotFound && errors.IsNotFound(err) {
 					continue
