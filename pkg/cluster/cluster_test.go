@@ -3,8 +3,10 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/stretchr/testify/assert"
@@ -59,7 +61,9 @@ func TestClusterGetMissing(t *testing.T) {
 
 func TestClusterApplyKIND(t *testing.T) {
 	f := newFixture(t)
+	f.dmachine.os = "darwin"
 
+	assert.Equal(t, false, f.d4m.started)
 	kindAdmin := newFakeAdmin(f.config)
 	f.controller.admins[ProductKIND] = kindAdmin
 
@@ -67,8 +71,70 @@ func TestClusterApplyKIND(t *testing.T) {
 		Product: string(ProductKIND),
 	})
 	assert.NoError(t, err)
+	assert.Equal(t, true, f.d4m.started)
 	assert.Equal(t, "kind-kind", kindAdmin.created.Name)
 	assert.Equal(t, "kind-kind", result.Name)
+}
+
+func TestClusterApplyDockerForMac(t *testing.T) {
+	f := newFixture(t)
+	f.dmachine.os = "darwin"
+
+	assert.Equal(t, false, f.d4m.started)
+	assert.Equal(t, 1, f.dockerClient.ncpu)
+	f.controller.Apply(context.Background(), &ctlptlapi.Cluster{
+		Product: string(ProductDockerDesktop),
+		MinCPUs: 3,
+	})
+	assert.Equal(t, true, f.d4m.started)
+	assert.Equal(t, 3, f.dockerClient.ncpu)
+}
+
+func TestClusterApplyDockerForMacCPUOnly(t *testing.T) {
+	f := newFixture(t)
+	f.dmachine.os = "darwin"
+
+	err := f.d4m.start(context.Background())
+	require.NoError(t, err)
+
+	assert.Equal(t, true, f.d4m.started)
+	assert.Equal(t, 1, f.dockerClient.ncpu)
+	f.controller.Apply(context.Background(), &ctlptlapi.Cluster{
+		Product: string(ProductDockerDesktop),
+		MinCPUs: 3,
+	})
+	assert.Equal(t, true, f.d4m.started)
+	assert.Equal(t, 3, f.dockerClient.ncpu)
+}
+
+func TestClusterApplyDockerForMacStartClusterOnly(t *testing.T) {
+	f := newFixture(t)
+	f.dmachine.os = "darwin"
+
+	assert.Equal(t, false, f.d4m.started)
+	assert.Equal(t, 1, f.dockerClient.ncpu)
+	f.controller.Apply(context.Background(), &ctlptlapi.Cluster{
+		Product: string(ProductDockerDesktop),
+		MinCPUs: 0,
+	})
+	assert.Equal(t, true, f.d4m.started)
+	assert.Equal(t, 1, f.dockerClient.ncpu)
+}
+
+func TestClusterApplyDockerForMacNoRestart(t *testing.T) {
+	f := newFixture(t)
+	f.dmachine.os = "darwin"
+
+	assert.Equal(t, 0, f.d4m.settingsWriteCount)
+	f.controller.Apply(context.Background(), &ctlptlapi.Cluster{
+		Product: string(ProductDockerDesktop),
+	})
+	assert.Equal(t, 1, f.d4m.settingsWriteCount)
+
+	f.controller.Apply(context.Background(), &ctlptlapi.Cluster{
+		Product: string(ProductDockerDesktop),
+	})
+	assert.Equal(t, 1, f.d4m.settingsWriteCount)
 }
 
 type fixture struct {
@@ -85,6 +151,9 @@ func newFixture(t *testing.T) *fixture {
 	d4m := &fakeD4MClient{docker: dockerClient}
 	dmachine := &dockerMachine{
 		dockerClient: dockerClient,
+		errOut:       os.Stderr,
+		sleep:        func(d time.Duration) {},
+		d4m:          d4m,
 		os:           runtime.GOOS,
 	}
 	config := &clientcmdapi.Config{
@@ -146,14 +215,16 @@ func (c *fakeDockerClient) Info(ctx context.Context) (types.Info, error) {
 }
 
 type fakeD4MClient struct {
-	lastSettings map[string]interface{}
-	docker       *fakeDockerClient
-	started      bool
+	lastSettings       map[string]interface{}
+	docker             *fakeDockerClient
+	started            bool
+	settingsWriteCount int
 }
 
 func (c *fakeD4MClient) writeSettings(ctx context.Context, settings map[string]interface{}) error {
 	c.lastSettings = settings
 	c.docker.ncpu = settings["cpu"].(int)
+	c.settingsWriteCount++
 	return nil
 }
 
@@ -184,6 +255,8 @@ func (c *fakeD4MClient) start(ctx context.Context) error {
 	c.lastSettings = map[string]interface{}{
 		"cpu": c.docker.ncpu,
 	}
+	c.started = true
+	c.docker.started = true
 	return nil
 }
 

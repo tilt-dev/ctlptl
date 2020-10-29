@@ -72,7 +72,7 @@ func (c *Controller) machine(ctx context.Context, name string, product Product) 
 	switch product {
 	case ProductDockerDesktop, ProductKIND, ProductK3D:
 		if c.dmachine == nil {
-			machine, err := NewDockerMachine(ctx)
+			machine, err := NewDockerMachine(ctx, c.iostreams.ErrOut)
 			if err != nil {
 				return nil, err
 			}
@@ -235,6 +235,20 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 		desired.Name = Product(desired.Product).DefaultClusterName()
 	}
 
+	// Fetch the machine driver for this product and cluster name,
+	// and use it to apply the constraints to the underlying VM.
+	machine, err := c.machine(ctx, desired.Name, Product(desired.Product))
+	if err != nil {
+		return nil, err
+	}
+
+	// First, we have to make sure the machine driver has started, so that we can
+	// query it at all for the existing configuration.
+	err = machine.EnsureExists(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// Fetch the admin driver for this product, for setting up the cluster on top of
 	// the machine.
 	admin, err := c.admin(ctx, Product(desired.Product))
@@ -252,6 +266,14 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 	}
 
 	existingStatus := existingCluster.Status
+	needsRestart := existingStatus.CreationTimestamp.Time.IsZero() ||
+		existingStatus.CPUs < desired.MinCPUs
+	if needsRestart {
+		err := machine.Restart(ctx, desired, existingCluster)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// Configure the cluster to match what we want.
 	needsCreate := existingStatus.CreationTimestamp.Time.IsZero() ||
