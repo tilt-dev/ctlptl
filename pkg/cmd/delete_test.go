@@ -41,6 +41,24 @@ name: kind-kind
 	assert.Equal(t, "kind-kind", cd.lastName)
 }
 
+func TestDeleteDefault(t *testing.T) {
+	streams, in, out, _ := genericclioptions.NewTestIOStreams()
+	o := NewDeleteOptions()
+	o.IOStreams = streams
+
+	_, _ = in.Write([]byte(`apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+product: kind
+`))
+
+	cd := &fakeClusterDeleter{}
+	o.Filenames = []string{"-"}
+	err := o.run(cd, []string{})
+	require.NoError(t, err)
+	assert.Equal(t, "cluster.ctlptl.dev/kind-kind deleted\n", out.String())
+	assert.Equal(t, "kind-kind", cd.lastName)
+}
+
 func TestDeleteNotFound(t *testing.T) {
 	streams, _, _, _ := genericclioptions.NewTestIOStreams()
 	o := NewDeleteOptions()

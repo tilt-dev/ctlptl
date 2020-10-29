@@ -226,6 +226,14 @@ func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) 
 	wg.Wait()
 }
 
+func FillDefaults(cluster *api.Cluster) {
+	// Create a default name if one isn't in the YAML.
+	// The default name is determined by the underlying product.
+	if cluster.Name == "" {
+		cluster.Name = Product(cluster.Product).DefaultClusterName()
+	}
+}
+
 // Compare the desired cluster against the existing cluster, and reconcile
 // the two to match.
 func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Cluster, error) {
@@ -233,11 +241,7 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 		return nil, fmt.Errorf("product field must be non-empty")
 	}
 
-	// Create a default name if one isn't in the YAML.
-	// The default name is determiend by the underlying product.
-	if desired.Name == "" {
-		desired.Name = Product(desired.Product).DefaultClusterName()
-	}
+	FillDefaults(desired)
 
 	// Fetch the machine driver for this product and cluster name,
 	// and use it to apply the constraints to the underlying VM.
@@ -299,13 +303,17 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 }
 
 func (c *Controller) Delete(ctx context.Context, name string) error {
-	_, ok := c.config.Contexts[name]
-	if !ok {
-		return errors.NewNotFound(groupResource, name)
+	existing, err := c.Get(ctx, name)
+	if err != nil {
+		return err
 	}
 
-	fmt.Printf("Cluster Delete is currently a stub! You deleted: %s\n", name)
-	return nil
+	admin, err := c.admin(ctx, Product(existing.Product))
+	if err != nil {
+		return err
+	}
+
+	return admin.Delete(ctx, existing)
 }
 
 func (c *Controller) reloadConfigs() error {
