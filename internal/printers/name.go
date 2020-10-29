@@ -35,6 +35,7 @@ type Named interface {
 }
 
 var _ Named = &api.Cluster{}
+var _ Named = &api.Registry{}
 
 // NamePrinter is an implementation of ResourcePrinter which outputs "resource/name" pair of an object.
 type NamePrinter struct {

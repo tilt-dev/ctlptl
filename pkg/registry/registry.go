@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"sort"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 var typeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "Registry"}
@@ -29,21 +31,32 @@ func ListTypeMeta() api.TypeMeta {
 	return listTypeMeta
 }
 
+func FillDefaults(registry *api.Registry) {
+	// Create a default name if one isn't in the YAML.
+	// The default name is determined by the underlying product.
+	if registry.Name == "" {
+		registry.Name = "ctlptl-registry"
+	}
+}
+
 type ContainerClient interface {
 	ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error)
+	ContainerRemove(ctx context.Context, id string, options types.ContainerRemoveOptions) error
 }
 
 type Controller struct {
+	iostreams    genericclioptions.IOStreams
 	dockerClient ContainerClient
 }
 
-func NewController(dockerClient ContainerClient) (*Controller, error) {
+func NewController(iostreams genericclioptions.IOStreams, dockerClient ContainerClient) (*Controller, error) {
 	return &Controller{
+		iostreams:    iostreams,
 		dockerClient: dockerClient,
 	}, nil
 }
 
-func DefaultController(ctx context.Context) (*Controller, error) {
+func DefaultController(ctx context.Context, iostreams genericclioptions.IOStreams) (*Controller, error) {
 	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return nil, err
@@ -51,12 +64,7 @@ func DefaultController(ctx context.Context) (*Controller, error) {
 
 	dockerClient.NegotiateAPIVersion(ctx)
 
-	return NewController(dockerClient)
-}
-
-func (c *Controller) Apply(ctx context.Context, registry *api.Registry) (*api.Registry, error) {
-	fmt.Printf("Registry Apply is currently a stub! You applied:\n%+v\n", registry)
-	return registry, nil
+	return NewController(iostreams, dockerClient)
 }
 
 func (c *Controller) Get(ctx context.Context, name string) (*api.Registry, error) {
@@ -118,6 +126,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 			Name:     name,
 			Status: api.RegistryStatus{
 				CreationTimestamp: metav1.Time{Time: created},
+				ContainerID:       container.ID,
 				IPAddress:         ipAddress,
 				HostPort:          hostPort,
 				ContainerPort:     containerPort,
@@ -148,4 +157,60 @@ func (c *Controller) portsFrom(ports []types.Port) (hostPort int, containerPort 
 		return int(port.PublicPort), int(port.PrivatePort)
 	}
 	return 0, 0
+}
+
+// Compare the desired registry against the existing registry, and reconcile
+// the two to match.
+func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Registry, error) {
+	FillDefaults(desired)
+	existing, err := c.Get(ctx, desired.Name)
+	if err != nil && !errors.IsNotFound(err) {
+		return nil, err
+	}
+
+	if existing == nil {
+		existing = &api.Registry{}
+	}
+
+	hostPort := existing.Status.HostPort
+	if hostPort != 0 && desired.Port != 0 && hostPort != desired.Port {
+		// If the port has changed, let's delete the registry and recreate it.
+		err = c.Delete(ctx, desired.Name)
+		if err != nil {
+			return nil, err
+		}
+		existing = &api.Registry{}
+	}
+
+	if existing.Status.ContainerID != "" {
+		// If we got to this point, and the container id exists, then the registry is up to date!
+		return existing, nil
+	}
+
+	portSpec := fmt.Sprintf("%d:5000", desired.Port)
+
+	cmd := exec.CommandContext(ctx, "docker", "run", "-d", "--restart=always", "-p", portSpec, "--name", desired.Name, "registry:2")
+	err = cmd.Run()
+	if err != nil {
+		return nil, err
+	}
+
+	return c.Get(ctx, desired.Name)
+}
+
+// Delete the given registry.
+func (c *Controller) Delete(ctx context.Context, name string) error {
+	registry, err := c.Get(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	cID := registry.Status.ContainerID
+	if cID == "" {
+		return fmt.Errorf("container not running registry: %s", name)
+	}
+
+	return c.dockerClient.ContainerRemove(ctx, registry.Status.ContainerID, types.ContainerRemoveOptions{
+		Force: true,
+	})
 }

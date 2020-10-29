@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/cluster"
+	"github.com/tilt-dev/ctlptl/pkg/registry"
 	"github.com/tilt-dev/ctlptl/pkg/visitor"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
@@ -58,10 +59,6 @@ func (o *ApplyOptions) Run(cmd *cobra.Command, args []string) {
 
 func (o *ApplyOptions) run() error {
 	ctx := context.TODO()
-	c, err := cluster.DefaultController(o.IOStreams)
-	if err != nil {
-		return err
-	}
 
 	printer, err := toPrinter(o.PrintFlags)
 	if err != nil {
@@ -78,16 +75,48 @@ func (o *ApplyOptions) run() error {
 		return err
 	}
 
+	var cc *cluster.Controller
+	var rc *registry.Controller
 	for _, obj := range objects {
-		cluster := obj.(*api.Cluster)
-		newObj, err := c.Apply(ctx, cluster)
-		if err != nil {
-			return err
-		}
+		switch obj := obj.(type) {
+		case *api.Cluster:
+			if cc == nil {
+				cc, err = cluster.DefaultController(o.IOStreams)
+				if err != nil {
+					return err
+				}
+			}
 
-		err = printer.PrintObj(newObj, o.Out)
-		if err != nil {
-			return err
+			newObj, err := cc.Apply(ctx, obj)
+			if err != nil {
+				return err
+			}
+
+			err = printer.PrintObj(newObj, o.Out)
+			if err != nil {
+				return err
+			}
+
+		case *api.Registry:
+			if rc == nil {
+				rc, err = registry.DefaultController(ctx, o.IOStreams)
+				if err != nil {
+					return err
+				}
+			}
+
+			newObj, err := rc.Apply(ctx, obj)
+			if err != nil {
+				return err
+			}
+
+			err = printer.PrintObj(newObj, o.Out)
+			if err != nil {
+				return err
+			}
+
+		default:
+			return fmt.Errorf("Unrecognized type: %T", obj)
 		}
 	}
 	return nil

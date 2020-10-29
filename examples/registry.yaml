@@ -1,0 +1,4 @@
+# Creates a registry called ctlptl-registry on port 5002
+apiVersion: ctlptl.dev/v1alpha1
+kind: Registry
+port: 5002

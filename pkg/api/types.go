@@ -95,6 +95,9 @@ type RegistryStatus struct {
 
 	// Networks that the registry container is connected to.
 	Networks []string `json:"networks,omitempty" yaml:"networks,omitempty"`
+
+	// The ID of the container in Docker.
+	ContainerID string `json:"containerId,omitempty" yaml:"containerId,omitempty"`
 }
 
 // RegistryList is a list of Registrys.
