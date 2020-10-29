@@ -46,6 +46,16 @@ type ClusterStatus struct {
 	CPUs int `json:"cpus,omitempty" yaml:"cpus,omitempty"`
 }
 
+// ClusterList is a list of Clusters.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type ClusterList struct {
+	TypeMeta `json:",inline"`
+
+	// List of clusters.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md
+	Items []Cluster `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
 // Cluster contains registry configuration.
 //
 // Currently designed for local registries on the host machine, but
@@ -85,4 +95,14 @@ type RegistryStatus struct {
 
 	// Networks that the registry container is connected to.
 	Networks []string `json:"networks,omitempty" yaml:"networks,omitempty"`
+}
+
+// RegistryList is a list of Registrys.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type RegistryList struct {
+	TypeMeta `json:",inline"`
+
+	// List of registrys.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md
+	Items []Registry `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
