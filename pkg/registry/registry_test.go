@@ -54,6 +54,7 @@ func TestListRegistries(t *testing.T) {
 	assert.Equal(t, list.Items[0], api.Registry{
 		TypeMeta: typeMeta,
 		Name:     "kind-registry",
+		Port:     5001,
 		Status: api.RegistryStatus{
 			CreationTimestamp: metav1.Time{Time: time.Unix(1603483645, 0)},
 			HostPort:          5001,
@@ -76,6 +77,7 @@ func TestGetRegistry(t *testing.T) {
 	assert.Equal(t, *registry, api.Registry{
 		TypeMeta: typeMeta,
 		Name:     "kind-registry",
+		Port:     5001,
 		Status: api.RegistryStatus{
 			CreationTimestamp: metav1.Time{Time: time.Unix(1603483645, 0)},
 			HostPort:          5001,

@@ -12,10 +12,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tilt-dev/ctlptl/pkg/api"
+	"github.com/tilt-dev/ctlptl/pkg/registry"
+	"github.com/tilt-dev/localregistry-go"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
@@ -64,8 +67,7 @@ func TestClusterApplyKIND(t *testing.T) {
 	f.dmachine.os = "darwin"
 
 	assert.Equal(t, false, f.d4m.started)
-	kindAdmin := newFakeAdmin(f.config)
-	f.controller.admins[ProductKIND] = kindAdmin
+	kindAdmin := f.newFakeAdmin(ProductKIND)
 
 	result, err := f.controller.Apply(context.Background(), &api.Cluster{
 		Product: string(ProductKIND),
@@ -81,8 +83,7 @@ func TestClusterApplyKINDWithCluster(t *testing.T) {
 
 	f.dockerClient.started = true
 
-	kindAdmin := newFakeAdmin(f.config)
-	f.controller.admins[ProductKIND] = kindAdmin
+	kindAdmin := f.newFakeAdmin(ProductKIND)
 
 	result, err := f.controller.Apply(context.Background(), &api.Cluster{
 		Product:  string(ProductKIND),
@@ -90,6 +91,7 @@ func TestClusterApplyKINDWithCluster(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "kind-kind", result.Name)
+	assert.Equal(t, "kind-registry", result.Registry)
 	assert.Equal(t, "kind-registry", kindAdmin.createdRegistry.Name)
 	assert.Equal(t, 5000, kindAdmin.createdRegistry.Status.ContainerPort)
 	assert.Equal(t, "kind-registry", f.registryCtl.lastApply.Name)
@@ -164,6 +166,7 @@ type fixture struct {
 	d4m          *fakeD4MClient
 	config       *clientcmdapi.Config
 	registryCtl  *fakeRegistryController
+	fakeK8s      *fake.Clientset
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -186,6 +189,10 @@ func newFixture(t *testing.T) *fixture {
 				Cluster: "docker-desktop",
 			},
 		},
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"microk8s-cluster": &clientcmdapi.Cluster{Server: "http://microk8s.localhost/"},
+			"docker-desktop":   &clientcmdapi.Cluster{Server: "http://docker-desktop.localhost/"},
+		},
 	}
 	configLoader := configLoader(func() (clientcmdapi.Config, error) {
 		return *config, nil
@@ -195,16 +202,20 @@ func newFixture(t *testing.T) *fixture {
 		Out:    os.Stdout,
 		ErrOut: os.Stderr,
 	}
+	fakeK8s := fake.NewSimpleClientset()
+	clientLoader := clientLoader(func(restConfig *rest.Config) (kubernetes.Interface, error) {
+		return fakeK8s, nil
+	})
+
 	registryCtl := &fakeRegistryController{}
 	controller := &Controller{
-		iostreams: iostreams,
-		admins:    make(map[Product]Admin),
-		config:    *config,
-		clients: map[string]kubernetes.Interface{
-			"microk8s": fake.NewSimpleClientset(),
-		},
+		iostreams:    iostreams,
+		admins:       make(map[Product]Admin),
+		config:       *config,
 		dmachine:     dmachine,
 		configLoader: configLoader,
+		clientLoader: clientLoader,
+		clients:      make(map[string]kubernetes.Interface),
 		registryCtl:  registryCtl,
 	}
 	return &fixture{
@@ -215,7 +226,14 @@ func newFixture(t *testing.T) *fixture {
 		dockerClient: dockerClient,
 		config:       config,
 		registryCtl:  registryCtl,
+		fakeK8s:      fakeK8s,
 	}
+}
+
+func (f *fixture) newFakeAdmin(p Product) *fakeAdmin {
+	admin := newFakeAdmin(f.config, f.fakeK8s)
+	f.controller.admins[p] = admin
+	return admin
 }
 
 func newFakeController(t *testing.T) *Controller {
@@ -294,10 +312,11 @@ type fakeAdmin struct {
 	createdRegistry *api.Registry
 	deleted         *api.Cluster
 	config          *clientcmdapi.Config
+	fakeK8s         *fake.Clientset
 }
 
-func newFakeAdmin(config *clientcmdapi.Config) *fakeAdmin {
-	return &fakeAdmin{config: config}
+func newFakeAdmin(config *clientcmdapi.Config, fakeK8s *fake.Clientset) *fakeAdmin {
+	return &fakeAdmin{config: config, fakeK8s: fakeK8s}
 }
 
 func (a *fakeAdmin) EnsureInstalled(ctx context.Context) error { return nil }
@@ -306,8 +325,17 @@ func (a *fakeAdmin) Create(ctx context.Context, config *api.Cluster, registry *a
 	a.created = config.DeepCopy()
 	a.createdRegistry = registry.DeepCopy()
 	a.config.Contexts[config.Name] = &clientcmdapi.Context{Cluster: config.Name}
+	a.config.Clusters[config.Name] = &clientcmdapi.Cluster{Server: fmt.Sprintf("http://%s.localhost/", config.Name)}
 	return nil
 }
+
+func (a *fakeAdmin) LocalRegistryHosting(registry *api.Registry) *localregistry.LocalRegistryHostingV1 {
+	return &localregistry.LocalRegistryHostingV1{
+		Host: fmt.Sprintf("localhost:%d", registry.Status.HostPort),
+		Help: "https://github.com/tilt-dev/ctlptl",
+	}
+}
+
 func (a *fakeAdmin) Delete(ctx context.Context, config *api.Cluster) error {
 	a.deleted = config.DeepCopy()
 	delete(a.config.Contexts, config.Name)
@@ -316,6 +344,15 @@ func (a *fakeAdmin) Delete(ctx context.Context, config *api.Cluster) error {
 
 type fakeRegistryController struct {
 	lastApply *api.Registry
+}
+
+func (c *fakeRegistryController) List(ctx context.Context, options registry.ListOptions) (*api.RegistryList, error) {
+	list := &api.RegistryList{}
+	if c.lastApply != nil {
+		item := c.lastApply.DeepCopy()
+		list.Items = append(list.Items, *item)
+	}
+	return list, nil
 }
 
 func (c *fakeRegistryController) Apply(ctx context.Context, r *api.Registry) (*api.Registry, error) {

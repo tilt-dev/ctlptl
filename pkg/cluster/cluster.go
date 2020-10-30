@@ -6,15 +6,19 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/pkg/errors"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/registry"
 	"github.com/tilt-dev/localregistry-go"
-	"k8s.io/apimachinery/pkg/api/errors"
+	"gopkg.in/yaml.v3"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
@@ -38,7 +42,10 @@ type configLoader func() (clientcmdapi.Config, error)
 
 type registryController interface {
 	Apply(ctx context.Context, r *api.Registry) (*api.Registry, error)
+	List(ctx context.Context, options registry.ListOptions) (*api.RegistryList, error)
 }
+
+type clientLoader func(*rest.Config) (kubernetes.Interface, error)
 
 type Controller struct {
 	iostreams    genericclioptions.IOStreams
@@ -49,6 +56,7 @@ type Controller struct {
 	configLoader configLoader
 	registryCtl  registryController
 	mu           sync.Mutex
+	clientLoader clientLoader
 }
 
 func DefaultController(iostreams genericclioptions.IOStreams) (*Controller, error) {
@@ -59,6 +67,10 @@ func DefaultController(iostreams genericclioptions.IOStreams) (*Controller, erro
 		overrides := &clientcmd.ConfigOverrides{}
 		loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides)
 		return loader.RawConfig()
+	})
+
+	clientLoader := clientLoader(func(restConfig *rest.Config) (kubernetes.Interface, error) {
+		return kubernetes.NewForConfig(restConfig)
 	})
 
 	config, err := configLoader()
@@ -72,6 +84,7 @@ func DefaultController(iostreams genericclioptions.IOStreams) (*Controller, erro
 		clients:      make(map[string]kubernetes.Interface),
 		admins:       make(map[Product]Admin),
 		configLoader: configLoader,
+		clientLoader: clientLoader,
 	}, nil
 }
 
@@ -156,7 +169,7 @@ func (c *Controller) client(name string) (kubernetes.Interface, error) {
 		return nil, err
 	}
 
-	client, err = kubernetes.NewForConfig(restConfig)
+	client, err = c.clientLoader(restConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -190,6 +203,34 @@ func (c *Controller) populateLocalRegistryHosting(ctx context.Context, cluster *
 	}
 
 	cluster.Status.LocalRegistryHosting = &hosting
+
+	if hosting.Host == "" {
+		return nil
+	}
+
+	// Let's try to find the registry corresponding to this cluster.
+	var port int
+	_, err = fmt.Sscanf(hosting.Host, "localhost:%d", &port)
+	if err != nil || port == 0 {
+		return err
+	}
+
+	registryCtl, err := c.registryController(ctx)
+	if err != nil {
+		return err
+	}
+
+	registryList, err := registryCtl.List(ctx, registry.ListOptions{FieldSelector: fmt.Sprintf("port=%d", port)})
+	if err != nil {
+		return err
+	}
+
+	if len(registryList.Items) == 0 {
+		return nil
+	}
+
+	cluster.Registry = registryList.Items[0].Name
+
 	return nil
 }
 
@@ -330,7 +371,7 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 	}
 
 	existingCluster, err := c.Get(ctx, desired.Name)
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 
@@ -387,7 +428,43 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 		return nil, err
 	}
 
+	if needsCreate && desired.Registry != "" {
+		err = c.createRegistryHosting(ctx, admin, desired, reg)
+		if err != nil {
+			return nil, errors.Wrap(err, "configuring cluster registry")
+		}
+	}
+
 	return c.Get(ctx, desired.Name)
+}
+
+// Create a configmap on the cluster, so that other tools know that a registry
+// has been configured.
+func (c *Controller) createRegistryHosting(ctx context.Context, admin Admin, cluster *api.Cluster, reg *api.Registry) error {
+	hosting := admin.LocalRegistryHosting(reg)
+	if hosting == nil {
+		return nil
+	}
+
+	_, _ = fmt.Fprintf(c.iostreams.ErrOut, "   Configuring %s for registry %s\n", cluster.Name, reg.Name)
+	client, err := c.client(cluster.Name)
+	if err != nil {
+		return err
+	}
+
+	data, err := yaml.Marshal(hosting)
+	if err != nil {
+		return err
+	}
+
+	_, err = client.CoreV1().ConfigMaps("kube-public").Create(ctx, &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "local-registry-hosting",
+			Namespace: "kube-public",
+		},
+		Data: map[string]string{"localRegistryHosting.v1": string(data)},
+	}, metav1.CreateOptions{})
+	return err
 }
 
 func (c *Controller) Delete(ctx context.Context, name string) error {
@@ -420,7 +497,7 @@ func (c *Controller) reloadConfigs() error {
 func (c *Controller) Get(ctx context.Context, name string) (*api.Cluster, error) {
 	ct, ok := c.config.Contexts[name]
 	if !ok {
-		return nil, errors.NewNotFound(groupResource, name)
+		return nil, apierrors.NewNotFound(groupResource, name)
 	}
 	cluster := &api.Cluster{
 		TypeMeta: typeMeta,
@@ -428,6 +505,7 @@ func (c *Controller) Get(ctx context.Context, name string) (*api.Cluster, error)
 		Product:  productFromContext(ct, c.config.Clusters[ct.Cluster]).String(),
 	}
 	c.populateCluster(ctx, cluster)
+
 	return cluster, nil
 }
 
