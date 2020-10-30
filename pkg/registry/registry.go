@@ -11,6 +11,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/phayes/freeport"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -172,8 +173,8 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 		existing = &api.Registry{}
 	}
 
-	hostPort := existing.Status.HostPort
-	if hostPort != 0 && desired.Port != 0 && hostPort != desired.Port {
+	existingHostPort := existing.Status.HostPort
+	if existingHostPort != 0 && desired.Port != 0 && existingHostPort != desired.Port {
 		// If the port has changed, let's delete the registry and recreate it.
 		err = c.Delete(ctx, desired.Name)
 		if err != nil {
@@ -187,8 +188,18 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 		return existing, nil
 	}
 
-	portSpec := fmt.Sprintf("%d:5000", desired.Port)
+	hostPort := desired.Port
+	if hostPort == 0 {
+		freePort, err := freeport.GetFreePort()
+		if err != nil {
+			return nil, err
+		}
+		hostPort = freePort
+	}
 
+	portSpec := fmt.Sprintf("%d:5000", hostPort)
+
+	_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Creating registry %q...\n", desired.Name)
 	cmd := exec.CommandContext(ctx, "docker", "run", "-d", "--restart=always", "-p", portSpec, "--name", desired.Name, "registry:2")
 	err = cmd.Run()
 	if err != nil {
