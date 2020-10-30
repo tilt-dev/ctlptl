@@ -29,6 +29,15 @@ type Cluster struct {
 	// CPU, it will return an error.
 	MinCPUs int `json:"minCPUs,omitempty" yaml:"minCPUs,omitempty"`
 
+	// The name of a registry.
+	//
+	// If the registry doesn't exist, ctlptl will create one with this name.
+	//
+	// The registry can be configured by creating a `kind: Registry` config file.
+	//
+	// Not supported on all cluster products.
+	Registry string `json:"registry,omitempty" yaml:"registry,omitempty"`
+
 	// Most recently observed status of the cluster.
 	// Populated by the system.
 	// Read-only.

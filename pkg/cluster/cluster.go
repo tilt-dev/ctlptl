@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/tilt-dev/ctlptl/pkg/api"
+	"github.com/tilt-dev/ctlptl/pkg/registry"
 	"github.com/tilt-dev/localregistry-go"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +36,10 @@ func ListTypeMeta() api.TypeMeta {
 
 type configLoader func() (clientcmdapi.Config, error)
 
+type registryController interface {
+	Apply(ctx context.Context, r *api.Registry) (*api.Registry, error)
+}
+
 type Controller struct {
 	iostreams    genericclioptions.IOStreams
 	config       clientcmdapi.Config
@@ -42,6 +47,7 @@ type Controller struct {
 	admins       map[Product]Admin
 	dmachine     *dockerMachine
 	configLoader configLoader
+	registryCtl  registryController
 	mu           sync.Mutex
 }
 
@@ -89,6 +95,22 @@ func (c *Controller) machine(ctx context.Context, name string, product Product) 
 	}
 
 	return unknownMachine{product: product}, nil
+}
+
+func (c *Controller) registryController(ctx context.Context) (registryController, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	result := c.registryCtl
+	if result == nil {
+		var err error
+		result, err = registry.DefaultController(ctx, c.iostreams)
+		if err != nil {
+			return nil, err
+		}
+		c.registryCtl = result
+	}
+	return result, nil
 }
 
 // A cluster admin provides the basic start/stop functionality of a cluster,
@@ -189,7 +211,7 @@ func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) 
 	name := cluster.Name
 	client, err := c.client(cluster.Name)
 	if err != nil {
-		klog.V(4).Infof("WARNING: creating cluster %s client: %v", name, err)
+		klog.V(4).Infof("WARNING: creating cluster %s client: %v\n", name, err)
 		return
 	}
 	wg := sync.WaitGroup{}
@@ -200,7 +222,7 @@ func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) 
 
 		err := c.populateCreationTimestamp(ctx, cluster, client)
 		if err != nil {
-			klog.V(4).Infof("WARNING: reading cluster %s creation time: %v", name, err)
+			klog.V(4).Infof("WARNING: reading cluster %s creation time: %v\n", name, err)
 		}
 	}()
 
@@ -210,7 +232,7 @@ func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) 
 
 		err := c.populateLocalRegistryHosting(ctx, cluster, client)
 		if err != nil {
-			klog.V(4).Infof("WARNING: reading cluster %s registry: %v", name, err)
+			klog.V(4).Infof("WARNING: reading cluster %s registry: %v\n", name, err)
 		}
 	}()
 
@@ -219,7 +241,7 @@ func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) 
 		defer wg.Done()
 		err := c.populateMachineStatus(ctx, cluster)
 		if err != nil {
-			klog.V(4).Infof("WARNING: reading cluster %s machine: %v", name, err)
+			klog.V(4).Infof("WARNING: reading cluster %s machine: %v\n", name, err)
 		}
 	}()
 
@@ -234,11 +256,61 @@ func FillDefaults(cluster *api.Cluster) {
 	}
 }
 
+// TODO(nick): Add more registry-supporting clusters.
+func supportsRegistry(product Product) bool {
+	return product == ProductKIND
+}
+
+func (c *Controller) deleteIfIrreconcilable(ctx context.Context, desired, existing *api.Cluster) error {
+	if existing.Name == "" {
+		// Nothing to delete
+		return nil
+	}
+
+	needsDelete := false
+	if existing.Product != "" && existing.Product != desired.Product {
+		_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Deleting cluster %s to change admin from %s to %s\n",
+			desired.Name, existing.Product, desired.Product)
+		needsDelete = true
+	} else if desired.Registry != "" && desired.Registry != existing.Registry {
+		_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Deleting cluster %s to initialize with registry %s\n",
+			desired.Name, desired.Registry)
+		needsDelete = true
+	}
+
+	if !needsDelete {
+		return nil
+	}
+
+	err := c.Delete(ctx, desired.Name)
+	if err != nil {
+		return err
+	}
+	*existing = api.Cluster{}
+	return nil
+}
+
+// Checks if a registry exists with the given name, and creates one if it doesn't.
+func (c *Controller) ensureRegistryExists(ctx context.Context, name string) (*api.Registry, error) {
+	regCtl, err := c.registryController(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return regCtl.Apply(ctx, &api.Registry{
+		TypeMeta: registry.TypeMeta(),
+		Name:     name,
+	})
+}
+
 // Compare the desired cluster against the existing cluster, and reconcile
 // the two to match.
 func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Cluster, error) {
 	if desired.Product == "" {
 		return nil, fmt.Errorf("product field must be non-empty")
+	}
+	if desired.Registry != "" && !supportsRegistry(Product(desired.Product)) {
+		return nil, fmt.Errorf("product %s does not support a registry", desired.Product)
 	}
 
 	FillDefaults(desired)
@@ -257,13 +329,6 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 		return nil, err
 	}
 
-	// Fetch the admin driver for this product, for setting up the cluster on top of
-	// the machine.
-	admin, err := c.admin(ctx, Product(desired.Product))
-	if err != nil {
-		return nil, err
-	}
-
 	existingCluster, err := c.Get(ctx, desired.Name)
 	if err != nil && !errors.IsNotFound(err) {
 		return nil, err
@@ -271,6 +336,21 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 
 	if existingCluster == nil {
 		existingCluster = &api.Cluster{}
+	}
+
+	// If we can't reconcile the two clusters, delete it now.
+	// TODO(nick): Check for a --force flag, and only delete the cluster
+	// if there's a --force.
+	err = c.deleteIfIrreconcilable(ctx, desired, existingCluster)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch the admin driver for this product, for setting up the cluster on top of
+	// the machine.
+	admin, err := c.admin(ctx, Product(desired.Product))
+	if err != nil {
+		return nil, err
 	}
 
 	existingStatus := existingCluster.Status
@@ -283,12 +363,20 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 		}
 	}
 
+	var reg *api.Registry
+	if desired.Registry != "" {
+		reg, err = c.ensureRegistryExists(ctx, desired.Registry)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// Configure the cluster to match what we want.
 	needsCreate := existingStatus.CreationTimestamp.Time.IsZero() ||
 		desired.Name != existingCluster.Name ||
 		desired.Product != existingCluster.Product
 	if needsCreate {
-		err := admin.Create(ctx, desired)
+		err := admin.Create(ctx, desired, reg)
 		if err != nil {
 			return nil, err
 		}
