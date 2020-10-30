@@ -11,11 +11,11 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	ctlptlapi "github.com/tilt-dev/ctlptl/pkg/api"
+	"github.com/tilt-dev/ctlptl/pkg/api"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/tools/clientcmd/api"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
@@ -67,7 +67,7 @@ func TestClusterApplyKIND(t *testing.T) {
 	kindAdmin := newFakeAdmin(f.config)
 	f.controller.admins[ProductKIND] = kindAdmin
 
-	result, err := f.controller.Apply(context.Background(), &ctlptlapi.Cluster{
+	result, err := f.controller.Apply(context.Background(), &api.Cluster{
 		Product: string(ProductKIND),
 	})
 	assert.NoError(t, err)
@@ -76,13 +76,32 @@ func TestClusterApplyKIND(t *testing.T) {
 	assert.Equal(t, "kind-kind", result.Name)
 }
 
+func TestClusterApplyKINDWithCluster(t *testing.T) {
+	f := newFixture(t)
+
+	f.dockerClient.started = true
+
+	kindAdmin := newFakeAdmin(f.config)
+	f.controller.admins[ProductKIND] = kindAdmin
+
+	result, err := f.controller.Apply(context.Background(), &api.Cluster{
+		Product:  string(ProductKIND),
+		Registry: "kind-registry",
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "kind-kind", result.Name)
+	assert.Equal(t, "kind-registry", kindAdmin.createdRegistry.Name)
+	assert.Equal(t, 5000, kindAdmin.createdRegistry.Status.ContainerPort)
+	assert.Equal(t, "kind-registry", f.registryCtl.lastApply.Name)
+}
+
 func TestClusterApplyDockerForMac(t *testing.T) {
 	f := newFixture(t)
 	f.dmachine.os = "darwin"
 
 	assert.Equal(t, false, f.d4m.started)
 	assert.Equal(t, 1, f.dockerClient.ncpu)
-	f.controller.Apply(context.Background(), &ctlptlapi.Cluster{
+	f.controller.Apply(context.Background(), &api.Cluster{
 		Product: string(ProductDockerDesktop),
 		MinCPUs: 3,
 	})
@@ -99,7 +118,7 @@ func TestClusterApplyDockerForMacCPUOnly(t *testing.T) {
 
 	assert.Equal(t, true, f.d4m.started)
 	assert.Equal(t, 1, f.dockerClient.ncpu)
-	f.controller.Apply(context.Background(), &ctlptlapi.Cluster{
+	f.controller.Apply(context.Background(), &api.Cluster{
 		Product: string(ProductDockerDesktop),
 		MinCPUs: 3,
 	})
@@ -113,7 +132,7 @@ func TestClusterApplyDockerForMacStartClusterOnly(t *testing.T) {
 
 	assert.Equal(t, false, f.d4m.started)
 	assert.Equal(t, 1, f.dockerClient.ncpu)
-	f.controller.Apply(context.Background(), &ctlptlapi.Cluster{
+	f.controller.Apply(context.Background(), &api.Cluster{
 		Product: string(ProductDockerDesktop),
 		MinCPUs: 0,
 	})
@@ -126,12 +145,12 @@ func TestClusterApplyDockerForMacNoRestart(t *testing.T) {
 	f.dmachine.os = "darwin"
 
 	assert.Equal(t, 0, f.d4m.settingsWriteCount)
-	f.controller.Apply(context.Background(), &ctlptlapi.Cluster{
+	f.controller.Apply(context.Background(), &api.Cluster{
 		Product: string(ProductDockerDesktop),
 	})
 	assert.Equal(t, 1, f.d4m.settingsWriteCount)
 
-	f.controller.Apply(context.Background(), &ctlptlapi.Cluster{
+	f.controller.Apply(context.Background(), &api.Cluster{
 		Product: string(ProductDockerDesktop),
 	})
 	assert.Equal(t, 1, f.d4m.settingsWriteCount)
@@ -144,6 +163,7 @@ type fixture struct {
 	dmachine     *dockerMachine
 	d4m          *fakeD4MClient
 	config       *clientcmdapi.Config
+	registryCtl  *fakeRegistryController
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -158,11 +178,11 @@ func newFixture(t *testing.T) *fixture {
 	}
 	config := &clientcmdapi.Config{
 		CurrentContext: "microk8s",
-		Contexts: map[string]*api.Context{
-			"microk8s": &api.Context{
+		Contexts: map[string]*clientcmdapi.Context{
+			"microk8s": &clientcmdapi.Context{
 				Cluster: "microk8s-cluster",
 			},
-			"docker-desktop": &api.Context{
+			"docker-desktop": &clientcmdapi.Context{
 				Cluster: "docker-desktop",
 			},
 		},
@@ -170,14 +190,22 @@ func newFixture(t *testing.T) *fixture {
 	configLoader := configLoader(func() (clientcmdapi.Config, error) {
 		return *config, nil
 	})
+	iostreams := genericclioptions.IOStreams{
+		In:     os.Stdin,
+		Out:    os.Stdout,
+		ErrOut: os.Stderr,
+	}
+	registryCtl := &fakeRegistryController{}
 	controller := &Controller{
-		admins: make(map[Product]Admin),
-		config: *config,
+		iostreams: iostreams,
+		admins:    make(map[Product]Admin),
+		config:    *config,
 		clients: map[string]kubernetes.Interface{
 			"microk8s": fake.NewSimpleClientset(),
 		},
 		dmachine:     dmachine,
 		configLoader: configLoader,
+		registryCtl:  registryCtl,
 	}
 	return &fixture{
 		t:            t,
@@ -186,6 +214,7 @@ func newFixture(t *testing.T) *fixture {
 		d4m:          d4m,
 		dockerClient: dockerClient,
 		config:       config,
+		registryCtl:  registryCtl,
 	}
 }
 
@@ -261,9 +290,10 @@ func (c *fakeD4MClient) start(ctx context.Context) error {
 }
 
 type fakeAdmin struct {
-	created *ctlptlapi.Cluster
-	deleted *ctlptlapi.Cluster
-	config  *clientcmdapi.Config
+	created         *api.Cluster
+	createdRegistry *api.Registry
+	deleted         *api.Cluster
+	config          *clientcmdapi.Config
 }
 
 func newFakeAdmin(config *clientcmdapi.Config) *fakeAdmin {
@@ -272,13 +302,32 @@ func newFakeAdmin(config *clientcmdapi.Config) *fakeAdmin {
 
 func (a *fakeAdmin) EnsureInstalled(ctx context.Context) error { return nil }
 
-func (a *fakeAdmin) Create(ctx context.Context, config *ctlptlapi.Cluster) error {
+func (a *fakeAdmin) Create(ctx context.Context, config *api.Cluster, registry *api.Registry) error {
 	a.created = config.DeepCopy()
+	a.createdRegistry = registry.DeepCopy()
 	a.config.Contexts[config.Name] = &clientcmdapi.Context{Cluster: config.Name}
 	return nil
 }
-func (a *fakeAdmin) Delete(ctx context.Context, config *ctlptlapi.Cluster) error {
+func (a *fakeAdmin) Delete(ctx context.Context, config *api.Cluster) error {
 	a.deleted = config.DeepCopy()
 	delete(a.config.Contexts, config.Name)
 	return nil
+}
+
+type fakeRegistryController struct {
+	lastApply *api.Registry
+}
+
+func (c *fakeRegistryController) Apply(ctx context.Context, r *api.Registry) (*api.Registry, error) {
+	c.lastApply = r.DeepCopy()
+
+	newR := r.DeepCopy()
+	newR.Status = api.RegistryStatus{
+		ContainerPort: 5000,
+		ContainerID:   "fake-container-id",
+		HostPort:      5000,
+		IPAddress:     "172.0.0.2",
+		Networks:      []string{"bridge"},
+	}
+	return newR, nil
 }
