@@ -125,6 +125,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 		registry := &api.Registry{
 			TypeMeta: typeMeta,
 			Name:     name,
+			Port:     hostPort,
 			Status: api.RegistryStatus{
 				CreationTimestamp: metav1.Time{Time: created},
 				ContainerID:       container.ID,
@@ -173,8 +174,7 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 		existing = &api.Registry{}
 	}
 
-	existingHostPort := existing.Status.HostPort
-	if existingHostPort != 0 && desired.Port != 0 && existingHostPort != desired.Port {
+	if existing.Port != 0 && desired.Port != 0 && existing.Port != desired.Port {
 		// If the port has changed, let's delete the registry and recreate it.
 		err = c.Delete(ctx, desired.Name)
 		if err != nil {

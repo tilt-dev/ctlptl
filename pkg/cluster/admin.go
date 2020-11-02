@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/tilt-dev/ctlptl/pkg/api"
+	"github.com/tilt-dev/localregistry-go"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/klog/v2"
 )
@@ -18,6 +19,7 @@ import (
 type Admin interface {
 	EnsureInstalled(ctx context.Context) error
 	Create(ctx context.Context, desired *api.Cluster, registry *api.Registry) error
+	LocalRegistryHosting(registry *api.Registry) *localregistry.LocalRegistryHostingV1
 	Delete(ctx context.Context, config *api.Cluster) error
 }
 
@@ -42,6 +44,10 @@ func (a *dockerDesktopAdmin) Create(ctx context.Context, desired *api.Cluster, r
 		return nil
 	}
 	return fmt.Errorf("docker-desktop Kubernetes clusters are only available on macos and windows")
+}
+
+func (a *dockerDesktopAdmin) LocalRegistryHosting(registry *api.Registry) *localregistry.LocalRegistryHostingV1 {
+	return nil
 }
 
 func (a *dockerDesktopAdmin) Delete(ctx context.Context, config *api.Cluster) error {
@@ -120,30 +126,6 @@ containerdConfigPatches:
 		}
 	}
 
-	if registry != nil {
-		configMap := fmt.Sprintf(`
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: local-registry-hosting
-  namespace: kube-public
-data:
-  localRegistryHosting.v1: |
-    host: "localhost:%d"
-    help: "https://github.com/tilt-dev/ctlptl"
-`, registry.Status.HostPort)
-
-		_, _ = fmt.Fprintf(a.iostreams.ErrOut, "   Configurating kind for registry %s\n", registry.Name)
-		cmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", "-")
-		cmd.Stdout = a.iostreams.Out
-		cmd.Stderr = a.iostreams.ErrOut
-		cmd.Stdin = strings.NewReader(configMap)
-		err := cmd.Run()
-		if err != nil {
-			return errors.Wrap(err, "configuring kind registry")
-		}
-	}
-
 	return nil
 }
 
@@ -154,6 +136,14 @@ func (a *kindAdmin) inKindNetwork(registry *api.Registry) bool {
 		}
 	}
 	return false
+}
+
+func (a *kindAdmin) LocalRegistryHosting(registry *api.Registry) *localregistry.LocalRegistryHostingV1 {
+	return &localregistry.LocalRegistryHostingV1{
+		Host:                   fmt.Sprintf("localhost:%d", registry.Status.HostPort),
+		HostFromClusterNetwork: fmt.Sprintf("%s:%d", registry.Name, registry.Status.ContainerPort),
+		Help:                   "https://github.com/tilt-dev/ctlptl",
+	}
 }
 
 func (a *kindAdmin) Delete(ctx context.Context, config *api.Cluster) error {
