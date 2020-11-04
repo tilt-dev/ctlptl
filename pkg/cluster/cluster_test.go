@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"runtime"
 	"testing"
 	"time"
 
@@ -80,6 +79,7 @@ func TestClusterApplyKIND(t *testing.T) {
 
 func TestClusterApplyKINDWithCluster(t *testing.T) {
 	f := newFixture(t)
+	f.dmachine.os = "linux"
 
 	f.dockerClient.started = true
 
@@ -177,7 +177,7 @@ func newFixture(t *testing.T) *fixture {
 		errOut:       os.Stderr,
 		sleep:        func(d time.Duration) {},
 		d4m:          d4m,
-		os:           runtime.GOOS,
+		os:           "darwin", // default to macos
 	}
 	config := &clientcmdapi.Config{
 		CurrentContext: "microk8s",
