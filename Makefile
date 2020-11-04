@@ -1,5 +1,8 @@
 .PHONY: generate test vendor
 
+install:
+	go install ./cmd/ctlptl
+
 test:
 	go test -timeout 30s -v ./...
 

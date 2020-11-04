@@ -36,7 +36,7 @@ func TestEnableKubernetes(t *testing.T) {
 	settings, err := f.d4m.settings(ctx)
 	require.NoError(t, err)
 
-	changed, err := f.d4m.ensureK8sEnabled(settings)
+	changed, err := f.d4m.setK8sEnabled(settings, true)
 	assert.True(t, changed)
 	require.NoError(t, err)
 
