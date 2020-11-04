@@ -45,12 +45,12 @@ workflows:
           context: Tilt Slack Context
           requires:
             - build
+  release:
+    jobs:
       - release:
           context:
           - Tilt Slack Context
           - Tilt Release CLI Context
-          requires:
-            - release-dry-run
           filters:
             branches:
               only: never-release-on-a-branch
