@@ -67,6 +67,26 @@ func (c DockerForMacClient) start(ctx context.Context) error {
 	return err
 }
 
+func (c DockerForMacClient) resetK8s(ctx context.Context) error {
+	klog.V(7).Infof("POST %s /kubernetes/reset\n", c.socketPath)
+	req, err := http.NewRequest("POST", "http://localhost/kubernetes/reset", nil)
+	if err != nil {
+		return errors.Wrap(err, "reset d4m kubernetes")
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return errors.Wrap(err, "reset d4m kubernetes")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("reset d4m kubernetes: status code %d", resp.StatusCode)
+	}
+	return nil
+}
+
 func (c DockerForMacClient) writeSettings(ctx context.Context, settings map[string]interface{}) error {
 	klog.V(7).Infof("POST %s /settings\n", c.socketPath)
 	buf := bytes.NewBuffer(nil)
@@ -134,7 +154,7 @@ func (c DockerForMacClient) lookupMapAt(settings map[string]interface{}, key str
 	return current, nil
 }
 
-func (c DockerForMacClient) ensureK8sEnabled(settings map[string]interface{}) (changed bool, err error) {
+func (c DockerForMacClient) setK8sEnabled(settings map[string]interface{}, newVal bool) (changed bool, err error) {
 	enabledSetting, err := c.lookupMapAt(settings, "vm.kubernetes.enabled")
 	if err != nil {
 		return false, err
@@ -146,10 +166,10 @@ func (c DockerForMacClient) ensureK8sEnabled(settings map[string]interface{}) (c
 			enabledSetting["value"])
 	}
 
-	if isEnabled {
+	if isEnabled == newVal {
 		return false, nil
 	}
-	enabledSetting["value"] = true
+	enabledSetting["value"] = newVal
 	return true, nil
 }
 

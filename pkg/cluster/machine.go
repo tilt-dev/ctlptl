@@ -47,7 +47,8 @@ type sleeper func(dur time.Duration)
 type d4mClient interface {
 	writeSettings(ctx context.Context, settings map[string]interface{}) error
 	settings(ctx context.Context) (map[string]interface{}, error)
-	ensureK8sEnabled(settings map[string]interface{}) (bool, error)
+	resetK8s(tx context.Context) error
+	setK8sEnabled(settings map[string]interface{}, desired bool) (bool, error)
 	ensureMinCPU(settings map[string]interface{}, desired int) (bool, error)
 	start(ctx context.Context) error
 }
@@ -142,7 +143,7 @@ func (m dockerMachine) Restart(ctx context.Context, desired, existing *api.Clust
 
 		k8sChanged := false
 		if desired.Product == string(ProductDockerDesktop) {
-			k8sChanged, err = m.d4m.ensureK8sEnabled(settings)
+			k8sChanged, err = m.d4m.setK8sEnabled(settings, true)
 			if err != nil {
 				return err
 			}

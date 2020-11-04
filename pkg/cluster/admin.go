@@ -51,7 +51,34 @@ func (a *dockerDesktopAdmin) LocalRegistryHosting(registry *api.Registry) *local
 }
 
 func (a *dockerDesktopAdmin) Delete(ctx context.Context, config *api.Cluster) error {
-	return fmt.Errorf("docker-desktop delete not implemented")
+	if runtime.GOOS != "darwin" {
+		return fmt.Errorf("docker-desktop delete not implemented on: %s", runtime.GOOS)
+	}
+
+	client, err := NewDockerForMacClient()
+	if err != nil {
+		return err
+	}
+
+	err = client.resetK8s(ctx)
+	if err != nil {
+		return err
+	}
+
+	settings, err := client.settings(ctx)
+	if err != nil {
+		return err
+	}
+
+	changed, err := client.setK8sEnabled(settings, false)
+	if err != nil {
+		return err
+	}
+	if !changed {
+		return nil
+	}
+
+	return client.writeSettings(ctx, settings)
 }
 
 const kindNetworkName = "kind"

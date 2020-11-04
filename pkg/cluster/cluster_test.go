@@ -266,6 +266,7 @@ type fakeD4MClient struct {
 	docker             *fakeDockerClient
 	started            bool
 	settingsWriteCount int
+	resetCount         int
 }
 
 func (c *fakeD4MClient) writeSettings(ctx context.Context, settings map[string]interface{}) error {
@@ -279,7 +280,7 @@ func (c *fakeD4MClient) settings(ctx context.Context) (map[string]interface{}, e
 	return c.lastSettings, nil
 }
 
-func (c *fakeD4MClient) ensureK8sEnabled(settings map[string]interface{}) (bool, error) {
+func (c *fakeD4MClient) setK8sEnabled(settings map[string]interface{}, desired bool) (bool, error) {
 	enabled, ok := settings["k8sEnabled"]
 	if ok && enabled.(bool) == true {
 		return false, nil
@@ -296,6 +297,11 @@ func (c *fakeD4MClient) ensureMinCPU(settings map[string]interface{}, desired in
 	settings["cpu"] = desired
 	return true, nil
 
+}
+
+func (c *fakeD4MClient) resetK8s(ctx context.Context) error {
+	c.resetCount++
+	return nil
 }
 
 func (c *fakeD4MClient) start(ctx context.Context) error {
