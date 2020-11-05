@@ -13,6 +13,7 @@ func NewRootCommand() *cobra.Command {
 	rootCmd.AddCommand(NewGetOptions().Command())
 	rootCmd.AddCommand(NewApplyOptions().Command())
 	rootCmd.AddCommand(NewDeleteOptions().Command())
+	rootCmd.AddCommand(NewDockerDesktopCommand())
 
 	return rootCmd
 }
