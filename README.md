@@ -17,6 +17,61 @@ Inspired by `kubectl` and
 [ClusterAPI's](https://github.com/kubernetes-sigs/cluster-api) `clusterctl`, you
 declare your local cluster with YAML and use `ctlptl` to set it up.
 
+## How do I install it?
+
+### Homebrew (Mac/Linux)
+
+```
+brew install tilt-dev/tap/ctlptl
+```
+
+### Scoop (Windows)
+
+```
+scoop bucket add tilt-dev https://github.com/tilt-dev/scoop-bucket
+scoop install ctlptl
+```
+
+## How do I use it?
+
+`ctlptl` supports 3 major commands:
+
+- `ctlptl apply -f cluster.yaml` - ensure a cluster exists, or create one
+- `ctlptl delete -f cluster.yaml` - delete a cluster and its state
+- `ctlptl get` - see all running clusters
+
+### Examples
+
+Turn on Kubernetes in Docker for Mac and make sure it has at least 4 CPU:
+
+```
+cat <<EOF | ctlptl apply -f -
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+product: docker-desktop
+minCPUs: 4
+EOF
+```
+
+Reset and shutdown the Kubernetes cluster in Docker for Mac:
+
+```
+ctlptl delete cluster docker-desktop
+```
+
+Create a KIND cluster with a built-in registry:
+
+```
+cat <<EOF | ctlptl apply -f -
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+product: kind
+registry: kind-registry
+EOF
+```
+
+You can see more example configurations under [./examples](./examples).
+
 ## Why did you make this?
 
 At [Tilt](https://tilt.dev/), we want to make Kubernetes a nice environment for local dev.
@@ -31,9 +86,21 @@ cluster](https://docs.tilt.dev/choosing_clusters.html) and example repos like
 
 `ctlptl` is a culmination of what we've learned.
 
-## How do I try it?
+## Features
 
-We're still writing it! Stay tuned.
+### Current
+
+- Docker for Mac
+- [KIND](https://kind.sigs.k8s.io/)
+- [KIND with a registry](https://kind.sigs.k8s.io/docs/user/local-registry/)
+- Allocating CPUs
+
+### In progress
+
+- Minikube
+- K3D
+- Microk8s
+- Allocating Memory
 
 ## Community
 
