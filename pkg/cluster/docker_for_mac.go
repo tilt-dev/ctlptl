@@ -87,6 +87,14 @@ func (c DockerForMacClient) resetK8s(ctx context.Context) error {
 	return nil
 }
 
+func (c DockerForMacClient) SettingsValues(ctx context.Context) (interface{}, error) {
+	s, err := c.settings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return c.settingsForWrite(s), nil
+}
+
 func (c DockerForMacClient) writeSettings(ctx context.Context, settings map[string]interface{}) error {
 	klog.V(7).Infof("POST %s /settings\n", c.socketPath)
 	buf := bytes.NewBuffer(nil)
