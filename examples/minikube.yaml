@@ -1,0 +1,6 @@
+# Creates a minikube cluster with a registry.
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+product: minikube
+registry: ctlptl-registry
+minCPUs: 3
