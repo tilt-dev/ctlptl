@@ -104,7 +104,14 @@ func (c *Controller) machine(ctx context.Context, name string, product Product) 
 		return c.dmachine, nil
 
 	case ProductMinikube:
-		return minikubeMachine{name: name}, nil
+		if c.dmachine == nil {
+			machine, err := NewDockerMachine(ctx, c.iostreams.ErrOut)
+			if err != nil {
+				return nil, err
+			}
+			c.dmachine = machine
+		}
+		return newMinikubeMachine(name, c.dmachine), nil
 	}
 
 	return unknownMachine{product: product}, nil
@@ -142,6 +149,8 @@ func (c *Controller) admin(ctx context.Context, product Product) (Admin, error) 
 		admin = newDockerDesktopAdmin()
 	case ProductKIND:
 		admin = newKindAdmin(c.iostreams)
+	case ProductMinikube:
+		admin = newMinikubeAdmin(c.iostreams)
 	}
 
 	if product == "" {
@@ -152,6 +161,13 @@ func (c *Controller) admin(ctx context.Context, product Product) (Admin, error) 
 	}
 	c.admins[product] = admin
 	return admin, nil
+}
+
+func (c *Controller) configCopy() *clientcmdapi.Config {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.config.DeepCopy()
 }
 
 func (c *Controller) client(name string) (kubernetes.Interface, error) {
@@ -299,7 +315,7 @@ func FillDefaults(cluster *api.Cluster) {
 
 // TODO(nick): Add more registry-supporting clusters.
 func supportsRegistry(product Product) bool {
-	return product == ProductKIND
+	return product == ProductKIND || product == ProductMinikube
 }
 
 func (c *Controller) deleteIfIrreconcilable(ctx context.Context, desired, existing *api.Cluster) error {
@@ -314,6 +330,8 @@ func (c *Controller) deleteIfIrreconcilable(ctx context.Context, desired, existi
 			desired.Name, existing.Product, desired.Product)
 		needsDelete = true
 	} else if desired.Registry != "" && desired.Registry != existing.Registry {
+		// TODO(nick): Ideally, we should be able to patch a cluster
+		// with a registry, but it gets a little hairy.
 		_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Deleting cluster %s to initialize with registry %s\n",
 			desired.Name, desired.Registry)
 		needsDelete = true
@@ -429,6 +447,15 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 	}
 
 	if needsCreate && desired.Registry != "" {
+		// NOTE(nick): The kubernetes client fails if it tries to create a ConfigMap
+		// on Minikube without reading anything first. I have no idea why this
+		// happens -- it seems to be a bug deep in the auth code.
+		//
+		// For now, do a dummy Get to initialize it correctly.
+		if desired.Product == string(ProductMinikube) {
+			_, _ = c.Get(ctx, desired.Name)
+		}
+
 		err = c.createRegistryHosting(ctx, admin, desired, reg)
 		if err != nil {
 			return nil, errors.Wrap(err, "configuring cluster registry")
@@ -495,14 +522,15 @@ func (c *Controller) reloadConfigs() error {
 }
 
 func (c *Controller) Get(ctx context.Context, name string) (*api.Cluster, error) {
-	ct, ok := c.config.Contexts[name]
+	config := c.configCopy()
+	ct, ok := config.Contexts[name]
 	if !ok {
 		return nil, apierrors.NewNotFound(groupResource, name)
 	}
 	cluster := &api.Cluster{
 		TypeMeta: typeMeta,
 		Name:     name,
-		Product:  productFromContext(ct, c.config.Clusters[ct.Cluster]).String(),
+		Product:  productFromContext(ct, config.Clusters[ct.Cluster]).String(),
 	}
 	c.populateCluster(ctx, cluster)
 
@@ -515,9 +543,10 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Cluste
 		return nil, err
 	}
 
+	config := c.configCopy()
 	result := []api.Cluster{}
 	names := make([]string, 0, len(c.config.Contexts))
-	for name := range c.config.Contexts {
+	for name := range config.Contexts {
 		names = append(names, name)
 	}
 	sort.Strings(names)
@@ -527,7 +556,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Cluste
 		cluster := &api.Cluster{
 			TypeMeta: typeMeta,
 			Name:     name,
-			Product:  productFromContext(ct, c.config.Clusters[ct.Cluster]).String(),
+			Product:  productFromContext(ct, config.Clusters[ct.Cluster]).String(),
 		}
 		if !selector.Matches((*clusterFields)(cluster)) {
 			continue

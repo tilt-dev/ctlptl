@@ -9,9 +9,9 @@ import (
 	"github.com/tilt-dev/localregistry-go"
 )
 
-// dockerDesktopAdmin is mostly a no-op admin.
-// The dockerMachine driver automatically sets up Kubernetes
-// when we're setting up the docker VM itself.
+// The DockerDesktop manages the Kubernetes cluster for DockerDesktop.
+// This is a bit different than the other admins, due to the overlap
+//
 type dockerDesktopAdmin struct {
 	os string
 }

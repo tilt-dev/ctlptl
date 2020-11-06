@@ -127,7 +127,9 @@ func (m dockerMachine) EnsureExists(ctx context.Context) error {
 }
 
 func (m dockerMachine) Restart(ctx context.Context, desired, existing *api.Cluster) error {
-	canChangeCPUs := m.os == "darwin" || m.os == "windows"
+	canChangeCPUs :=
+		m.os == "darwin" || m.os == "windows" || // DockerForMac and DockerForWindows can change the CPU on the VM
+			Product(desired.Product) == ProductMinikube // Minikube can change the CPU on the VM or on the container itself
 	if existing.Status.CPUs < desired.MinCPUs && !canChangeCPUs {
 		return fmt.Errorf("Cannot automatically set minimum CPU to %d on this platform", desired.MinCPUs)
 	}
@@ -179,15 +181,25 @@ func (m dockerMachine) Restart(ctx context.Context, desired, existing *api.Clust
 	return nil
 }
 
+// Currently, out Minikube admin only supports Minikube on Docker,
+// so we delegate to the dockerMachine driver.
 type minikubeMachine struct {
+	dm   *dockerMachine
 	name string
+}
+
+func newMinikubeMachine(name string, dm *dockerMachine) *minikubeMachine {
+	return &minikubeMachine{
+		name: name,
+		dm:   dm,
+	}
 }
 
 type minikubeSettings struct {
 	CPUs int
 }
 
-func (m minikubeMachine) CPUs(ctx context.Context) (int, error) {
+func (m *minikubeMachine) CPUs(ctx context.Context) (int, error) {
 	homedir, err := homedir.Dir()
 	if err != nil {
 		return 0, err
@@ -208,12 +220,10 @@ func (m minikubeMachine) CPUs(ctx context.Context) (int, error) {
 	return settings.CPUs, nil
 }
 
-func (m minikubeMachine) EnsureExists(ctx context.Context) error {
-	// TODO(nick): Implement this
-	return fmt.Errorf("cluster type minikube not configurable")
+func (m *minikubeMachine) EnsureExists(ctx context.Context) error {
+	return m.dm.EnsureExists(ctx)
 }
 
-func (m minikubeMachine) Restart(ctx context.Context, desired, existing *api.Cluster) error {
-	// TODO(nick): Implement this
-	return fmt.Errorf("cluster type minikube not configurable")
+func (m *minikubeMachine) Restart(ctx context.Context, desired, existing *api.Cluster) error {
+	return m.dm.Restart(ctx, desired, existing)
 }
