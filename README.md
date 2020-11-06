@@ -42,7 +42,7 @@ scoop install ctlptl
 
 ### Examples
 
-Turn on Kubernetes in Docker for Mac and make sure it has at least 4 CPU:
+#### Docker for Mac: Enable Kubernetes and set 4 CPU
 
 ```
 cat <<EOF | ctlptl apply -f -
@@ -53,13 +53,13 @@ minCPUs: 4
 EOF
 ```
 
-Reset and shutdown the Kubernetes cluster in Docker for Mac:
+#### Docker for Mac: Reset and shutdown Kubernetes
 
 ```
 ctlptl delete cluster docker-desktop
 ```
 
-Create a KIND cluster with a built-in registry:
+#### KIND: with a built-in registry
 
 ```
 cat <<EOF | ctlptl apply -f -
@@ -70,7 +70,7 @@ registry: ctlptl-registry
 EOF
 ```
 
-Create a Minikube cluster with a built-in registry:
+#### Minikube: with a built-in registry
 
 ```
 cat <<EOF | ctlptl apply -f -
@@ -80,6 +80,8 @@ product: minikube
 registry: ctlptl-registry
 EOF
 ```
+
+#### More
 
 For more details, see:
 
@@ -111,11 +113,12 @@ cluster](https://docs.tilt.dev/choosing_clusters.html) and example repos like
 - [Minikube](https://minikube.sigs.k8s.io/) and Minikube with a registry
 - Allocating CPUs
 
-### In progress
+### Future Work
 
 - K3D
 - Microk8s
 - Allocating Memory
+- Allocating Storage
 
 ## Community
 
