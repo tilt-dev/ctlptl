@@ -1,6 +1,9 @@
 package cmd
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/spf13/cobra"
+	"github.com/tilt-dev/wmclient/pkg/analytics"
+)
 
 func NewRootCommand() *cobra.Command {
 	var rootCmd = &cobra.Command{
@@ -14,6 +17,8 @@ func NewRootCommand() *cobra.Command {
 	rootCmd.AddCommand(NewApplyOptions().Command())
 	rootCmd.AddCommand(NewDeleteOptions().Command())
 	rootCmd.AddCommand(NewDockerDesktopCommand())
+	rootCmd.AddCommand(newDocsCommand(rootCmd))
+	rootCmd.AddCommand(analytics.NewCommand())
 
 	return rootCmd
 }

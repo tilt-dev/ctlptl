@@ -17,6 +17,7 @@ Mess around with local Kubernetes clusters without consequences
 
 ### SEE ALSO
 
+* [ctlptl analytics](ctlptl_analytics.md)	 - info and status about windmill analytics
 * [ctlptl apply](ctlptl_apply.md)	 - Apply a cluster config to the currently running clusters
 * [ctlptl delete](ctlptl_delete.md)	 - Delete a currently running cluster
 * [ctlptl docker-desktop](ctlptl_docker-desktop.md)	 - Debugging tool for the Docker Desktop client

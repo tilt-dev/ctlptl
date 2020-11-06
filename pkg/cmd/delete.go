@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/tilt-dev/ctlptl/pkg/api"
@@ -65,6 +66,13 @@ type deleter interface {
 }
 
 func (o *DeleteOptions) run(args []string) error {
+	a, err := newAnalytics()
+	if err != nil {
+		return err
+	}
+	a.Incr("cmd.delete", nil)
+	defer a.Flush(time.Second)
+
 	hasFiles := len(o.Filenames) > 0
 	hasNames := len(args) >= 2
 	if !(hasFiles || hasNames) {
