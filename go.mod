@@ -27,6 +27,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.6.1
 	github.com/tilt-dev/localregistry-go v0.0.0-20201021185044-ffc4c827f097
+	github.com/tilt-dev/wmclient v0.0.0-20200901155816-d8d972f01eb9
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a // indirect
 	golang.org/x/net v0.0.0-20200904194848-62affa334b73 // indirect
 	golang.org/x/sys v0.0.0-20200916030750-2334cc1a136f // indirect

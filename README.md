@@ -143,6 +143,10 @@ We expect everyone -- users, contributors, followers, and employees alike -- to 
 
 - `ctlptl` is NOT intended to help you setup a remote cluster, or a remote dev sandbox. If you want to declaratively set up prod clusters, check out [`clusterapi`](https://cluster-api.sigs.k8s.io/).
 
+## Privacy
+
+`ctlptl` sends anonymized usage statistics, so we can improve it on every platform. Opt out with `ctlptl analytics opt out`.
+
 ## License
 
 Copyright 2020 Windmill Engineering

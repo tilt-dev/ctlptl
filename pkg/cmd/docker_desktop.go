@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/tilt-dev/ctlptl/pkg/cluster"
@@ -22,7 +23,7 @@ func NewDockerDesktopCommand() *cobra.Command {
 	cmd.AddCommand(&cobra.Command{
 		Use:   "settings",
 		Short: "Print the docker-desktop settings",
-		Run:   withDockerDesktopClient(dockerDesktopSettings),
+		Run:   withDockerDesktopClient("docker-desktop-settings", dockerDesktopSettings),
 		Args:  cobra.ExactArgs(0),
 	})
 	cmd.AddCommand(&cobra.Command{
@@ -34,15 +35,23 @@ func NewDockerDesktopCommand() *cobra.Command {
 			"Most settings are scalars. vm.fileSharing is a list of paths separated by commas.",
 		Example: "  ctlptl docker-desktop set vm.resources.cpus 2\n" +
 			"  ctlptl docker-desktop set vm.fileSharing /Users,/Volumes,/private,/tmp",
-		Run:  withDockerDesktopClient(dockerDesktopSet),
+		Run:  withDockerDesktopClient("docker-desktop-set", dockerDesktopSet),
 		Args: cobra.ExactArgs(2),
 	})
 
 	return cmd
 }
 
-func withDockerDesktopClient(run func(client cluster.DockerDesktopClient, args []string) error) func(_ *cobra.Command, args []string) {
+func withDockerDesktopClient(name string, run func(client cluster.DockerDesktopClient, args []string) error) func(_ *cobra.Command, args []string) {
 	return func(_ *cobra.Command, args []string) {
+		a, err := newAnalytics()
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "analytics: %v\n", err)
+			os.Exit(1)
+		}
+		a.Incr(fmt.Sprintf("cmd.%s", name), nil)
+		defer a.Flush(time.Second)
+
 		if runtime.GOOS != "darwin" && runtime.GOOS != "windows" {
 			_, _ = fmt.Fprintln(os.Stderr, "ctlptl docker-desktop: currently only works on Mac and Windows")
 			os.Exit(1)

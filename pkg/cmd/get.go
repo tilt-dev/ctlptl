@@ -53,6 +53,14 @@ func (o *GetOptions) Command() *cobra.Command {
 }
 
 func (o *GetOptions) Run(cmd *cobra.Command, args []string) {
+	a, err := newAnalytics()
+	if err != nil {
+		_, _ = fmt.Fprintf(o.ErrOut, "analytics: %v\n", err)
+		os.Exit(1)
+	}
+	a.Incr("cmd.get", nil)
+	defer a.Flush(time.Second)
+
 	ctx := context.TODO()
 	t := "cluster"
 	if len(args) >= 1 {
@@ -113,7 +121,7 @@ func (o *GetOptions) Run(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	err := o.Print(resource)
+	err = o.Print(resource)
 	if err != nil {
 		_, _ = fmt.Fprintf(o.ErrOut, "Error: %s\n", err)
 		os.Exit(1)

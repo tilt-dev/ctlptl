@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/tilt-dev/ctlptl/pkg/api"
@@ -58,6 +59,13 @@ func (o *ApplyOptions) Run(cmd *cobra.Command, args []string) {
 }
 
 func (o *ApplyOptions) run() error {
+	a, err := newAnalytics()
+	if err != nil {
+		return err
+	}
+	a.Incr("cmd.apply", nil)
+	defer a.Flush(time.Second)
+
 	ctx := context.TODO()
 
 	printer, err := toPrinter(o.PrintFlags)
