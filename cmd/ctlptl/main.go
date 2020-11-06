@@ -3,10 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/cobra/doc"
 	"github.com/spf13/pflag"
 	"github.com/tilt-dev/ctlptl/pkg/cmd"
 	"k8s.io/klog/v2"
@@ -20,6 +22,7 @@ var date string
 func main() {
 	command := cmd.NewRootCommand()
 	command.AddCommand(newVersionCommand())
+	command.AddCommand(newDocsCommand(command))
 
 	klog.InitFlags(nil)
 
@@ -58,4 +61,19 @@ func versionStamp() string {
 	}
 
 	return fmt.Sprintf("v%s, built %s", version, date)
+}
+
+func newDocsCommand(root *cobra.Command) *cobra.Command {
+	return &cobra.Command{
+		Use:    "docs",
+		Short:  "Generate the markdown docs for ctlptl",
+		Hidden: true,
+		Args:   cobra.ExactArgs(1),
+		Run: func(_ *cobra.Command, args []string) {
+			err := doc.GenMarkdownTree(root, args[0])
+			if err != nil {
+				log.Fatal(err)
+			}
+		},
+	}
 }
