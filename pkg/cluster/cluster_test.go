@@ -97,7 +97,7 @@ func TestClusterApplyKINDWithCluster(t *testing.T) {
 	assert.Equal(t, "kind-registry", f.registryCtl.lastApply.Name)
 }
 
-func TestClusterApplyDockerForMac(t *testing.T) {
+func TestClusterApplyDockerDesktop(t *testing.T) {
 	f := newFixture(t)
 	f.dmachine.os = "darwin"
 
@@ -111,7 +111,7 @@ func TestClusterApplyDockerForMac(t *testing.T) {
 	assert.Equal(t, 3, f.dockerClient.ncpu)
 }
 
-func TestClusterApplyDockerForMacCPUOnly(t *testing.T) {
+func TestClusterApplyDockerDesktopCPUOnly(t *testing.T) {
 	f := newFixture(t)
 	f.dmachine.os = "darwin"
 
@@ -128,7 +128,7 @@ func TestClusterApplyDockerForMacCPUOnly(t *testing.T) {
 	assert.Equal(t, 3, f.dockerClient.ncpu)
 }
 
-func TestClusterApplyDockerForMacStartClusterOnly(t *testing.T) {
+func TestClusterApplyDockerDesktopStartClusterOnly(t *testing.T) {
 	f := newFixture(t)
 	f.dmachine.os = "darwin"
 
@@ -142,7 +142,7 @@ func TestClusterApplyDockerForMacStartClusterOnly(t *testing.T) {
 	assert.Equal(t, 1, f.dockerClient.ncpu)
 }
 
-func TestClusterApplyDockerForMacNoRestart(t *testing.T) {
+func TestClusterApplyDockerDesktopNoRestart(t *testing.T) {
 	f := newFixture(t)
 	f.dmachine.os = "darwin"
 

@@ -99,7 +99,7 @@ func TestLookupMap(t *testing.T) {
 
 	_, err = f.d4m.lookupMapAt(settings, "vm.kubernetes.honk")
 	if assert.Error(t, err) {
-		assert.Equal(t, err.Error(), "expected map at DockerForMac setting vm.kubernetes.honk, got: <nil>")
+		assert.Equal(t, err.Error(), "expected map at DockerDesktop setting vm.kubernetes.honk, got: <nil>")
 	}
 }
 
@@ -183,7 +183,7 @@ var postSettingsJSON = `{"desktop":{"exportInsecureDaemon":false,"useGrpcfuse":t
 
 type d4mFixture struct {
 	t            *testing.T
-	d4m          *DockerForMacClient
+	d4m          *DockerDesktopClient
 	settings     string
 	postSettings map[string]interface{}
 }
@@ -191,7 +191,7 @@ type d4mFixture struct {
 func newD4MFixture(t *testing.T) *d4mFixture {
 	f := &d4mFixture{t: t}
 	f.settings = getSettingsJSON
-	f.d4m = &DockerForMacClient{httpClient: f}
+	f.d4m = &DockerDesktopClient{httpClient: f}
 	return f
 }
 

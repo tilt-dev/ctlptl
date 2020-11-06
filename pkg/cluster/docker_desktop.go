@@ -9,11 +9,10 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
-	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	klog "k8s.io/klog/v2"
 )
@@ -22,36 +21,39 @@ type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-// Uses the DockerForMac GUI protocol to control DockerForMac.
+// Uses the DockerDesktop GUI protocol to control DockerDesktop.
 //
 // There isn't an off-the-shelf library or documented protocol we can use
 // for this, so we do the best we can.
-type DockerForMacClient struct {
+type DockerDesktopClient struct {
 	httpClient HTTPClient
 	socketPath string
 }
 
-func NewDockerForMacClient() (DockerForMacClient, error) {
-	homedir, err := homedir.Dir()
+func NewDockerDesktopClient() (DockerDesktopClient, error) {
+	socketPath, err := dockerDesktopSocketPath()
 	if err != nil {
-		return DockerForMacClient{}, err
+		return DockerDesktopClient{}, err
 	}
 
-	socketPath := filepath.Join(homedir, "Library/Containers/com.docker.docker/Data/gui-api.sock")
 	httpClient := &http.Client{
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-				return net.Dial("unix", socketPath)
+				return dialDockerDesktop(socketPath)
 			},
 		},
 	}
-	return DockerForMacClient{
+	return DockerDesktopClient{
 		httpClient: httpClient,
 		socketPath: socketPath,
 	}, nil
 }
 
-func (c DockerForMacClient) start(ctx context.Context) error {
+func (c DockerDesktopClient) start(ctx context.Context) error {
+	if runtime.GOOS == "windows" {
+		return fmt.Errorf("Cannot auto-start Docker Desktop on Windows")
+	}
+
 	_, err := os.Stat("/Applications/Docker.app")
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -68,7 +70,7 @@ func (c DockerForMacClient) start(ctx context.Context) error {
 	return err
 }
 
-func (c DockerForMacClient) resetK8s(ctx context.Context) error {
+func (c DockerDesktopClient) resetK8s(ctx context.Context) error {
 	klog.V(7).Infof("POST %s /kubernetes/reset\n", c.socketPath)
 	req, err := http.NewRequest("POST", "http://localhost/kubernetes/reset", nil)
 	if err != nil {
@@ -88,7 +90,7 @@ func (c DockerForMacClient) resetK8s(ctx context.Context) error {
 	return nil
 }
 
-func (c DockerForMacClient) SettingsValues(ctx context.Context) (interface{}, error) {
+func (c DockerDesktopClient) SettingsValues(ctx context.Context) (interface{}, error) {
 	s, err := c.settings(ctx)
 	if err != nil {
 		return nil, err
@@ -96,7 +98,7 @@ func (c DockerForMacClient) SettingsValues(ctx context.Context) (interface{}, er
 	return c.settingsForWrite(s), nil
 }
 
-func (c DockerForMacClient) SetSettingValue(ctx context.Context, key, newValue string) error {
+func (c DockerDesktopClient) SetSettingValue(ctx context.Context, key, newValue string) error {
 	settings, err := c.settings(ctx)
 	if err != nil {
 		return err
@@ -112,7 +114,7 @@ func (c DockerForMacClient) SetSettingValue(ctx context.Context, key, newValue s
 	return c.writeSettings(ctx, settings)
 }
 
-func (c DockerForMacClient) applySet(settings map[string]interface{}, key, newValue string) (bool, error) {
+func (c DockerDesktopClient) applySet(settings map[string]interface{}, key, newValue string) (bool, error) {
 	spec, err := c.lookupMapAt(settings, key)
 	if err != nil {
 		return false, err
@@ -174,7 +176,7 @@ func (c DockerForMacClient) applySet(settings map[string]interface{}, key, newVa
 	return false, fmt.Errorf("Cannot set key: %s", key)
 }
 
-func (c DockerForMacClient) writeSettings(ctx context.Context, settings map[string]interface{}) error {
+func (c DockerDesktopClient) writeSettings(ctx context.Context, settings map[string]interface{}) error {
 	klog.V(7).Infof("POST %s /settings\n", c.socketPath)
 	buf := bytes.NewBuffer(nil)
 	err := json.NewEncoder(buf).Encode(c.settingsForWrite(settings))
@@ -201,7 +203,7 @@ func (c DockerForMacClient) writeSettings(ctx context.Context, settings map[stri
 	return nil
 }
 
-func (c DockerForMacClient) settings(ctx context.Context) (map[string]interface{}, error) {
+func (c DockerDesktopClient) settings(ctx context.Context) (map[string]interface{}, error) {
 	klog.V(7).Infof("GET %s /settings\n", c.socketPath)
 	req, err := http.NewRequest("GET", "http://localhost/settings", nil)
 	if err != nil {
@@ -227,21 +229,21 @@ func (c DockerForMacClient) settings(ctx context.Context) (map[string]interface{
 	return settings, nil
 }
 
-func (c DockerForMacClient) lookupMapAt(settings map[string]interface{}, key string) (map[string]interface{}, error) {
+func (c DockerDesktopClient) lookupMapAt(settings map[string]interface{}, key string) (map[string]interface{}, error) {
 	parts := strings.Split(key, ".")
 	current := settings
 	for i, part := range parts {
 		var ok bool
 		current, ok = current[part].(map[string]interface{})
 		if !ok {
-			return nil, fmt.Errorf("expected map at DockerForMac setting %s, got: %T",
+			return nil, fmt.Errorf("expected map at DockerDesktop setting %s, got: %T",
 				strings.Join(parts[:i+1], "."), current[part])
 		}
 	}
 	return current, nil
 }
 
-func (c DockerForMacClient) setK8sEnabled(settings map[string]interface{}, newVal bool) (changed bool, err error) {
+func (c DockerDesktopClient) setK8sEnabled(settings map[string]interface{}, newVal bool) (changed bool, err error) {
 	enabledSetting, err := c.lookupMapAt(settings, "vm.kubernetes.enabled")
 	if err != nil {
 		return false, err
@@ -249,7 +251,7 @@ func (c DockerForMacClient) setK8sEnabled(settings map[string]interface{}, newVa
 
 	isEnabled, ok := enabledSetting["value"].(bool)
 	if !ok {
-		return false, fmt.Errorf("expected bool at DockerForMac setting vm.kubernetes.enabled.value, got: %T",
+		return false, fmt.Errorf("expected bool at DockerDesktop setting vm.kubernetes.enabled.value, got: %T",
 			enabledSetting["value"])
 	}
 
@@ -260,7 +262,7 @@ func (c DockerForMacClient) setK8sEnabled(settings map[string]interface{}, newVa
 	return true, nil
 }
 
-func (c DockerForMacClient) ensureMinCPU(settings map[string]interface{}, desired int) (changed bool, err error) {
+func (c DockerDesktopClient) ensureMinCPU(settings map[string]interface{}, desired int) (changed bool, err error) {
 	cpusSetting, err := c.lookupMapAt(settings, "vm.resources.cpus")
 	if err != nil {
 		return false, err
@@ -268,12 +270,12 @@ func (c DockerForMacClient) ensureMinCPU(settings map[string]interface{}, desire
 
 	value, ok := cpusSetting["value"].(float64)
 	if !ok {
-		return false, fmt.Errorf("expected number at DockerForMac setting vm.resources.cpus.value, got: %T",
+		return false, fmt.Errorf("expected number at DockerDesktop setting vm.resources.cpus.value, got: %T",
 			cpusSetting["value"])
 	}
 	max, ok := cpusSetting["max"].(float64)
 	if !ok {
-		return false, fmt.Errorf("expected number at DockerForMac setting vm.resources.cpus.max, got: %T",
+		return false, fmt.Errorf("expected number at DockerDesktop setting vm.resources.cpus.max, got: %T",
 			cpusSetting["max"])
 	}
 
@@ -289,7 +291,7 @@ func (c DockerForMacClient) ensureMinCPU(settings map[string]interface{}, desire
 	return true, nil
 }
 
-func (c DockerForMacClient) settingsForWrite(settings interface{}) interface{} {
+func (c DockerDesktopClient) settingsForWrite(settings interface{}) interface{} {
 	settingsMap, ok := settings.(map[string]interface{})
 	if !ok {
 		return settings

@@ -74,7 +74,7 @@ func NewDockerMachine(ctx context.Context, errOut io.Writer) (*dockerMachine, er
 
 	client.NegotiateAPIVersion(ctx)
 
-	d4m, err := NewDockerForMacClient()
+	d4m, err := NewDockerDesktopClient()
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func (m dockerMachine) EnsureExists(ctx context.Context) error {
 	}
 
 	klog.V(2).Infoln("No Docker daemon running. Attempting to start Docker.")
-	if m.os == "darwin" {
+	if m.os == "darwin" || m.os == "windows" {
 		err := m.d4m.start(ctx)
 		if err != nil {
 			return err
@@ -123,19 +123,16 @@ func (m dockerMachine) EnsureExists(ctx context.Context) error {
 		return nil
 	}
 
-	if m.os == "windows" {
-		return fmt.Errorf("Please install Docker for Desktop: https://www.docker.com/products/docker-desktop")
-	}
 	return fmt.Errorf("Please install Docker for Linux: https://docs.docker.com/engine/install/")
 }
 
 func (m dockerMachine) Restart(ctx context.Context, desired, existing *api.Cluster) error {
-	canChangeCPUs := m.os == "darwin"
+	canChangeCPUs := m.os == "darwin" || m.os == "windows"
 	if existing.Status.CPUs < desired.MinCPUs && !canChangeCPUs {
 		return fmt.Errorf("Cannot automatically set minimum CPU to %d on this platform", desired.MinCPUs)
 	}
 
-	if m.os == "darwin" {
+	if m.os == "darwin" || m.os == "windows" {
 		settings, err := m.d4m.settings(ctx)
 		if err != nil {
 			return err
