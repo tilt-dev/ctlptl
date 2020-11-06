@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/mitchellh/go-homedir"
@@ -93,6 +94,84 @@ func (c DockerForMacClient) SettingsValues(ctx context.Context) (interface{}, er
 		return nil, err
 	}
 	return c.settingsForWrite(s), nil
+}
+
+func (c DockerForMacClient) SetSettingValue(ctx context.Context, key, newValue string) error {
+	settings, err := c.settings(ctx)
+	if err != nil {
+		return err
+	}
+
+	changed, err := c.applySet(settings, key, newValue)
+	if err != nil {
+		return err
+	}
+	if !changed {
+		return nil
+	}
+	return c.writeSettings(ctx, settings)
+}
+
+func (c DockerForMacClient) applySet(settings map[string]interface{}, key, newValue string) (bool, error) {
+	spec, err := c.lookupMapAt(settings, key)
+	if err != nil {
+		return false, err
+	}
+
+	switch v := spec["value"].(type) {
+	case bool:
+		if newValue == "true" {
+			spec["value"] = true
+			return !v, nil
+		} else if newValue == "false" {
+			spec["value"] = false
+			return v, nil
+		}
+
+		return false, fmt.Errorf("expected bool for setting %s, got: %s", key, newValue)
+
+	case float64:
+		newValFloat, err := strconv.ParseFloat(newValue, 64)
+		if err != nil {
+			return false, fmt.Errorf("expected number for setting %s, got: %s. Error: %v", key, newValue, err)
+		}
+
+		max, ok := spec["max"].(float64)
+		if ok && newValFloat > max {
+			return false, fmt.Errorf("setting value %s: %s greater than max allowed (%f)", key, newValue, max)
+		}
+		min, ok := spec["min"].(float64)
+		if ok && newValFloat < min {
+			return false, fmt.Errorf("setting value %s: %s less than min allowed (%f)", key, newValue, min)
+		}
+
+		if newValFloat != v {
+			spec["value"] = newValFloat
+			return true, nil
+		}
+		return false, nil
+	case string:
+		if newValue != v {
+			spec["value"] = newValue
+			return true, nil
+		}
+		return false, nil
+	default:
+		if key == "vm.fileSharing" {
+			pathSpec := []map[string]interface{}{}
+			paths := strings.Split(newValue, ",")
+			for _, path := range paths {
+				pathSpec = append(pathSpec, map[string]interface{}{"path": path, "cached": false})
+			}
+
+			spec["value"] = pathSpec
+
+			// Don't bother trying to optimize this.
+			return true, nil
+		}
+	}
+
+	return false, fmt.Errorf("Cannot set key: %s", key)
 }
 
 func (c DockerForMacClient) writeSettings(ctx context.Context, settings map[string]interface{}) error {
