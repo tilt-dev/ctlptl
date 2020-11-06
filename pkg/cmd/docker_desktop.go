@@ -41,14 +41,14 @@ func NewDockerDesktopCommand() *cobra.Command {
 	return cmd
 }
 
-func withDockerDesktopClient(run func(client cluster.DockerForMacClient, args []string) error) func(_ *cobra.Command, args []string) {
+func withDockerDesktopClient(run func(client cluster.DockerDesktopClient, args []string) error) func(_ *cobra.Command, args []string) {
 	return func(_ *cobra.Command, args []string) {
-		if runtime.GOOS != "darwin" {
-			_, _ = fmt.Fprintln(os.Stderr, "ctlptl docker-desktop: currently only works on Mac")
+		if runtime.GOOS != "darwin" && runtime.GOOS != "windows" {
+			_, _ = fmt.Fprintln(os.Stderr, "ctlptl docker-desktop: currently only works on Mac and Windows")
 			os.Exit(1)
 		}
 
-		c, err := cluster.NewDockerForMacClient()
+		c, err := cluster.NewDockerDesktopClient()
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "ctlptl docker-desktop: %v\n", err)
 			os.Exit(1)
@@ -62,7 +62,7 @@ func withDockerDesktopClient(run func(client cluster.DockerForMacClient, args []
 	}
 }
 
-func dockerDesktopSettings(c cluster.DockerForMacClient, args []string) error {
+func dockerDesktopSettings(c cluster.DockerDesktopClient, args []string) error {
 	settings, err := c.SettingsValues(context.Background())
 	if err != nil {
 		return err
@@ -72,6 +72,6 @@ func dockerDesktopSettings(c cluster.DockerForMacClient, args []string) error {
 	return encoder.Encode(settings)
 }
 
-func dockerDesktopSet(c cluster.DockerForMacClient, args []string) error {
+func dockerDesktopSet(c cluster.DockerDesktopClient, args []string) error {
 	return c.SetSettingValue(context.Background(), args[0], args[1])
 }

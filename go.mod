@@ -31,6 +31,7 @@ require (
 	golang.org/x/net v0.0.0-20200904194848-62affa334b73 // indirect
 	golang.org/x/sys v0.0.0-20200916030750-2334cc1a136f // indirect
 	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b // indirect
+	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
 	gotest.tools/v3 v3.0.3 // indirect
 	k8s.io/api v0.19.2
