@@ -66,12 +66,26 @@ cat <<EOF | ctlptl apply -f -
 apiVersion: ctlptl.dev/v1alpha1
 kind: Cluster
 product: kind
-registry: kind-registry
+registry: ctlptl-registry
 EOF
 ```
 
-You can see more example configurations under [./examples](./examples) and
-complete CLI docs under [./docs](./docs/ctlptl.md).
+Create a Minikube cluster with a built-in registry:
+
+```
+cat <<EOF | ctlptl apply -f -
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+product: minikube
+registry: ctlptl-registry
+EOF
+```
+
+For more details, see:
+
+- Example configurations under [./examples](./examples)
+- Complete CLI docs under [./docs](./docs/ctlptl.md)
+- Cluster API reference under [pkg.go.dev](https://pkg.go.dev/github.com/tilt-dev/ctlptl/pkg/api#Cluster)
 
 ## Why did you make this?
 
@@ -92,13 +106,13 @@ cluster](https://docs.tilt.dev/choosing_clusters.html) and example repos like
 ### Current
 
 - Docker for Mac
-- [KIND](https://kind.sigs.k8s.io/)
-- [KIND with a registry](https://kind.sigs.k8s.io/docs/user/local-registry/)
+- Docker for Windows
+- [KIND](https://kind.sigs.k8s.io/) and [KIND with a registry](https://kind.sigs.k8s.io/docs/user/local-registry/)
+- [Minikube](https://minikube.sigs.k8s.io/) and Minikube with a registry
 - Allocating CPUs
 
 ### In progress
 
-- Minikube
 - K3D
 - Microk8s
 - Allocating Memory

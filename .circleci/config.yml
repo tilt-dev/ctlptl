@@ -18,6 +18,7 @@ jobs:
       - image: circleci/golang:1.14
     steps:
       - checkout
+      - run: git fetch --tags
       - run: curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | sh
       - run: sudo mv ./bin/goreleaser /usr/local/bin/
       - run: goreleaser --rm-dist --skip-publish --snapshot
@@ -29,6 +30,7 @@ jobs:
       - image: circleci/golang:1.14
     steps:
       - checkout
+      - run: git fetch --tags
       - run: curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | sh
       - run: sudo mv ./bin/goreleaser /usr/local/bin/
       - run: goreleaser --rm-dist
