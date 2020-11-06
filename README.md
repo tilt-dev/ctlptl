@@ -70,7 +70,8 @@ registry: kind-registry
 EOF
 ```
 
-You can see more example configurations under [./examples](./examples).
+You can see more example configurations under [./examples](./examples) and
+complete CLI docs under [./docs](./docs/ctlptl.md).
 
 ## Why did you make this?
 
