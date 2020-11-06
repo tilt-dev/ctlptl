@@ -22,7 +22,11 @@ func main() {
 	command.AddCommand(newVersionCommand())
 
 	klog.InitFlags(nil)
+
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.VisitAll(func(f *pflag.Flag) {
+		f.Hidden = true
+	})
 
 	if err := command.Execute(); err != nil {
 		os.Exit(1)
