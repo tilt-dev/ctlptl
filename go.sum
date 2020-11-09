@@ -391,6 +391,8 @@ github.com/tilt-dev/localregistry-go v0.0.0-20201021185044-ffc4c827f097 h1:CiCHb
 github.com/tilt-dev/localregistry-go v0.0.0-20201021185044-ffc4c827f097/go.mod h1:SX7bKYACP+RsddxA+NBkfVzr5DOr5ranTirgT7xlxjA=
 github.com/tilt-dev/wmclient v0.0.0-20200901155816-d8d972f01eb9 h1:RW79Zk+stsHTJGAsvmncc9wU0P8S6CkRZaUQ8NWNb0g=
 github.com/tilt-dev/wmclient v0.0.0-20200901155816-d8d972f01eb9/go.mod h1:CmwKPbHUwMhi/BZXZUjLW1LuxKkRa9qLtJ7p9p9zitE=
+github.com/tilt-dev/wmclient v0.0.0-20201109174454-1839d0355fbc h1:wGkAoZhrvnmq93B4W2v+agiPl7xzqUaxXkxmKrwJ6bc=
+github.com/tilt-dev/wmclient v0.0.0-20201109174454-1839d0355fbc/go.mod h1:n01fG3LbImzxBP3GGCTHkgXuPeJusWg6xv0QYGm9HtE=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
 github.com/ugorji/go v1.1.4/go.mod h1:uQMGLiO92mf5W77hV/PUCpI3pbzQx3CRekS0kk+RGrc=
 github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8/go.mod h1:VFNgLljTbGfSG7qAOspJ7OScBnGdDN/yBr0sguwnwf0=
@@ -532,6 +534,8 @@ golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4/go.mod h1:h1NjWce9XRLGQEsW7w
 golang.org/x/sys v0.0.0-20200831180312-196b9ba8737a/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200916030750-2334cc1a136f h1:6Sc1XOXTulBN6imkqo6XoAXDEzoQ4/ro6xy7Vn8+rOM=
 golang.org/x/sys v0.0.0-20200916030750-2334cc1a136f/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20201106081118-db71ae66460a h1:ALUFBKlIyeY7y5ZgPJmblk/vKz+zBQSnNiPkt41sgeg=
+golang.org/x/sys v0.0.0-20201106081118-db71ae66460a/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/text v0.0.0-20160726164857-2910a502d2bf/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
