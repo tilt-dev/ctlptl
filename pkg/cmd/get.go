@@ -181,6 +181,10 @@ func (o *GetOptions) clustersAsTable(clusters []api.Cluster) runtime.Object {
 		TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "metav1.k8s.io"},
 		ColumnDefinitions: []metav1.TableColumnDefinition{
 			metav1.TableColumnDefinition{
+				Name: "Current",
+				Type: "string",
+			},
+			metav1.TableColumnDefinition{
 				Name: "Name",
 				Type: "string",
 			},
@@ -214,8 +218,14 @@ func (o *GetOptions) clustersAsTable(clusters []api.Cluster) runtime.Object {
 			rHost = "none"
 		}
 
+		current := ""
+		if cluster.Status.Current {
+			current = "*"
+		}
+
 		table.Rows = append(table.Rows, metav1.TableRow{
 			Cells: []interface{}{
+				current,
 				cluster.Name,
 				cluster.Product,
 				age,

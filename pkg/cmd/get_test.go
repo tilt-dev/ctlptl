@@ -25,6 +25,7 @@ var clusterList = &api.ClusterList{
 			Product:  "microk8s",
 			Status: api.ClusterStatus{
 				CreationTimestamp: metav1.Time{Time: createTime},
+				Current:           true,
 			},
 		},
 		api.Cluster{
@@ -49,9 +50,9 @@ func TestDefaultPrint(t *testing.T) {
 
 	err := o.Print(o.transformForOutput(clusterList))
 	require.NoError(t, err)
-	assert.Equal(t, out.String(), `NAME        PRODUCT    AGE   REGISTRY
-microk8s    microk8s   3y    none
-kind-kind   KIND       3y    localhost:5000
+	assert.Equal(t, out.String(), `CURRENT   NAME        PRODUCT    AGE   REGISTRY
+*         microk8s    microk8s   3y    none
+          kind-kind   KIND       3y    localhost:5000
 `)
 }
 
@@ -73,6 +74,7 @@ items:
   product: microk8s
   status:
     creationTimestamp: "2017-07-14T02:40:00Z"
+    current: true
 - apiVersion: ctlptl.dev/v1alpha1
   kind: Cluster
   name: kind-kind
