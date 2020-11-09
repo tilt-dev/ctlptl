@@ -53,6 +53,9 @@ type ClusterStatus struct {
 
 	// The number of CPU. Only applicable to local clusters.
 	CPUs int `json:"cpus,omitempty" yaml:"cpus,omitempty"`
+
+	// Whether this is the current cluster in `kubectl`
+	Current bool `json:"current,omitempty" yaml:"current,omitempty"`
 }
 
 // ClusterList is a list of Clusters.

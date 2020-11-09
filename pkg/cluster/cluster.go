@@ -170,6 +170,13 @@ func (c *Controller) configCopy() *clientcmdapi.Config {
 	return c.config.DeepCopy()
 }
 
+func (c *Controller) configCurrent() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.config.CurrentContext
+}
+
 func (c *Controller) client(name string) (kubernetes.Interface, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -303,6 +310,8 @@ func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) 
 	}()
 
 	wg.Wait()
+
+	cluster.Status.Current = c.configCurrent() == cluster.Name
 }
 
 func FillDefaults(cluster *api.Cluster) {
