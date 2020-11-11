@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -13,8 +14,13 @@ import (
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/registry"
 	"github.com/tilt-dev/localregistry-go"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	discoveryfake "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
@@ -147,6 +153,11 @@ func TestClusterApplyDockerDesktopNoRestart(t *testing.T) {
 	f.dmachine.os = "darwin"
 
 	assert.Equal(t, 0, f.d4m.settingsWriteCount)
+
+	// Pretend the cluster isn't running.
+	err := f.fakeK8s.Tracker().Delete(schema.GroupVersionResource{"", "v1", "nodes"}, "", "node-1")
+	assert.NoError(t, err)
+
 	f.controller.Apply(context.Background(), &api.Cluster{
 		Product: string(ProductDockerDesktop),
 	})
@@ -156,6 +167,49 @@ func TestClusterApplyDockerDesktopNoRestart(t *testing.T) {
 		Product: string(ProductDockerDesktop),
 	})
 	assert.Equal(t, 1, f.d4m.settingsWriteCount)
+}
+
+func TestClusterApplyMinikubeVersion(t *testing.T) {
+	f := newFixture(t)
+	f.dmachine.os = "darwin"
+
+	assert.Equal(t, false, f.d4m.started)
+	minikubeAdmin := f.newFakeAdmin(ProductMinikube)
+
+	result, err := f.controller.Apply(context.Background(), &api.Cluster{
+		Product:           string(ProductMinikube),
+		KubernetesVersion: "v1.14.0",
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, true, f.d4m.started)
+	assert.Equal(t, "minikube", minikubeAdmin.created.Name)
+	assert.Equal(t, "minikube", result.Name)
+
+	minikubeAdmin.created = nil
+
+	_, err = f.controller.Apply(context.Background(), &api.Cluster{
+		Product:           string(ProductMinikube),
+		KubernetesVersion: "v1.14.0",
+	})
+	assert.NoError(t, err)
+
+	// Make sure we don't recreate the cluster.
+	assert.Nil(t, minikubeAdmin.created)
+
+	// Now, change the version and make sure we re-create the cluster.
+	out := bytes.NewBuffer(nil)
+	f.controller.iostreams.ErrOut = out
+
+	_, err = f.controller.Apply(context.Background(), &api.Cluster{
+		Product:           string(ProductMinikube),
+		KubernetesVersion: "v1.15.0",
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, "minikube", minikubeAdmin.created.Name)
+	assert.Contains(t, out.String(),
+		"Deleting cluster minikube because desired Kubernetes version (v1.15.0) "+
+			"does not match current (v1.14.0)")
 }
 
 type fixture struct {
@@ -202,7 +256,13 @@ func newFixture(t *testing.T) *fixture {
 		Out:    os.Stdout,
 		ErrOut: os.Stderr,
 	}
-	fakeK8s := fake.NewSimpleClientset()
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "node-1",
+			CreationTimestamp: metav1.Time{Time: time.Now()},
+		},
+	}
+	fakeK8s := fake.NewSimpleClientset(node)
 	clientLoader := clientLoader(func(restConfig *rest.Config) (kubernetes.Interface, error) {
 		return fakeK8s, nil
 	})
@@ -319,6 +379,7 @@ type fakeAdmin struct {
 	deleted         *api.Cluster
 	config          *clientcmdapi.Config
 	fakeK8s         *fake.Clientset
+	serverVersion   *version.Info
 }
 
 func newFakeAdmin(config *clientcmdapi.Config, fakeK8s *fake.Clientset) *fakeAdmin {
@@ -332,6 +393,14 @@ func (a *fakeAdmin) Create(ctx context.Context, config *api.Cluster, registry *a
 	a.createdRegistry = registry.DeepCopy()
 	a.config.Contexts[config.Name] = &clientcmdapi.Context{Cluster: config.Name}
 	a.config.Clusters[config.Name] = &clientcmdapi.Cluster{Server: fmt.Sprintf("http://%s.localhost/", config.Name)}
+
+	kVersion := config.KubernetesVersion
+	if kVersion == "" {
+		kVersion = "v1.19.1"
+	}
+	a.fakeK8s.Discovery().(*discoveryfake.FakeDiscovery).FakedServerVersion = &version.Info{
+		GitVersion: kVersion,
+	}
 	return nil
 }
 

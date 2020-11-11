@@ -117,7 +117,7 @@ func (o *GetOptions) Run(cmd *cobra.Command, args []string) {
 		}
 
 	default:
-		_, _ = fmt.Fprintf(o.ErrOut, "Unrecognized type: %s\n", t)
+		_, _ = fmt.Fprintf(o.ErrOut, "Unrecognized type: %s. Possible values: cluster, registry.\n", t)
 		os.Exit(1)
 	}
 

@@ -257,6 +257,16 @@ func (c *Controller) populateLocalRegistryHosting(ctx context.Context, cluster *
 	return nil
 }
 
+func (c *Controller) populateKubernetesVersion(ctx context.Context, cluster *api.Cluster, client kubernetes.Interface) error {
+	d := client.Discovery()
+	v, err := d.ServerVersion()
+	if err != nil {
+		return err
+	}
+	cluster.Status.KubernetesVersion = v.GitVersion
+	return nil
+}
+
 func (c *Controller) populateMachineStatus(ctx context.Context, cluster *api.Cluster) error {
 	machine, err := c.machine(ctx, cluster.Name, Product(cluster.Product))
 	if err != nil {
@@ -309,6 +319,15 @@ func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) 
 		}
 	}()
 
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := c.populateKubernetesVersion(ctx, cluster, client)
+		if err != nil {
+			klog.V(4).Infof("WARNING: reading cluster %s version: %v\n", name, err)
+		}
+	}()
+
 	wg.Wait()
 
 	cluster.Status.Current = c.configCurrent() == cluster.Name
@@ -327,6 +346,10 @@ func supportsRegistry(product Product) bool {
 	return product == ProductKIND || product == ProductMinikube
 }
 
+func supportsKubernetesVersion(product Product, version string) bool {
+	return product == ProductMinikube
+}
+
 func (c *Controller) deleteIfIrreconcilable(ctx context.Context, desired, existing *api.Cluster) error {
 	if existing.Name == "" {
 		// Nothing to delete
@@ -343,6 +366,12 @@ func (c *Controller) deleteIfIrreconcilable(ctx context.Context, desired, existi
 		// with a registry, but it gets a little hairy.
 		_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Deleting cluster %s to initialize with registry %s\n",
 			desired.Name, desired.Registry)
+		needsDelete = true
+	} else if desired.KubernetesVersion != "" &&
+		desired.KubernetesVersion != existing.Status.KubernetesVersion {
+		_, _ = fmt.Fprintf(c.iostreams.ErrOut,
+			"Deleting cluster %s because desired Kubernetes version (%s) does not match current (%s)\n",
+			desired.Name, desired.KubernetesVersion, existing.Status.KubernetesVersion)
 		needsDelete = true
 	}
 
@@ -379,6 +408,9 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 	}
 	if desired.Registry != "" && !supportsRegistry(Product(desired.Product)) {
 		return nil, fmt.Errorf("product %s does not support a registry", desired.Product)
+	}
+	if desired.KubernetesVersion != "" && !supportsKubernetesVersion(Product(desired.Product), desired.KubernetesVersion) {
+		return nil, fmt.Errorf("product %s does not support a custom Kubernetes version", desired.Product)
 	}
 
 	FillDefaults(desired)

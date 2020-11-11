@@ -38,6 +38,16 @@ type Cluster struct {
 	// Not supported on all cluster products.
 	Registry string `json:"registry,omitempty" yaml:"registry,omitempty"`
 
+	// The desired version of Kubernetes to run.
+	//
+	// Examples:
+	// v1.19.1
+	// v1.14.0
+	// Must start with 'v' and contain a major, minor, and patch version.
+	//
+	// Not all cluster products allow you to customize this.
+	KubernetesVersion string `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
+
 	// Most recently observed status of the cluster.
 	// Populated by the system.
 	// Read-only.
@@ -56,6 +66,16 @@ type ClusterStatus struct {
 
 	// Whether this is the current cluster in `kubectl`
 	Current bool `json:"current,omitempty" yaml:"current,omitempty"`
+
+	// The version of Kubernetes currently running.
+	//
+	// Reported by the Kubernetes API. May contain a build tag.
+	//
+	// Examples:
+	// v1.19.1
+	// v1.18.10-gke.601
+	// v1.19.3-34+fa32ff1c160058
+	KubernetesVersion string `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
 }
 
 // ClusterList is a list of Clusters.
