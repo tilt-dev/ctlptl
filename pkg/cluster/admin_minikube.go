@@ -47,6 +47,9 @@ func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, regist
 	if desired.MinCPUs != 0 {
 		args = append(args, fmt.Sprintf("--cpus=%d", desired.MinCPUs))
 	}
+	if desired.KubernetesVersion != "" {
+		args = append(args, "--kubernetes-version", desired.KubernetesVersion)
+	}
 
 	in := strings.NewReader("")
 

@@ -1,0 +1,6 @@
+# Creates a minikube cluster with a registry and Kubernetes v1.14
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+product: minikube
+registry: ctlptl-registry
+kubernetesVersion: v1.14.0
