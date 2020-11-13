@@ -26,6 +26,14 @@ func NewDockerDesktopCommand() *cobra.Command {
 		Run:   withDockerDesktopClient("docker-desktop-settings", dockerDesktopSettings),
 		Args:  cobra.ExactArgs(0),
 	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "reset-cluster",
+		Short: "Reset the docker-desktop Kubernetes cluster",
+		Run:   withDockerDesktopClient("docker-desktop-reset-cluster", dockerDesktopResetCluster),
+		Args:  cobra.ExactArgs(0),
+	})
+
 	cmd.AddCommand(&cobra.Command{
 		Use:   "set KEY VALUE",
 		Short: "Set the docker-desktop settings",
@@ -83,4 +91,8 @@ func dockerDesktopSettings(c cluster.DockerDesktopClient, args []string) error {
 
 func dockerDesktopSet(c cluster.DockerDesktopClient, args []string) error {
 	return c.SetSettingValue(context.Background(), args[0], args[1])
+}
+
+func dockerDesktopResetCluster(c cluster.DockerDesktopClient, args []string) error {
+	return c.ResetCluster(context.Background())
 }

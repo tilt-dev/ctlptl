@@ -47,7 +47,7 @@ type sleeper func(dur time.Duration)
 type d4mClient interface {
 	writeSettings(ctx context.Context, settings map[string]interface{}) error
 	settings(ctx context.Context) (map[string]interface{}, error)
-	resetK8s(tx context.Context) error
+	ResetCluster(tx context.Context) error
 	setK8sEnabled(settings map[string]interface{}, desired bool) (bool, error)
 	ensureMinCPU(settings map[string]interface{}, desired int) (bool, error)
 	start(ctx context.Context) error
