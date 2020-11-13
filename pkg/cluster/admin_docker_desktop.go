@@ -46,7 +46,7 @@ func (a *dockerDesktopAdmin) Delete(ctx context.Context, config *api.Cluster) er
 		return err
 	}
 
-	err = client.resetK8s(ctx)
+	err = client.ResetCluster(ctx)
 	if err != nil {
 		return err
 	}

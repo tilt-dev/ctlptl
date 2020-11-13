@@ -359,7 +359,7 @@ func (c *fakeD4MClient) ensureMinCPU(settings map[string]interface{}, desired in
 
 }
 
-func (c *fakeD4MClient) resetK8s(ctx context.Context) error {
+func (c *fakeD4MClient) ResetCluster(ctx context.Context) error {
 	c.resetCount++
 	return nil
 }

@@ -70,7 +70,7 @@ func (c DockerDesktopClient) start(ctx context.Context) error {
 	return err
 }
 
-func (c DockerDesktopClient) resetK8s(ctx context.Context) error {
+func (c DockerDesktopClient) ResetCluster(ctx context.Context) error {
 	klog.V(7).Infof("POST %s /kubernetes/reset\n", c.socketPath)
 	req, err := http.NewRequest("POST", "http://localhost/kubernetes/reset", nil)
 	if err != nil {
