@@ -35,6 +35,14 @@ func TestClusterGet(t *testing.T) {
 	assert.Equal(t, cluster.Product, "microk8s")
 }
 
+func TestClusterCurrent(t *testing.T) {
+	c := newFakeController(t)
+	cluster, err := c.Current(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, cluster.Name, "microk8s")
+	assert.Equal(t, cluster.Product, "microk8s")
+}
+
 func TestClusterList(t *testing.T) {
 	c := newFakeController(t)
 	clusters, err := c.List(context.Background(), ListOptions{})
