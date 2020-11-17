@@ -1,0 +1,6 @@
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+name: minikube-ctlptl-test-cluster
+product: minikube
+registry: ctlptl-test-registry
+

@@ -1,15 +1,47 @@
 version: 2.1
 orbs:
   slack: circleci/slack@3.3.0
+  kubernetes: circleci/kubernetes@0.11.1
 jobs:
   build:
     docker:
       - image: circleci/golang:1.14
-    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+    working_directory: /go/src/github.com/tilt-dev/ctlptl
     steps:
       - checkout
       - run: go get -v -t -d ./...
       - run: go test -v ./...
+      - slack/notify-on-failure:
+          only_for_branches: master
+
+  e2e:
+    machine:
+      image: ubuntu-1604:201903-01
+    working_directory: /home/circleci/.go_workspace/src/github.com/tilt-dev/ctlptl
+    steps:
+      - checkout
+      - kubernetes/install-kubectl
+      - run: |
+          set -ex
+          wget https://golang.org/dl/go1.15.5.linux-amd64.tar.gz
+          sudo rm -fR /usr/local/go
+          sudo tar -C /usr/local -xzf go1.15.5.linux-amd64.tar.gz
+      - run: |
+          set -ex
+          export MINIKUBE_VERSION=v1.15.0
+          curl -fLo ./minikube-linux-amd64 "https://github.com/kubernetes/minikube/releases/download/${MINIKUBE_VERSION}/minikube-linux-amd64"
+          chmod +x ./minikube-linux-amd64
+          sudo mv ./minikube-linux-amd64 /usr/local/bin/minikube
+      - run: |
+          set -ex
+          export KIND_VERSION=v0.9.0
+          curl -fLo ./kind-linux-amd64 "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
+          chmod +x ./kind-linux-amd64
+          sudo mv ./kind-linux-amd64 /usr/local/bin/kind
+      - run: |
+          set -ex
+          go get -v -t -d ./...
+          test/e2e.sh
       - slack/notify-on-failure:
           only_for_branches: master
           
@@ -43,6 +75,10 @@ workflows:
     jobs:
       - build:
           context: Tilt Slack Context
+      - e2e:
+          context: Tilt Slack Context
+          requires:
+            - build
       - release-dry-run:
           context: Tilt Slack Context
           requires:

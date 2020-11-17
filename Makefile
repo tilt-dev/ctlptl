@@ -11,3 +11,7 @@ generated:
 
 tidy:
 	go mod tidy
+
+e2e:
+	test/e2e.sh
+

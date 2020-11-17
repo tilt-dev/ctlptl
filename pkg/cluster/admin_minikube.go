@@ -130,8 +130,12 @@ func (a *minikubeAdmin) applyContainerdPatch(ctx context.Context, desired *api.C
 			fmt.Sprintf(
 				`s,\\\[plugins.cri.registry.mirrors\\\],[plugins.cri.registry.mirrors]\\\n`+
 					`\ \ \ \ \ \ \ \ [plugins.cri.registry.mirrors.\\\"localhost:%d\\\"]\\\n`+
+					`\ \ \ \ \ \ \ \ \ \ endpoint\ =\ [\\\"http://%s:%d\\\"]\\\n`+
+					`\ \ \ \ \ \ \ \ [plugins.cri.registry.mirrors.\\\"%s:%d\\\"]\\\n`+
 					`\ \ \ \ \ \ \ \ \ \ endpoint\ =\ [\\\"http://%s:%d\\\"],`,
-				registry.Status.HostPort, networkHost, registry.Status.ContainerPort),
+				registry.Status.HostPort, networkHost, registry.Status.ContainerPort,
+				networkHost, registry.Status.ContainerPort,
+				networkHost, registry.Status.ContainerPort),
 			configPath)
 		cmd.Stderr = a.iostreams.ErrOut
 		cmd.Stdout = a.iostreams.Out

@@ -61,7 +61,10 @@ containerdConfigPatches:
 - |-
   [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:%d"]
     endpoint = ["http://%s:%d"]
-`, registry.Status.HostPort, registry.Name, registry.Status.ContainerPort)
+  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."%s:%d"]
+    endpoint = ["http://%s:%d"]
+`, registry.Status.HostPort, registry.Name, registry.Status.ContainerPort,
+			registry.Name, registry.Status.ContainerPort, registry.Name, registry.Status.ContainerPort)
 		in = strings.NewReader(containerdConfig)
 
 		args = append(args, "--config", "-")

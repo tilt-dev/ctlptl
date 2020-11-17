@@ -1,0 +1,6 @@
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+name: kind-ctlptl-test-cluster
+product: kind
+registry: ctlptl-test-registry
+

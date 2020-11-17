@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ko-builder
+spec:
+  template:
+    metadata:
+      labels:
+        app: ko-builder
+    spec:
+      containers:
+      - name: builder
+        image: localhost:5005/ko-builder
+        command: ["bash", "-c",
+          "go get github.com/tilt-dev/ctlptl/test/simple-server && ko publish --insecure-registry github.com/tilt-dev/ctlptl/test/simple-server"]
+        env:
+        - name: KO_DOCKER_REPO
+          value: REGISTRY_HOST_PLACEHOLDER
+        - name: GO111MODULE
+          value: "off"
+      restartPolicy: Never
+  backoffLimit: 4
