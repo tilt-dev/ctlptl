@@ -408,11 +408,11 @@ func (a *fakeAdmin) Create(ctx context.Context, config *api.Cluster, registry *a
 	return nil
 }
 
-func (a *fakeAdmin) LocalRegistryHosting(registry *api.Registry) *localregistry.LocalRegistryHostingV1 {
+func (a *fakeAdmin) LocalRegistryHosting(ctx context.Context, cluster *api.Cluster, registry *api.Registry) (*localregistry.LocalRegistryHostingV1, error) {
 	return &localregistry.LocalRegistryHostingV1{
 		Host: fmt.Sprintf("localhost:%d", registry.Status.HostPort),
 		Help: "https://github.com/tilt-dev/ctlptl",
-	}
+	}, nil
 }
 
 func (a *fakeAdmin) Delete(ctx context.Context, config *api.Cluster) error {

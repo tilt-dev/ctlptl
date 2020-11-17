@@ -12,6 +12,9 @@ import (
 type Admin interface {
 	EnsureInstalled(ctx context.Context) error
 	Create(ctx context.Context, desired *api.Cluster, registry *api.Registry) error
-	LocalRegistryHosting(registry *api.Registry) *localregistry.LocalRegistryHostingV1
+
+	// Infers the LocalRegistryHosting that this admin will try to configure.
+	LocalRegistryHosting(ctx context.Context, desired *api.Cluster, registry *api.Registry) (*localregistry.LocalRegistryHostingV1, error)
+
 	Delete(ctx context.Context, config *api.Cluster) error
 }
