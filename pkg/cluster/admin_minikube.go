@@ -161,11 +161,22 @@ func (a *minikubeAdmin) inRegistryNetwork(registry *api.Registry, networkMode co
 	return false
 }
 
-func (a *minikubeAdmin) LocalRegistryHosting(registry *api.Registry) *localregistry.LocalRegistryHostingV1 {
-	return &localregistry.LocalRegistryHostingV1{
-		Host: fmt.Sprintf("localhost:%d", registry.Status.HostPort),
-		Help: "https://github.com/tilt-dev/ctlptl",
+func (a *minikubeAdmin) LocalRegistryHosting(ctx context.Context, desired *api.Cluster, registry *api.Registry) (*localregistry.LocalRegistryHostingV1, error) {
+	container, err := a.dockerClient.ContainerInspect(ctx, desired.Name)
+	if err != nil {
+		return nil, errors.Wrap(err, "inspecting minikube cluster")
 	}
+	networkMode := container.HostConfig.NetworkMode
+	networkHost := registry.Status.IPAddress
+	if networkMode.IsUserDefined() {
+		networkHost = registry.Name
+	}
+
+	return &localregistry.LocalRegistryHostingV1{
+		Host:                   fmt.Sprintf("localhost:%d", registry.Status.HostPort),
+		HostFromClusterNetwork: fmt.Sprintf("%s:%d", networkHost, registry.Status.ContainerPort),
+		Help:                   "https://github.com/tilt-dev/ctlptl",
+	}, nil
 }
 
 func (a *minikubeAdmin) Delete(ctx context.Context, config *api.Cluster) error {

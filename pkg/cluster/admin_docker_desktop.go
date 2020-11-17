@@ -32,8 +32,8 @@ func (a *dockerDesktopAdmin) Create(ctx context.Context, desired *api.Cluster, r
 	return fmt.Errorf("docker-desktop Kubernetes clusters are only available on macos and windows")
 }
 
-func (a *dockerDesktopAdmin) LocalRegistryHosting(registry *api.Registry) *localregistry.LocalRegistryHostingV1 {
-	return nil
+func (a *dockerDesktopAdmin) LocalRegistryHosting(ctx context.Context, desired *api.Cluster, registry *api.Registry) (*localregistry.LocalRegistryHostingV1, error) {
+	return nil, nil
 }
 
 func (a *dockerDesktopAdmin) Delete(ctx context.Context, config *api.Cluster) error {

@@ -97,12 +97,12 @@ func (a *kindAdmin) inKindNetwork(registry *api.Registry) bool {
 	return false
 }
 
-func (a *kindAdmin) LocalRegistryHosting(registry *api.Registry) *localregistry.LocalRegistryHostingV1 {
+func (a *kindAdmin) LocalRegistryHosting(ctx context.Context, desired *api.Cluster, registry *api.Registry) (*localregistry.LocalRegistryHostingV1, error) {
 	return &localregistry.LocalRegistryHostingV1{
 		Host:                   fmt.Sprintf("localhost:%d", registry.Status.HostPort),
 		HostFromClusterNetwork: fmt.Sprintf("%s:%d", registry.Name, registry.Status.ContainerPort),
 		Help:                   "https://github.com/tilt-dev/ctlptl",
-	}
+	}, nil
 }
 
 func (a *kindAdmin) Delete(ctx context.Context, config *api.Cluster) error {

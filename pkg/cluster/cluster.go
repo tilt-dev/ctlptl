@@ -539,7 +539,10 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 // Create a configmap on the cluster, so that other tools know that a registry
 // has been configured.
 func (c *Controller) createRegistryHosting(ctx context.Context, admin Admin, cluster *api.Cluster, reg *api.Registry) error {
-	hosting := admin.LocalRegistryHosting(reg)
+	hosting, err := admin.LocalRegistryHosting(ctx, cluster, reg)
+	if err != nil {
+		return err
+	}
 	if hosting == nil {
 		return nil
 	}
