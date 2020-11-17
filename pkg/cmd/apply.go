@@ -87,6 +87,28 @@ func (o *ApplyOptions) run() error {
 	var rc *registry.Controller
 	for _, obj := range objects {
 		switch obj := obj.(type) {
+		case *api.Registry:
+			if rc == nil {
+				rc, err = registry.DefaultController(ctx, o.IOStreams)
+				if err != nil {
+					return err
+				}
+			}
+
+			newObj, err := rc.Apply(ctx, obj)
+			if err != nil {
+				return err
+			}
+
+			err = printer.PrintObj(newObj, o.Out)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, obj := range objects {
+		switch obj := obj.(type) {
 		case *api.Cluster:
 			if cc == nil {
 				cc, err = cluster.DefaultController(o.IOStreams)
@@ -106,25 +128,11 @@ func (o *ApplyOptions) run() error {
 			}
 
 		case *api.Registry:
-			if rc == nil {
-				rc, err = registry.DefaultController(ctx, o.IOStreams)
-				if err != nil {
-					return err
-				}
-			}
-
-			newObj, err := rc.Apply(ctx, obj)
-			if err != nil {
-				return err
-			}
-
-			err = printer.PrintObj(newObj, o.Out)
-			if err != nil {
-				return err
-			}
+			// Handled above
+			continue
 
 		default:
-			return fmt.Errorf("Unrecognized type: %T", obj)
+			return fmt.Errorf("unrecognized type: %T", obj)
 		}
 	}
 	return nil
