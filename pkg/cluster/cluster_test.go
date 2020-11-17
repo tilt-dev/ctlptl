@@ -321,6 +321,10 @@ func (c *fakeDockerClient) Info(ctx context.Context) (types.Info, error) {
 	return types.Info{NCPU: c.ncpu}, nil
 }
 
+func (c *fakeDockerClient) ContainerInspect(ctx context.Context, id string) (types.ContainerJSON, error) {
+	return types.ContainerJSON{}, nil
+}
+
 type fakeD4MClient struct {
 	lastSettings       map[string]interface{}
 	docker             *fakeDockerClient

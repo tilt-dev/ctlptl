@@ -6,6 +6,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/registry"
@@ -52,6 +53,7 @@ type Controller struct {
 	config       clientcmdapi.Config
 	clients      map[string]kubernetes.Interface
 	admins       map[Product]Admin
+	dockerClient dockerClient
 	dmachine     *dockerMachine
 	configLoader configLoader
 	registryCtl  registryController
@@ -88,14 +90,37 @@ func DefaultController(iostreams genericclioptions.IOStreams) (*Controller, erro
 	}, nil
 }
 
+func (c *Controller) getDockerClient(ctx context.Context) (dockerClient, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.dockerClient != nil {
+		return c.dockerClient, nil
+	}
+
+	client, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return nil, err
+	}
+
+	client.NegotiateAPIVersion(ctx)
+	c.dockerClient = client
+	return client, nil
+}
+
 func (c *Controller) machine(ctx context.Context, name string, product Product) (Machine, error) {
+	dockerClient, err := c.getDockerClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	switch product {
 	case ProductDockerDesktop, ProductKIND, ProductK3D:
 		if c.dmachine == nil {
-			machine, err := NewDockerMachine(ctx, c.iostreams.ErrOut)
+			machine, err := NewDockerMachine(ctx, dockerClient, c.iostreams.ErrOut)
 			if err != nil {
 				return nil, err
 			}
@@ -105,7 +130,7 @@ func (c *Controller) machine(ctx context.Context, name string, product Product) 
 
 	case ProductMinikube:
 		if c.dmachine == nil {
-			machine, err := NewDockerMachine(ctx, c.iostreams.ErrOut)
+			machine, err := NewDockerMachine(ctx, dockerClient, c.iostreams.ErrOut)
 			if err != nil {
 				return nil, err
 			}
@@ -136,6 +161,11 @@ func (c *Controller) registryController(ctx context.Context) (registryController
 // A cluster admin provides the basic start/stop functionality of a cluster,
 // independent of the configuration of the machine it's running on.
 func (c *Controller) admin(ctx context.Context, product Product) (Admin, error) {
+	dockerClient, err := c.getDockerClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -150,7 +180,7 @@ func (c *Controller) admin(ctx context.Context, product Product) (Admin, error) 
 	case ProductKIND:
 		admin = newKindAdmin(c.iostreams)
 	case ProductMinikube:
-		admin = newMinikubeAdmin(c.iostreams)
+		admin = newMinikubeAdmin(c.iostreams, dockerClient)
 	}
 
 	if product == "" {
