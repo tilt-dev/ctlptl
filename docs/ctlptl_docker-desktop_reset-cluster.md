@@ -1,15 +1,15 @@
-## ctlptl docker-desktop settings
+## ctlptl docker-desktop reset-cluster
 
-Print the docker-desktop settings
+Reset the docker-desktop Kubernetes cluster
 
 ```
-ctlptl docker-desktop settings [flags]
+ctlptl docker-desktop reset-cluster [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for settings
+  -h, --help   help for reset-cluster
 ```
 
 ### SEE ALSO

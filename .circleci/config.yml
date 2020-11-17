@@ -67,7 +67,7 @@ jobs:
       - run: sudo mv ./bin/goreleaser /usr/local/bin/
       - run: goreleaser --rm-dist
       - slack/status:
-          mentions: "@nick"
+          mentions: "nick"
         
 workflows:
   version: 2
