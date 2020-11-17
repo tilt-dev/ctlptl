@@ -10,8 +10,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/tilt-dev/ctlptl/pkg/api"
@@ -53,11 +51,6 @@ type d4mClient interface {
 	start(ctx context.Context) error
 }
 
-type dockerClient interface {
-	ServerVersion(ctx context.Context) (types.Version, error)
-	Info(ctx context.Context) (types.Info, error)
-}
-
 type dockerMachine struct {
 	dockerClient dockerClient
 	errOut       io.Writer
@@ -66,14 +59,7 @@ type dockerMachine struct {
 	os           string
 }
 
-func NewDockerMachine(ctx context.Context, errOut io.Writer) (*dockerMachine, error) {
-	client, err := client.NewClientWithOpts(client.FromEnv)
-	if err != nil {
-		return nil, err
-	}
-
-	client.NegotiateAPIVersion(ctx)
-
+func NewDockerMachine(ctx context.Context, client dockerClient, errOut io.Writer) (*dockerMachine, error) {
 	d4m, err := NewDockerDesktopClient()
 	if err != nil {
 		return nil, err
