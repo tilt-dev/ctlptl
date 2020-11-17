@@ -595,6 +595,14 @@ func (c *Controller) reloadConfigs() error {
 	return nil
 }
 
+func (c *Controller) Current(ctx context.Context) (*api.Cluster, error) {
+	current := c.configCurrent()
+	if current == "" {
+		return nil, fmt.Errorf("no cluster selected in kubeconfig")
+	}
+	return c.Get(ctx, current)
+}
+
 func (c *Controller) Get(ctx context.Context, name string) (*api.Cluster, error) {
 	config := c.configCopy()
 	ct, ok := config.Contexts[name]
