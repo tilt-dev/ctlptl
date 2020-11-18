@@ -35,6 +35,20 @@ func NewDockerDesktopCommand() *cobra.Command {
 	})
 
 	cmd.AddCommand(&cobra.Command{
+		Use:   "open",
+		Short: "Open docker-desktop",
+		Run:   withDockerDesktopClient("docker-desktop-open", dockerDesktopOpen),
+		Args:  cobra.ExactArgs(0),
+	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "quit",
+		Short: "Shutdown docker-desktop",
+		Run:   withDockerDesktopClient("docker-desktop-quit", dockerDesktopQuit),
+		Args:  cobra.ExactArgs(0),
+	})
+
+	cmd.AddCommand(&cobra.Command{
 		Use:   "set KEY VALUE",
 		Short: "Set the docker-desktop settings",
 		Long: "Set the docker-desktop settings\n\n" +
@@ -95,4 +109,12 @@ func dockerDesktopSet(c cluster.DockerDesktopClient, args []string) error {
 
 func dockerDesktopResetCluster(c cluster.DockerDesktopClient, args []string) error {
 	return c.ResetCluster(context.Background())
+}
+
+func dockerDesktopOpen(c cluster.DockerDesktopClient, args []string) error {
+	return c.Open(context.Background())
+}
+
+func dockerDesktopQuit(c cluster.DockerDesktopClient, args []string) error {
+	return c.Quit(context.Background())
 }

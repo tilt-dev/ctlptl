@@ -48,7 +48,7 @@ type d4mClient interface {
 	ResetCluster(tx context.Context) error
 	setK8sEnabled(settings map[string]interface{}, desired bool) (bool, error)
 	ensureMinCPU(settings map[string]interface{}, desired int) (bool, error)
-	start(ctx context.Context) error
+	Open(ctx context.Context) error
 }
 
 type dockerMachine struct {
@@ -90,7 +90,7 @@ func (m dockerMachine) EnsureExists(ctx context.Context) error {
 
 	klog.V(2).Infoln("No Docker daemon running. Attempting to start Docker.")
 	if m.os == "darwin" || m.os == "windows" {
-		err := m.d4m.start(ctx)
+		err := m.d4m.Open(ctx)
 		if err != nil {
 			return err
 		}

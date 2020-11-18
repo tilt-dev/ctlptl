@@ -129,7 +129,7 @@ func TestClusterApplyDockerDesktopCPUOnly(t *testing.T) {
 	f := newFixture(t)
 	f.dmachine.os = "darwin"
 
-	err := f.d4m.start(context.Background())
+	err := f.d4m.Open(context.Background())
 	require.NoError(t, err)
 
 	assert.Equal(t, true, f.d4m.started)
@@ -376,7 +376,7 @@ func (c *fakeD4MClient) ResetCluster(ctx context.Context) error {
 	return nil
 }
 
-func (c *fakeD4MClient) start(ctx context.Context) error {
+func (c *fakeD4MClient) Open(ctx context.Context) error {
 	c.lastSettings = map[string]interface{}{
 		"cpu": c.docker.ncpu,
 	}
