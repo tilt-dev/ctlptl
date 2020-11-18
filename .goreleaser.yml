@@ -35,13 +35,13 @@ brews:
   commit_author:
     name: Tilt Dev
     email: hi@tilt.dev
-  url_template: "http://github.com/tilt-dev/ctlptl/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+  url_template: "https://github.com/tilt-dev/ctlptl/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
   homepage: "https://ctlptl.dev/"
   description: "Making local Kubernetes clusters easy to set up and tear down"
   test: |
     system "#{bin}/ctlptl version"
 scoop:
-  url_template: "http://github.com/tilt-dev/tilt/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+  url_template: "https://github.com/tilt-dev/tilt/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
   bucket:
     owner: tilt-dev
     name: scoop-bucket
