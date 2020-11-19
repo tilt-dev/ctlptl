@@ -1,15 +1,15 @@
-## ctlptl docker-desktop reset-cluster
+## ctlptl docker-desktop open
 
-Reset the docker-desktop Kubernetes cluster
+Open docker-desktop
 
 ```
-ctlptl docker-desktop reset-cluster [flags]
+ctlptl docker-desktop open [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for reset-cluster
+  -h, --help   help for open
 ```
 
 ### SEE ALSO
