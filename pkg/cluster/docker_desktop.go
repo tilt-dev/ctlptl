@@ -49,7 +49,7 @@ func NewDockerDesktopClient() (DockerDesktopClient, error) {
 	}, nil
 }
 
-func (c DockerDesktopClient) start(ctx context.Context) error {
+func (c DockerDesktopClient) Open(ctx context.Context) error {
 	if runtime.GOOS == "windows" {
 		return fmt.Errorf("Cannot auto-start Docker Desktop on Windows")
 	}
@@ -67,7 +67,20 @@ func (c DockerDesktopClient) start(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "starting Docker")
 	}
-	return err
+	return nil
+}
+
+func (c DockerDesktopClient) Quit(ctx context.Context) error {
+	if runtime.GOOS == "windows" {
+		return fmt.Errorf("Cannot quit Docker Desktop on Windows")
+	}
+
+	cmd := exec.Command("osascript", "-e", `quit app "Docker"`)
+	err := cmd.Run()
+	if err != nil {
+		return errors.Wrap(err, "quitting Docker")
+	}
+	return nil
 }
 
 func (c DockerDesktopClient) ResetCluster(ctx context.Context) error {
