@@ -49,7 +49,7 @@ Create:
 
 ```
 ctlptl docker-desktop open
-ctpltl create cluster docker-desktop --min-cpus=4
+ctlptl create cluster docker-desktop --min-cpus=4
 ```
 
 or ensure exists:
@@ -75,7 +75,7 @@ ctlptl docker-desktop quit
 Create:
 
 ```
-ctpltl create cluster kind --registry=ctlptl-registry
+ctlptl create cluster kind --registry=ctlptl-registry
 ```
 
 or ensure exists:
