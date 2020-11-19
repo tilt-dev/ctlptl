@@ -79,7 +79,7 @@ containerdConfigPatches:
 		return errors.Wrap(err, "creating kind cluster")
 	}
 
-	if !a.inKindNetwork(registry) {
+	if registry != nil && !a.inKindNetwork(registry) {
 		_, _ = fmt.Fprintf(a.iostreams.ErrOut, "   Connecting kind to registry %s\n", registry.Name)
 		cmd := exec.CommandContext(ctx, "docker", "network", "connect", kindNetworkName, registry.Name)
 		err := cmd.Run()

@@ -13,6 +13,7 @@ func NewRootCommand() *cobra.Command {
 			"  ctlptl apply -f my-cluster.yaml",
 	}
 
+	rootCmd.AddCommand(NewCreateOptions().Command())
 	rootCmd.AddCommand(NewGetOptions().Command())
 	rootCmd.AddCommand(NewApplyOptions().Command())
 	rootCmd.AddCommand(NewDeleteOptions().Command())
