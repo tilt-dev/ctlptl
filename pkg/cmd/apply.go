@@ -41,6 +41,7 @@ func (o *ApplyOptions) Command() *cobra.Command {
 	}
 
 	o.FileNameFlags.AddFlags(cmd.Flags())
+	o.PrintFlags.AddFlags(cmd)
 
 	return cmd
 }
