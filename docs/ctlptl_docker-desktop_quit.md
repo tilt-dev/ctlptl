@@ -1,15 +1,15 @@
-## ctlptl docker-desktop reset-cluster
+## ctlptl docker-desktop quit
 
-Reset the docker-desktop Kubernetes cluster
+Shutdown docker-desktop
 
 ```
-ctlptl docker-desktop reset-cluster [flags]
+ctlptl docker-desktop quit [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for reset-cluster
+  -h, --help   help for quit
 ```
 
 ### SEE ALSO

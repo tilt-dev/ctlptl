@@ -34,15 +34,25 @@ scoop install ctlptl
 
 ## How do I use it?
 
-`ctlptl` supports 3 major commands:
+`ctlptl` supports 4 major commands:
 
+- `ctlptl get` - see all running clusters
+- `ctlptl create cluster [product]` - create a cluster and make it the current `kubectl` context
 - `ctlptl apply -f cluster.yaml` - ensure a cluster exists, or create one
 - `ctlptl delete -f cluster.yaml` - delete a cluster and its state
-- `ctlptl get` - see all running clusters
 
 ### Examples
 
 #### Docker for Mac: Enable Kubernetes and set 4 CPU
+
+Create:
+
+```
+ctlptl docker-desktop open
+ctpltl create cluster docker-desktop --min-cpus=4
+```
+
+or ensure exists:
 
 ```
 cat <<EOF | ctlptl apply -f -
@@ -57,9 +67,18 @@ EOF
 
 ```
 ctlptl delete cluster docker-desktop
+ctlptl docker-desktop quit
 ```
 
 #### KIND: with a built-in registry
+
+Create:
+
+```
+ctpltl create cluster kind --registry=ctlptl-registry
+```
+
+or ensure exists:
 
 ```
 cat <<EOF | ctlptl apply -f -
@@ -71,6 +90,14 @@ EOF
 ```
 
 #### Minikube: with a built-in registry
+
+Create:
+
+```
+ctlptl create cluster minikube --registry=ctlptl-registry
+```
+
+or ensure exists:
 
 ```
 cat <<EOF | ctlptl apply -f -
