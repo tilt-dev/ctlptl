@@ -56,6 +56,7 @@ type Controller struct {
 	dockerClient dockerClient
 	dmachine     *dockerMachine
 	configLoader configLoader
+	configWriter configWriter
 	registryCtl  registryController
 	mu           sync.Mutex
 	clientLoader clientLoader
@@ -71,6 +72,8 @@ func DefaultController(iostreams genericclioptions.IOStreams) (*Controller, erro
 		return loader.RawConfig()
 	})
 
+	configWriter := kubeconfigWriter{iostreams: iostreams}
+
 	clientLoader := clientLoader(func(restConfig *rest.Config) (kubernetes.Interface, error) {
 		return kubernetes.NewForConfig(restConfig)
 	})
@@ -83,6 +86,7 @@ func DefaultController(iostreams genericclioptions.IOStreams) (*Controller, erro
 	return &Controller{
 		iostreams:    iostreams,
 		config:       config,
+		configWriter: configWriter,
 		clients:      make(map[string]kubernetes.Interface),
 		admins:       make(map[Product]Admin),
 		configLoader: configLoader,
@@ -512,6 +516,12 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 		}
 	}
 
+	// Update the kubectl context to match this cluster.
+	err = c.configWriter.SetContext(desired.Name)
+	if err != nil {
+		return nil, err
+	}
+
 	err = c.reloadConfigs()
 	if err != nil {
 		return nil, err
@@ -579,7 +589,22 @@ func (c *Controller) Delete(ctx context.Context, name string) error {
 		return err
 	}
 
-	return admin.Delete(ctx, existing)
+	err = admin.Delete(ctx, existing)
+	if err != nil {
+		return err
+	}
+
+	err = c.reloadConfigs()
+	if err != nil {
+		return err
+	}
+
+	// If the context is still in the configs, delete it.
+	_, ok := c.configCopy().Contexts[existing.Name]
+	if ok {
+		return c.configWriter.DeleteContext(existing.Name)
+	}
+	return nil
 }
 
 func (c *Controller) reloadConfigs() error {
