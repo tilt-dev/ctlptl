@@ -37,7 +37,7 @@ func (a *dockerDesktopAdmin) LocalRegistryHosting(ctx context.Context, desired *
 }
 
 func (a *dockerDesktopAdmin) Delete(ctx context.Context, config *api.Cluster) error {
-	if runtime.GOOS != "darwin" && runtime.GOOS != "windows" {
+	if a.os != "darwin" && a.os != "windows" {
 		return fmt.Errorf("docker-desktop delete not implemented on: %s", runtime.GOOS)
 	}
 

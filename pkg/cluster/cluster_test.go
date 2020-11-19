@@ -43,6 +43,21 @@ func TestClusterCurrent(t *testing.T) {
 	assert.Equal(t, cluster.Product, "microk8s")
 }
 
+func TestDeleteClusterContext(t *testing.T) {
+	f := newFixture(t)
+
+	admin := f.newFakeAdmin("docker-desktop")
+
+	_, exists := f.config.Contexts["docker-desktop"]
+	assert.True(t, exists)
+	err := f.controller.Delete(context.Background(), "docker-desktop")
+	assert.NoError(t, err)
+	assert.Equal(t, "docker-desktop", admin.deleted.Name)
+
+	_, exists = f.config.Contexts["docker-desktop"]
+	assert.False(t, exists)
+}
+
 func TestClusterList(t *testing.T) {
 	c := newFakeController(t)
 	clusters, err := c.List(context.Background(), ListOptions{})
@@ -192,6 +207,7 @@ func TestClusterApplyMinikubeVersion(t *testing.T) {
 	assert.Equal(t, true, f.d4m.started)
 	assert.Equal(t, "minikube", minikubeAdmin.created.Name)
 	assert.Equal(t, "minikube", result.Name)
+	assert.Equal(t, "minikube", f.config.CurrentContext)
 
 	minikubeAdmin.created = nil
 
@@ -259,6 +275,7 @@ func newFixture(t *testing.T) *fixture {
 	configLoader := configLoader(func() (clientcmdapi.Config, error) {
 		return *config, nil
 	})
+	configWriter := fakeConfigWriter{config: config}
 	iostreams := genericclioptions.IOStreams{
 		In:     os.Stdin,
 		Out:    os.Stdout,
@@ -280,6 +297,7 @@ func newFixture(t *testing.T) *fixture {
 		iostreams:    iostreams,
 		admins:       make(map[Product]Admin),
 		config:       *config,
+		configWriter: configWriter,
 		dmachine:     dmachine,
 		configLoader: configLoader,
 		clientLoader: clientLoader,
@@ -454,4 +472,21 @@ func (c *fakeRegistryController) Apply(ctx context.Context, r *api.Registry) (*a
 		Networks:      []string{"bridge"},
 	}
 	return newR, nil
+}
+
+type fakeConfigWriter struct {
+	config *clientcmdapi.Config
+}
+
+func (w fakeConfigWriter) SetContext(name string) error {
+	w.config.CurrentContext = name
+	return nil
+}
+
+func (w fakeConfigWriter) DeleteContext(name string) error {
+	if w.config.CurrentContext == name {
+		w.config.CurrentContext = ""
+	}
+	delete(w.config.Contexts, name)
+	return nil
 }
