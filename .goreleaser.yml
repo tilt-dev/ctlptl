@@ -41,7 +41,7 @@ brews:
   test: |
     system "#{bin}/ctlptl version"
 scoop:
-  url_template: "https://github.com/tilt-dev/tilt/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+  url_template: "https://github.com/tilt-dev/ctlptl/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
   bucket:
     owner: tilt-dev
     name: scoop-bucket
