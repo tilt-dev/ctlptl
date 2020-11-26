@@ -32,6 +32,10 @@ scoop bucket add tilt-dev https://github.com/tilt-dev/scoop-bucket
 scoop install ctlptl
 ```
 
+### Manually (Mac/Linux/Windows)
+
+Download the pre-compiled binaries from the [releases](https://github.com/tilt-dev/ctlptl/releases) page and copy to the desired location.
+
 ## How do I use it?
 
 `ctlptl` supports 4 major commands:
@@ -126,7 +130,7 @@ We wrote docs like [Choosing a local dev
 cluster](https://docs.tilt.dev/choosing_clusters.html) and example repos like
 [kind-local](https://github.com/tilt-dev/kind-local),
 [minikube-local](https://github.com/tilt-dev/minikube-local), and
-[k3d-local](https://github.com/tilt-dev/k3d-local) to help people get set up.
+[k3d-local](https://github.com/tilt-dev/k3d-local-registry) to help people get set up.
 
 `ctlptl` is a culmination of what we've learned.
 
