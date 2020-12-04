@@ -93,12 +93,12 @@ registry: ctlptl-registry
 EOF
 ```
 
-#### Minikube: with a built-in registry
+#### Minikube: with a built-in registry at Kubernetes v1.18.8
 
 Create:
 
 ```
-ctlptl create cluster minikube --registry=ctlptl-registry
+ctlptl create cluster minikube --registry=ctlptl-registry --kubernetes-version=v1.18.8
 ```
 
 or ensure exists:
@@ -109,6 +109,7 @@ apiVersion: ctlptl.dev/v1alpha1
 kind: Cluster
 product: minikube
 registry: ctlptl-registry
+kubernetesVersion: v1.18.8
 EOF
 ```
 
