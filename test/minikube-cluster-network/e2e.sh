@@ -19,6 +19,15 @@ cat builder.yaml | sed "s/REGISTRY_HOST_PLACEHOLDER/$HOST/g" | kubectl apply -f 
 kubectl wait --for=condition=complete job/ko-builder --timeout=180s
 cat simple-server.yaml | sed "s/REGISTRY_HOST_PLACEHOLDER/$HOST/g" | kubectl apply -f -
 kubectl wait --for=condition=available deployment/simple-server --timeout=60s
+
+# Check to see we started the right kubernetes version.
+k8sVersion=$(ctlptl get cluster minikube-ctlptl-test-cluster -o go-template --template='{{.status.kubernetesVersion}}')
+
 ctlptl delete -f cluster.yaml
+
+if [[ "$k8sVersion" != "v1.18.8" ]]; then
+    echo "Expected kubernetes version v1.18.8 but got $k8sVersion"
+    exit 1
+fi
 
 echo "minikube-cluster-network test passed!"
