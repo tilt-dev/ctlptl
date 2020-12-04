@@ -6,6 +6,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/blang/semver/v4"
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
 	"github.com/tilt-dev/ctlptl/pkg/api"
@@ -381,7 +382,32 @@ func supportsRegistry(product Product) bool {
 }
 
 func supportsKubernetesVersion(product Product, version string) bool {
-	return product == ProductMinikube
+	return product == ProductKIND || product == ProductMinikube
+}
+
+func (c *Controller) canReconcileK8sVersion(ctx context.Context, desired, existing *api.Cluster) bool {
+	if desired.KubernetesVersion == "" {
+		return true
+	}
+
+	if desired.KubernetesVersion == existing.Status.KubernetesVersion {
+		return true
+	}
+
+	// On KIND, it's ok if the patch doesn't match.
+	if Product(desired.Product) == ProductKIND {
+		dv, err := semver.ParseTolerant(desired.KubernetesVersion)
+		if err != nil {
+			return false
+		}
+		ev, err := semver.ParseTolerant(existing.Status.KubernetesVersion)
+		if err != nil {
+			return false
+		}
+		return dv.Major == ev.Major && dv.Minor == ev.Minor
+	}
+
+	return false
 }
 
 func (c *Controller) deleteIfIrreconcilable(ctx context.Context, desired, existing *api.Cluster) error {
@@ -401,8 +427,7 @@ func (c *Controller) deleteIfIrreconcilable(ctx context.Context, desired, existi
 		_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Deleting cluster %s to initialize with registry %s\n",
 			desired.Name, desired.Registry)
 		needsDelete = true
-	} else if desired.KubernetesVersion != "" &&
-		desired.KubernetesVersion != existing.Status.KubernetesVersion {
+	} else if !c.canReconcileK8sVersion(ctx, desired, existing) {
 		_, _ = fmt.Fprintf(c.iostreams.ErrOut,
 			"Deleting cluster %s because desired Kubernetes version (%s) does not match current (%s)\n",
 			desired.Name, desired.KubernetesVersion, existing.Status.KubernetesVersion)
