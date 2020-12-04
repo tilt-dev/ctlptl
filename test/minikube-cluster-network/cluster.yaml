@@ -3,4 +3,5 @@ kind: Cluster
 name: minikube-ctlptl-test-cluster
 product: minikube
 registry: ctlptl-test-registry
+kubernetesVersion: v1.19.3
 
