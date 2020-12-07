@@ -143,21 +143,21 @@ func (c DockerDesktopClient) applySet(settings map[string]interface{}, key, newV
 			return v, nil
 		}
 
-		return false, fmt.Errorf("expected bool for setting %s, got: %s", key, newValue)
+		return false, fmt.Errorf("expected bool for setting %q, got: %s", key, newValue)
 
 	case float64:
 		newValFloat, err := strconv.ParseFloat(newValue, 64)
 		if err != nil {
-			return false, fmt.Errorf("expected number for setting %s, got: %s. Error: %v", key, newValue, err)
+			return false, fmt.Errorf("expected number for setting %q, got: %s. Error: %v", key, newValue, err)
 		}
 
 		max, ok := spec["max"].(float64)
 		if ok && newValFloat > max {
-			return false, fmt.Errorf("setting value %s: %s greater than max allowed (%f)", key, newValue, max)
+			return false, fmt.Errorf("setting value %q: %s greater than max allowed (%f)", key, newValue, max)
 		}
 		min, ok := spec["min"].(float64)
 		if ok && newValFloat < min {
-			return false, fmt.Errorf("setting value %s: %s less than min allowed (%f)", key, newValue, min)
+			return false, fmt.Errorf("setting value %q: %s less than min allowed (%f)", key, newValue, min)
 		}
 
 		if newValFloat != v {
@@ -186,7 +186,7 @@ func (c DockerDesktopClient) applySet(settings map[string]interface{}, key, newV
 		}
 	}
 
-	return false, fmt.Errorf("Cannot set key: %s", key)
+	return false, fmt.Errorf("Cannot set key: %q", key)
 }
 
 func (c DockerDesktopClient) writeSettings(ctx context.Context, settings map[string]interface{}) error {
@@ -247,10 +247,15 @@ func (c DockerDesktopClient) lookupMapAt(settings map[string]interface{}, key st
 	current := settings
 	for i, part := range parts {
 		var ok bool
-		current, ok = current[part].(map[string]interface{})
+		val := current[part]
+		current, ok = val.(map[string]interface{})
 		if !ok {
-			return nil, fmt.Errorf("expected map at DockerDesktop setting %s, got: %T",
-				strings.Join(parts[:i+1], "."), current[part])
+			if val == nil {
+				return nil, fmt.Errorf("nothing found at DockerDesktop setting %q",
+					strings.Join(parts[:i+1], "."))
+			}
+			return nil, fmt.Errorf("expected map at DockerDesktop setting %q, got: %T",
+				strings.Join(parts[:i+1], "."), val)
 		}
 	}
 	return current, nil
