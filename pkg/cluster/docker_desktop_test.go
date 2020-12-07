@@ -99,7 +99,29 @@ func TestLookupMap(t *testing.T) {
 
 	_, err = f.d4m.lookupMapAt(settings, "vm.kubernetes.honk")
 	if assert.Error(t, err) {
-		assert.Equal(t, err.Error(), "expected map at DockerDesktop setting vm.kubernetes.honk, got: <nil>")
+		assert.Equal(t, err.Error(), `nothing found at DockerDesktop setting "vm.kubernetes.honk"`)
+	}
+}
+
+func TestSetSettingValueInvalidKey(t *testing.T) {
+	f := newD4MFixture(t)
+	defer f.TearDown()
+
+	ctx := context.Background()
+	err := f.d4m.SetSettingValue(ctx, "vm.doesNotExist", "4")
+	if assert.Error(t, err) {
+		assert.Equal(t, err.Error(), `nothing found at DockerDesktop setting "vm.doesNotExist"`)
+	}
+}
+
+func TestSetSettingValueInvalidSet(t *testing.T) {
+	f := newD4MFixture(t)
+	defer f.TearDown()
+
+	ctx := context.Background()
+	err := f.d4m.SetSettingValue(ctx, "vm.resources.cpus.value.doesNotExist", "4")
+	if assert.Error(t, err) {
+		assert.Equal(t, err.Error(), `expected map at DockerDesktop setting "vm.resources.cpus.value", got: float64`)
 	}
 }
 
@@ -131,11 +153,11 @@ func TestSetSettingValueFloatLimit(t *testing.T) {
 	ctx := context.Background()
 	err := f.d4m.SetSettingValue(ctx, "vm.resources.cpus", "100")
 	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "setting value vm.resources.cpus: 100 greater than max allowed")
+		assert.Contains(t, err.Error(), `setting value "vm.resources.cpus": 100 greater than max allowed`)
 	}
 	err = f.d4m.SetSettingValue(ctx, "vm.resources.cpus", "0")
 	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "setting value vm.resources.cpus: 0 less than min allowed")
+		assert.Contains(t, err.Error(), `setting value "vm.resources.cpus": 0 less than min allowed`)
 	}
 }
 
