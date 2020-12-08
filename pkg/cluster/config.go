@@ -16,7 +16,7 @@ type kubeconfigWriter struct {
 }
 
 func (w kubeconfigWriter) SetContext(name string) error {
-	cmd := exec.Command("kubectl", "config", "set-context", name)
+	cmd := exec.Command("kubectl", "config", "use-context", name)
 	cmd.Stdout = w.iostreams.Out
 	cmd.Stderr = w.iostreams.ErrOut
 	return cmd.Run()
