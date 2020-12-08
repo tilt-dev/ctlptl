@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os/exec"
@@ -10,8 +11,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/localregistry-go"
+	"gopkg.in/yaml.v3"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/kind/pkg/apis/config/v1alpha4"
 )
 
 const kindNetworkName = "kind"
@@ -34,6 +37,26 @@ func (a *kindAdmin) EnsureInstalled(ctx context.Context) error {
 		return fmt.Errorf("kind not installed. Please install kind with these instructions: https://kind.sigs.k8s.io/")
 	}
 	return nil
+}
+
+func (a *kindAdmin) kindClusterConfig(desired *api.Cluster, registry *api.Registry) *v1alpha4.Cluster {
+	kindConfig := desired.KindV1Alpha4Cluster
+	if kindConfig == nil {
+		kindConfig = &v1alpha4.Cluster{}
+	}
+	kindConfig.Kind = "Cluster"
+	kindConfig.APIVersion = "kind.x-k8s.io/v1alpha4"
+
+	if registry != nil {
+		patch := fmt.Sprintf(`[plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:%d"]
+  endpoint = ["http://%s:%d"]
+[plugins."io.containerd.grpc.v1.cri".registry.mirrors."%s:%d"]
+  endpoint = ["http://%s:%d"]
+`, registry.Status.HostPort, registry.Name, registry.Status.ContainerPort,
+			registry.Name, registry.Status.ContainerPort, registry.Name, registry.Status.ContainerPort)
+		kindConfig.ContainerdConfigPatches = append(kindConfig.ContainerdConfigPatches, patch)
+	}
+	return kindConfig
 }
 
 func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *api.Registry) error {
@@ -63,31 +86,21 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 		args = append(args, "--image", node)
 	}
 
-	// TODO(nick): Let the user pass in their own Kind configuration.
-	in := strings.NewReader("")
-
-	if registry != nil {
-		containerdConfig := fmt.Sprintf(`
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-containerdConfigPatches:
-- |-
-  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:%d"]
-    endpoint = ["http://%s:%d"]
-  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."%s:%d"]
-    endpoint = ["http://%s:%d"]
-`, registry.Status.HostPort, registry.Name, registry.Status.ContainerPort,
-			registry.Name, registry.Status.ContainerPort, registry.Name, registry.Status.ContainerPort)
-		in = strings.NewReader(containerdConfig)
-
-		args = append(args, "--config", "-")
+	kindConfig := a.kindClusterConfig(desired, registry)
+	buf := bytes.NewBuffer(nil)
+	encoder := yaml.NewEncoder(buf)
+	err := encoder.Encode(kindConfig)
+	if err != nil {
+		return errors.Wrap(err, "creating kind cluster")
 	}
+
+	args = append(args, "--config", "-")
 
 	cmd := exec.CommandContext(ctx, "kind", args...)
 	cmd.Stdout = a.iostreams.Out
 	cmd.Stderr = a.iostreams.ErrOut
-	cmd.Stdin = in
-	err := cmd.Run()
+	cmd.Stdin = buf
+	err = cmd.Run()
 	if err != nil {
 		return errors.Wrap(err, "creating kind cluster")
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/blang/semver/v4"
@@ -369,10 +370,21 @@ func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) 
 }
 
 func FillDefaults(cluster *api.Cluster) {
+	// If the name is in the Kind config, but not in the main config,
+	// lift it up to the main config.
+	if cluster.KindV1Alpha4Cluster != nil && cluster.Name == "" {
+		cluster.Name = fmt.Sprintf("kind-%s", cluster.KindV1Alpha4Cluster.Name)
+	}
+
 	// Create a default name if one isn't in the YAML.
 	// The default name is determined by the underlying product.
 	if cluster.Name == "" {
 		cluster.Name = Product(cluster.Product).DefaultClusterName()
+	}
+
+	// Override the Kind config if necessary.
+	if cluster.KindV1Alpha4Cluster != nil {
+		cluster.KindV1Alpha4Cluster.Name = strings.TrimPrefix(cluster.Name, "kind-")
 	}
 }
 
@@ -470,6 +482,9 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 	}
 	if desired.KubernetesVersion != "" && !supportsKubernetesVersion(Product(desired.Product), desired.KubernetesVersion) {
 		return nil, fmt.Errorf("product %s does not support a custom Kubernetes version", desired.Product)
+	}
+	if desired.KindV1Alpha4Cluster != nil && Product(desired.Product) != ProductKIND {
+		return nil, fmt.Errorf("kind config may only be set on clusters with product: kind. Actual product: %s", desired.Product)
 	}
 
 	FillDefaults(desired)

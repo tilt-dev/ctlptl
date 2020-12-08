@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/tilt-dev/localregistry-go"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/kind/pkg/apis/config/v1alpha4"
 )
 
 // TypeMeta partially copies apimachinery/pkg/apis/meta/v1.TypeMeta
@@ -47,6 +48,16 @@ type Cluster struct {
 	//
 	// Not all cluster products allow you to customize this.
 	KubernetesVersion string `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
+
+	// The Kind cluster config. Only applicable for clusters with product: kind.
+	//
+	// Full documentation at:
+	// https://pkg.go.dev/sigs.k8s.io/kind/pkg/apis/config/v1alpha4#Cluster
+	//
+	// Properties of this config may be overridden by properties of the ctlptl
+	// Cluster config. For example, the name field of the top-level Cluster object
+	// wins over one specified in the Kind config.
+	KindV1Alpha4Cluster *v1alpha4.Cluster `json:"kindV1Alpha4Cluster,omitempty" yaml:"kindV1Alpha4Cluster,omitempty"`
 
 	// Most recently observed status of the cluster.
 	// Populated by the system.
