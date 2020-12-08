@@ -6,4 +6,7 @@ product: kind
 registry: ctlptl-registry
 kindV1Alpha4Cluster:
   name: my-cluster
+  nodes:
+  - role: control-plane
+  - role: worker
   
