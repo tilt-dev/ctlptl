@@ -41,6 +41,7 @@ require (
 	k8s.io/client-go v0.19.2
 	k8s.io/klog/v2 v2.2.0
 	k8s.io/utils v0.0.0-20201015054608-420da100c033 // indirect
+	sigs.k8s.io/kind v0.9.0
 )
 
 replace github.com/Azure/go-autorest => github.com/Azure/go-autorest v12.4.3+incompatible

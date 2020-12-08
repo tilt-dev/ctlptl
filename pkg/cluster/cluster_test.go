@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"sigs.k8s.io/kind/pkg/apis/config/v1alpha4"
 )
 
 func TestClusterGet(t *testing.T) {
@@ -234,6 +235,21 @@ func TestClusterApplyMinikubeVersion(t *testing.T) {
 	assert.Contains(t, out.String(),
 		"Deleting cluster minikube because desired Kubernetes version (v1.15.0) "+
 			"does not match current (v1.14.0)")
+}
+
+func TestFillDefaultsKindConfig(t *testing.T) {
+	c := &api.Cluster{
+		Product: "kind",
+		KindV1Alpha4Cluster: &v1alpha4.Cluster{
+			Name: "my-cluster",
+		},
+	}
+	FillDefaults(c)
+	assert.Equal(t, "kind-my-cluster", c.Name)
+
+	c.KindV1Alpha4Cluster.Name = "your-cluster"
+	FillDefaults(c)
+	assert.Equal(t, "my-cluster", c.KindV1Alpha4Cluster.Name)
 }
 
 type fixture struct {
