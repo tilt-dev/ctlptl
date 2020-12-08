@@ -30,6 +30,8 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
+const clusterSpecConfigMap = "ctlptl-cluster-spec"
+
 var typeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "Cluster"}
 var listTypeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "ClusterList"}
 var groupResource = schema.GroupResource{"ctlptl.dev", "clusters"}
@@ -317,6 +319,27 @@ func (c *Controller) populateMachineStatus(ctx context.Context, cluster *api.Clu
 	return nil
 }
 
+func (c *Controller) populateClusterSpec(ctx context.Context, cluster *api.Cluster, client kubernetes.Interface) error {
+	cMap, err := client.CoreV1().ConfigMaps("kube-public").Get(ctx, clusterSpecConfigMap, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) || apierrors.IsForbidden(err) {
+			return nil
+		}
+		return err
+	}
+
+	spec := api.Cluster{}
+	err = yaml.Unmarshal([]byte(cMap.Data["cluster.v1alpha1"]), &spec)
+	if err != nil {
+		return err
+	}
+
+	cluster.KubernetesVersion = spec.KubernetesVersion
+	cluster.MinCPUs = spec.MinCPUs
+	cluster.KindV1Alpha4Cluster = spec.KindV1Alpha4Cluster
+	return nil
+}
+
 func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) {
 	name := cluster.Name
 	client, err := c.client(cluster.Name)
@@ -361,6 +384,15 @@ func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) 
 		err := c.populateKubernetesVersion(ctx, cluster, client)
 		if err != nil {
 			klog.V(4).Infof("WARNING: reading cluster %s version: %v\n", name, err)
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := c.populateClusterSpec(ctx, cluster, client)
+		if err != nil {
+			klog.V(4).Infof("WARNING: reading cluster %s spec: %v\n", name, err)
 		}
 	}()
 
@@ -567,6 +599,13 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 		return nil, err
 	}
 
+	if needsCreate {
+		err = c.writeClusterSpec(ctx, desired)
+		if err != nil {
+			return nil, errors.Wrap(err, "configuring cluster")
+		}
+	}
+
 	if needsCreate && desired.Registry != "" {
 		// NOTE(nick): The kubernetes client fails if it tries to create a ConfigMap
 		// on Minikube without reading anything first. I have no idea why this
@@ -584,6 +623,36 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 	}
 
 	return c.Get(ctx, desired.Name)
+}
+
+// Writes the cluster spec to the cluster itself, so
+// we can read it later to determine how the cluster was initialized.
+func (c *Controller) writeClusterSpec(ctx context.Context, cluster *api.Cluster) error {
+	client, err := c.client(cluster.Name)
+	if err != nil {
+		return err
+	}
+
+	specOnly := cluster.DeepCopy()
+	specOnly.Status = api.ClusterStatus{}
+	data, err := yaml.Marshal(specOnly)
+	if err != nil {
+		return err
+	}
+
+	err = client.CoreV1().ConfigMaps("kube-public").Delete(ctx, clusterSpecConfigMap, metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	_, err = client.CoreV1().ConfigMaps("kube-public").Create(ctx, &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterSpecConfigMap,
+			Namespace: "kube-public",
+		},
+		Data: map[string]string{"cluster.v1alpha1": string(data)},
+	}, metav1.CreateOptions{})
+	return err
 }
 
 // Create a configmap on the cluster, so that other tools know that a registry
