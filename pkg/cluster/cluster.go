@@ -666,7 +666,6 @@ func (c *Controller) createRegistryHosting(ctx context.Context, admin Admin, clu
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(c.iostreams.ErrOut, "   Configuring %s for registry %s\n", cluster.Name, reg.Name)
 	client, err := c.client(cluster.Name)
 	if err != nil {
 		return err
@@ -684,7 +683,14 @@ func (c *Controller) createRegistryHosting(ctx context.Context, admin Admin, clu
 		},
 		Data: map[string]string{"localRegistryHosting.v1": string(data)},
 	}, metav1.CreateOptions{})
-	return err
+	if err != nil {
+		return err
+	}
+
+	_, _ = fmt.Fprintf(c.iostreams.ErrOut, " 🔌 Connected cluster %s to registry %s at %s\n", cluster.Name, reg.Name, hosting.Host)
+	_, _ = fmt.Fprintf(c.iostreams.ErrOut, " 👐 Push images to the cluster like 'docker push %s/alpine'\n", hosting.Host)
+
+	return nil
 }
 
 func (c *Controller) Delete(ctx context.Context, name string) error {
