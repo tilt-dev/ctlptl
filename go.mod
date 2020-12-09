@@ -11,6 +11,7 @@ require (
 	github.com/docker/docker v17.12.0-ce-rc1.0.20200730172259-9f28837c1d93+incompatible
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
+	github.com/google/go-cmp v0.5.2
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
 	github.com/imdario/mergo v0.3.11 // indirect
@@ -30,7 +31,9 @@ require (
 	github.com/tilt-dev/localregistry-go v0.0.0-20201021185044-ffc4c827f097
 	github.com/tilt-dev/wmclient v0.0.0-20201109174454-1839d0355fbc
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a // indirect
-	golang.org/x/net v0.0.0-20200904194848-62affa334b73 // indirect
+	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b // indirect
+	golang.org/x/text v0.3.4 // indirect
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
@@ -39,7 +42,8 @@ require (
 	k8s.io/apimachinery v0.19.2
 	k8s.io/cli-runtime v0.19.2
 	k8s.io/client-go v0.19.2
-	k8s.io/klog/v2 v2.2.0
+	k8s.io/klog/v2 v2.4.0
+	k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd // indirect
 	k8s.io/utils v0.0.0-20201015054608-420da100c033 // indirect
 	sigs.k8s.io/kind v0.9.0
 )

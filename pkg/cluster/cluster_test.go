@@ -252,8 +252,54 @@ func TestFillDefaultsKindConfig(t *testing.T) {
 	assert.Equal(t, "my-cluster", c.KindV1Alpha4Cluster.Name)
 }
 
+func TestClusterApplyKindConfig(t *testing.T) {
+	f := newFixture(t)
+	f.dmachine.os = "darwin"
+
+	assert.Equal(t, false, f.d4m.started)
+	kindAdmin := f.newFakeAdmin(ProductKIND)
+
+	cluster := &api.Cluster{
+		Product: string(ProductKIND),
+		KindV1Alpha4Cluster: &v1alpha4.Cluster{
+			Nodes: []v1alpha4.Node{
+				v1alpha4.Node{Role: "control-plane"},
+			},
+		},
+	}
+	_, err := f.controller.Apply(context.Background(), cluster)
+	assert.NoError(t, err)
+	assert.Equal(t, "kind-kind", kindAdmin.created.Name)
+	kindAdmin.created = nil
+
+	// Assert that re-applying the same config doesn't create a new cluster.
+	_, err = f.controller.Apply(context.Background(), cluster)
+	assert.NoError(t, err)
+	assert.Nil(t, kindAdmin.created)
+	assert.Nil(t, kindAdmin.deleted)
+
+	// Assert that applying a different config deletes and re-creates.
+	cluster2 := &api.Cluster{
+		Product: string(ProductKIND),
+		KindV1Alpha4Cluster: &v1alpha4.Cluster{
+			Nodes: []v1alpha4.Node{
+				v1alpha4.Node{Role: "control-plane"},
+				v1alpha4.Node{Role: "worker"},
+			},
+		},
+	}
+
+	f.errOut.Truncate(0)
+	_, err = f.controller.Apply(context.Background(), cluster2)
+	assert.NoError(t, err)
+	assert.Equal(t, "kind-kind", kindAdmin.created.Name)
+	assert.Equal(t, "kind-kind", kindAdmin.deleted.Name)
+	assert.Contains(t, f.errOut.String(), "desired Kind config does not match current")
+}
+
 type fixture struct {
 	t            *testing.T
+	errOut       *bytes.Buffer
 	controller   *Controller
 	dockerClient *fakeDockerClient
 	dmachine     *dockerMachine
@@ -294,8 +340,8 @@ func newFixture(t *testing.T) *fixture {
 	configWriter := fakeConfigWriter{config: config}
 	iostreams := genericclioptions.IOStreams{
 		In:     os.Stdin,
-		Out:    os.Stdout,
-		ErrOut: os.Stderr,
+		Out:    bytes.NewBuffer(nil),
+		ErrOut: bytes.NewBuffer(nil),
 	}
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -322,6 +368,7 @@ func newFixture(t *testing.T) *fixture {
 	}
 	return &fixture{
 		t:            t,
+		errOut:       iostreams.ErrOut.(*bytes.Buffer),
 		controller:   controller,
 		dmachine:     dmachine,
 		d4m:          d4m,
