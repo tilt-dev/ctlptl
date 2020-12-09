@@ -1,5 +1,6 @@
 # Creates a kind cluster with Kind's custom cluster config
 # https://pkg.go.dev/sigs.k8s.io/kind/pkg/apis/config/v1alpha4#Cluster
+# Creates a cluster with 2 nodes.
 apiVersion: ctlptl.dev/v1alpha1
 kind: Cluster
 product: kind

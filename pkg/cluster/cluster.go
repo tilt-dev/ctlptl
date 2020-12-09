@@ -9,6 +9,7 @@ import (
 
 	"github.com/blang/semver/v4"
 	"github.com/docker/docker/client"
+	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/registry"
@@ -404,7 +405,7 @@ func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) 
 func FillDefaults(cluster *api.Cluster) {
 	// If the name is in the Kind config, but not in the main config,
 	// lift it up to the main config.
-	if cluster.KindV1Alpha4Cluster != nil && cluster.Name == "" {
+	if cluster.KindV1Alpha4Cluster != nil && cluster.Name == "" && cluster.KindV1Alpha4Cluster.Name != "" {
 		cluster.Name = fmt.Sprintf("kind-%s", cluster.KindV1Alpha4Cluster.Name)
 	}
 
@@ -475,6 +476,11 @@ func (c *Controller) deleteIfIrreconcilable(ctx context.Context, desired, existi
 		_, _ = fmt.Fprintf(c.iostreams.ErrOut,
 			"Deleting cluster %s because desired Kubernetes version (%s) does not match current (%s)\n",
 			desired.Name, desired.KubernetesVersion, existing.Status.KubernetesVersion)
+		needsDelete = true
+	} else if desired.KindV1Alpha4Cluster != nil && !cmp.Equal(existing.KindV1Alpha4Cluster, desired.KindV1Alpha4Cluster) {
+		_, _ = fmt.Fprintf(c.iostreams.ErrOut,
+			"Deleting cluster %s because desired Kind config does not match current.\nCluster config diff: %s\n",
+			desired.Name, cmp.Diff(existing.KindV1Alpha4Cluster, desired.KindV1Alpha4Cluster))
 		needsDelete = true
 	}
 

@@ -43,6 +43,8 @@ func (a *kindAdmin) kindClusterConfig(desired *api.Cluster, registry *api.Regist
 	kindConfig := desired.KindV1Alpha4Cluster
 	if kindConfig == nil {
 		kindConfig = &v1alpha4.Cluster{}
+	} else {
+		kindConfig = kindConfig.DeepCopy()
 	}
 	kindConfig.Kind = "Cluster"
 	kindConfig.APIVersion = "kind.x-k8s.io/v1alpha4"
