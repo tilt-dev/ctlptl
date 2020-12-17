@@ -11,6 +11,7 @@ jobs:
       - checkout
       - run: go get -v -t -d ./...
       - run: go test -v ./...
+      - run: go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.30.0 && make golangci-lint
       - slack/notify-on-failure:
           only_for_branches: master
 
