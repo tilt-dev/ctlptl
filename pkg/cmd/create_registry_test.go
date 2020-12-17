@@ -34,5 +34,5 @@ func (cd *fakeRegistryController) Apply(ctx context.Context, registry *api.Regis
 }
 
 func (cd *fakeRegistryController) Get(ctx context.Context, name string) (*api.Registry, error) {
-	return nil, apierrors.NewNotFound(schema.GroupResource{"ctlptl.dev", "registries"}, name)
+	return nil, apierrors.NewNotFound(schema.GroupResource{Group: "ctlptl.dev", Resource: "registries"}, name)
 }

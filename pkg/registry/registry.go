@@ -22,7 +22,7 @@ import (
 
 var typeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "Registry"}
 var listTypeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "RegistryList"}
-var groupResource = schema.GroupResource{"ctlptl.dev", "registries"}
+var groupResource = schema.GroupResource{Group: "ctlptl.dev", Resource: "registries"}
 
 func TypeMeta() api.TypeMeta {
 	return typeMeta

@@ -68,7 +68,7 @@ func TestDeleteNotFound(t *testing.T) {
 	o.IOStreams = streams
 
 	cd := &fakeDeleter{nextError: errors.NewNotFound(
-		schema.GroupResource{"ctlptl.dev", "clusters"}, "garbage")}
+		schema.GroupResource{Group: "ctlptl.dev", Resource: "clusters"}, "garbage")}
 	o.clusterDeleter = cd
 	err := o.run([]string{"cluster", "garbage"})
 	if assert.Error(t, err) {
@@ -82,7 +82,7 @@ func TestDeleteIgnoreNotFound(t *testing.T) {
 	o.IOStreams = streams
 
 	cd := &fakeDeleter{nextError: errors.NewNotFound(
-		schema.GroupResource{"ctlptl.dev", "clusters"}, "garbage")}
+		schema.GroupResource{Group: "ctlptl.dev", Resource: "clusters"}, "garbage")}
 	o.clusterDeleter = cd
 	o.IgnoreNotFound = true
 	err := o.run([]string{"cluster", "garbage"})

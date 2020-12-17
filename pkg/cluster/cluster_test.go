@@ -28,6 +28,10 @@ import (
 	"sigs.k8s.io/kind/pkg/apis/config/v1alpha4"
 )
 
+var (
+	cluster *api.Cluster
+)
+
 func TestClusterGet(t *testing.T) {
 	c := newFakeController(t)
 	cluster, err := c.Get(context.Background(), "microk8s")
@@ -133,10 +137,7 @@ func TestClusterApplyDockerDesktop(t *testing.T) {
 
 	assert.Equal(t, false, f.d4m.started)
 	assert.Equal(t, 1, f.dockerClient.ncpu)
-	f.controller.Apply(context.Background(), &api.Cluster{
-		Product: string(ProductDockerDesktop),
-		MinCPUs: 3,
-	})
+	f, _ = controllerApply(f, ProductDockerDesktop, 3)
 	assert.Equal(t, true, f.d4m.started)
 	assert.Equal(t, 3, f.dockerClient.ncpu)
 }
@@ -150,10 +151,7 @@ func TestClusterApplyDockerDesktopCPUOnly(t *testing.T) {
 
 	assert.Equal(t, true, f.d4m.started)
 	assert.Equal(t, 1, f.dockerClient.ncpu)
-	f.controller.Apply(context.Background(), &api.Cluster{
-		Product: string(ProductDockerDesktop),
-		MinCPUs: 3,
-	})
+	f, _ = controllerApply(f, ProductDockerDesktop, 3)
 	assert.Equal(t, true, f.d4m.started)
 	assert.Equal(t, 3, f.dockerClient.ncpu)
 }
@@ -164,12 +162,25 @@ func TestClusterApplyDockerDesktopStartClusterOnly(t *testing.T) {
 
 	assert.Equal(t, false, f.d4m.started)
 	assert.Equal(t, 1, f.dockerClient.ncpu)
-	f.controller.Apply(context.Background(), &api.Cluster{
-		Product: string(ProductDockerDesktop),
-		MinCPUs: 0,
-	})
+	f, _ = controllerApply(f, ProductDockerDesktop, 0)
 	assert.Equal(t, true, f.d4m.started)
 	assert.Equal(t, 1, f.dockerClient.ncpu)
+}
+
+func controllerApply(f *fixture, product Product, cpus int) (*fixture, error) {
+	// We should to know that if the cpu <0 ,it's mean that we use the default value of CPU but may not equals to 0.
+	if cpus >= 0 {
+		cluster = &api.Cluster{
+			Product: string(product),
+			MinCPUs: cpus,
+		}
+	} else {
+		cluster = &api.Cluster{
+			Product: string(product),
+		}
+	}
+	_, err := f.controller.Apply(context.Background(), cluster)
+	return f, err
 }
 
 func TestClusterApplyDockerDesktopNoRestart(t *testing.T) {
@@ -179,17 +190,17 @@ func TestClusterApplyDockerDesktopNoRestart(t *testing.T) {
 	assert.Equal(t, 0, f.d4m.settingsWriteCount)
 
 	// Pretend the cluster isn't running.
-	err := f.fakeK8s.Tracker().Delete(schema.GroupVersionResource{"", "v1", "nodes"}, "", "node-1")
+	err := f.fakeK8s.Tracker().Delete(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "nodes"}, "", "node-1")
 	assert.NoError(t, err)
-
-	f.controller.Apply(context.Background(), &api.Cluster{
-		Product: string(ProductDockerDesktop),
-	})
+	f, _ = controllerApply(f, ProductDockerDesktop, -1)
+	//f.controller.Apply(context.Background(), &api.Cluster{
+	//	Product: string(ProductDockerDesktop),
+	//})
 	assert.Equal(t, 1, f.d4m.settingsWriteCount)
-
-	f.controller.Apply(context.Background(), &api.Cluster{
-		Product: string(ProductDockerDesktop),
-	})
+	f, _ = controllerApply(f, ProductDockerDesktop, -1)
+	//f.controller.Apply(context.Background(), &api.Cluster{
+	//	Product: string(ProductDockerDesktop),
+	//})
 	assert.Equal(t, 1, f.d4m.settingsWriteCount)
 }
 
@@ -472,7 +483,7 @@ type fakeAdmin struct {
 	deleted         *api.Cluster
 	config          *clientcmdapi.Config
 	fakeK8s         *fake.Clientset
-	serverVersion   *version.Info
+	//serverVersion   *version.Info
 }
 
 func newFakeAdmin(config *clientcmdapi.Config, fakeK8s *fake.Clientset) *fakeAdmin {

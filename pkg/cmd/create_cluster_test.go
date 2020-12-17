@@ -34,5 +34,5 @@ func (cd *fakeClusterController) Apply(ctx context.Context, cluster *api.Cluster
 }
 
 func (cd *fakeClusterController) Get(ctx context.Context, name string) (*api.Cluster, error) {
-	return nil, apierrors.NewNotFound(schema.GroupResource{"ctlptl.dev", "clusters"}, name)
+	return nil, apierrors.NewNotFound(schema.GroupResource{Group: "ctlptl.dev", Resource: "clusters"}, name)
 }

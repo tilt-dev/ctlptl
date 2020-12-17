@@ -35,7 +35,7 @@ const clusterSpecConfigMap = "ctlptl-cluster-spec"
 
 var typeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "Cluster"}
 var listTypeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "ClusterList"}
-var groupResource = schema.GroupResource{"ctlptl.dev", "clusters"}
+var groupResource = schema.GroupResource{Group: "ctlptl.dev", Resource: "clusters"}
 
 func TypeMeta() api.TypeMeta {
 	return typeMeta
