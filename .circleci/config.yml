@@ -73,21 +73,17 @@ workflows:
   version: 2
   build:
     jobs:
-      - build:
-          context: Tilt Slack Context
+      - build
       - e2e:
-          context: Tilt Slack Context
           requires:
             - build
       - release-dry-run:
-          context: Tilt Slack Context
           requires:
             - build
   release:
     jobs:
       - release:
           context:
-          - Tilt Slack Context
           - Tilt Release CLI Context
           filters:
             branches:
