@@ -134,7 +134,7 @@ type RegistryStatus struct {
 	//
 	// We try to make this not configurable, because there's no real reason not
 	// to use the default registry port 5000.
-	ContainerPort int `json:"containerPort,omitempty" yaml:containerPort,omitempty"`
+	ContainerPort int `json:"containerPort,omitempty" yaml:"containerPort,omitempty"`
 
 	// Networks that the registry container is connected to.
 	Networks []string `json:"networks,omitempty" yaml:"networks,omitempty"`

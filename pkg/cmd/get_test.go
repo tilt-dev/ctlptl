@@ -62,9 +62,10 @@ func TestYAML(t *testing.T) {
 	o.IOStreams = streams
 	o.StartTime = startTime
 
-	o.Command().Flags().Set("output", "yaml")
+	err:= o.Command().Flags().Set("output", "yaml")
+	require.NoError(t, err)
 
-	err := o.Print(o.transformForOutput(clusterList))
+	err = o.Print(o.transformForOutput(clusterList))
 	require.NoError(t, err)
 	assert.Equal(t, `apiVersion: ctlptl.dev/v1alpha1
 items:
