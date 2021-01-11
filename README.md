@@ -156,7 +156,7 @@ cluster](https://docs.tilt.dev/choosing_clusters.html) and example repos like
 
 `ctlptl` is a work in progress!
 
-We welcome contributions from the Kubernetes community to help make this better.
+We welcome [contributions](CONTRIBUTING.md) from the Kubernetes community to help make this better.
 
 We expect everyone -- users, contributors, followers, and employees alike -- to abide by our [**Code of Conduct**](CODE_OF_CONDUCT.md).
 
