@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/blang/semver/v4"
 	"github.com/docker/docker/client"
@@ -606,29 +607,58 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 	}
 
 	if needsCreate {
+		if desired.Product == string(ProductMinikube) {
+			err = c.waitForMinikubeInit(ctx, desired)
+			if err != nil {
+				return nil, errors.Wrap(err, "minikube is not healthy")
+			}
+		}
+
 		err = c.writeClusterSpec(ctx, desired)
 		if err != nil {
 			return nil, errors.Wrap(err, "configuring cluster")
 		}
-	}
 
-	if needsCreate && desired.Registry != "" {
-		// NOTE(nick): The kubernetes client fails if it tries to create a ConfigMap
-		// on Minikube without reading anything first. I have no idea why this
-		// happens -- it seems to be a bug deep in the auth code.
-		//
-		// For now, do a dummy Get to initialize it correctly.
-		if desired.Product == string(ProductMinikube) {
-			_, _ = c.Get(ctx, desired.Name)
-		}
-
-		err = c.createRegistryHosting(ctx, admin, desired, reg)
-		if err != nil {
-			return nil, errors.Wrap(err, "configuring cluster registry")
+		if desired.Registry != "" {
+			err = c.createRegistryHosting(ctx, admin, desired, reg)
+			if err != nil {
+				return nil, errors.Wrap(err, "configuring cluster registry")
+			}
 		}
 	}
 
 	return c.Get(ctx, desired.Name)
+}
+
+// Minikube seems to have all sorts of weird API errors during startup.
+// We have no idea why this happens. It might be a race condition.
+//
+// Errors we've seen include weird auth errors and connection closed errors.
+//
+// https://github.com/tilt-dev/ctlptl/issues/87
+//
+// For now, do a dummy get until it succeeds.
+func (c *Controller) waitForMinikubeInit(ctx context.Context, desired *api.Cluster) error {
+	var err error
+	retries := 3
+	for retries > 0 {
+		retries--
+
+		_, err = c.Get(ctx, desired.Name)
+		if err == nil {
+			return nil
+		}
+
+		if retries > 0 {
+			time.Sleep(time.Second)
+
+			err = c.reloadConfigs()
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return err
 }
 
 // Writes the cluster spec to the cluster itself, so
