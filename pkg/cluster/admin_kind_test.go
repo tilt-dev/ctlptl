@@ -26,6 +26,10 @@ func TestNodeImage(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "kindest/node:v1.19.1@sha256:98cf5288864662e37115e362b23e4369c8c4a408f99cbc06e58ac30ddc721600", img)
 
+	img, err = a.getNodeImage(ctx, "v0.10.0", "v1.20")
+	assert.NoError(t, err)
+	assert.Equal(t, "kindest/node:v1.20.2@sha256:8f7ea6e7642c0da54f04a7ee10431549c0257315b3a634f6ef2fecaaedb19bab", img)
+
 	img, err = a.getNodeImage(ctx, "v0.8.1", "v1.16.1")
 	assert.NoError(t, err)
 	assert.Equal(t, "kindest/node:v1.16.9@sha256:7175872357bc85847ec4b1aba46ed1d12fa054c83ac7a8a11f5c268957fd5765", img)
