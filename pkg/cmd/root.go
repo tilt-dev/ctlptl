@@ -20,6 +20,7 @@ func NewRootCommand() *cobra.Command {
 	rootCmd.AddCommand(NewDockerDesktopCommand())
 	rootCmd.AddCommand(newDocsCommand(rootCmd))
 	rootCmd.AddCommand(analytics.NewCommand())
+	rootCmd.AddCommand(NewSocatCommand())
 
 	return rootCmd
 }
