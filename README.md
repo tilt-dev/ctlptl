@@ -19,6 +19,11 @@ declare your local cluster with YAML and use `ctlptl` to set it up.
 
 ## How do I install it?
 
+Install your cluster of choice: [Docker for
+Desktop](https://www.docker.com/products/docker-desktop),
+[Kind](https://kind.sigs.k8s.io/), or
+[Minikube](https://minikube.sigs.k8s.io/). Then run:
+
 ### Homebrew (Mac/Linux)
 
 ```
