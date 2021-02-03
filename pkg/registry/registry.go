@@ -3,7 +3,6 @@ package registry
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"sort"
 	"strings"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/phayes/freeport"
+	"github.com/tilt-dev/ctlptl/internal/exec"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,6 +23,9 @@ import (
 var typeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "Registry"}
 var listTypeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "RegistryList"}
 var groupResource = schema.GroupResource{Group: "ctlptl.dev", Resource: "registries"}
+
+// https://github.com/moby/moby/blob/v20.10.3/api/types/types.go#L313
+const containerStateRunning = "running"
 
 func TypeMeta() api.TypeMeta {
 	return typeMeta
@@ -48,12 +51,14 @@ type ContainerClient interface {
 type Controller struct {
 	iostreams    genericclioptions.IOStreams
 	dockerClient ContainerClient
+	runner       exec.CmdRunner
 }
 
 func NewController(iostreams genericclioptions.IOStreams, dockerClient ContainerClient) (*Controller, error) {
 	return &Controller{
 		iostreams:    iostreams,
 		dockerClient: dockerClient,
+		runner:       exec.RealCmdRunner{},
 	}, nil
 }
 
@@ -93,6 +98,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 
 	containers, err := c.dockerClient.ContainerList(ctx, types.ContainerListOptions{
 		Filters: filterArgs,
+		All:     true,
 	})
 	if err != nil {
 		return nil, err
@@ -133,6 +139,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 				HostPort:          hostPort,
 				ContainerPort:     containerPort,
 				Networks:          networks,
+				State:             container.State,
 			},
 		}
 
@@ -174,9 +181,17 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 		existing = &api.Registry{}
 	}
 
+	needsDelete := false
 	if existing.Port != 0 && desired.Port != 0 && existing.Port != desired.Port {
 		// If the port has changed, let's delete the registry and recreate it.
-		err = c.Delete(ctx, desired.Name)
+		needsDelete = true
+	}
+	if existing.Status.State != containerStateRunning {
+		// If the registry has died, we need to recreate.
+		needsDelete = true
+	}
+	if needsDelete && existing.Name != "" {
+		err = c.Delete(ctx, existing.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -200,8 +215,7 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 	portSpec := fmt.Sprintf("%d:5000", hostPort)
 
 	_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Creating registry %q...\n", desired.Name)
-	cmd := exec.CommandContext(ctx, "docker", "run", "-d", "--restart=always", "-p", portSpec, "--name", desired.Name, "registry:2")
-	err = cmd.Run()
+	err = c.runner.Run(ctx, "docker", "run", "-d", "--restart=always", "-p", portSpec, "--name", desired.Name, "registry:2")
 	if err != nil {
 		return nil, err
 	}

@@ -141,6 +141,11 @@ type RegistryStatus struct {
 
 	// The ID of the container in Docker.
 	ContainerID string `json:"containerId,omitempty" yaml:"containerId,omitempty"`
+
+	// Current health status of the registry container.
+	// Reflects underlying ContainerState.Status
+	// https://github.com/moby/moby/blob/v20.10.3/api/types/types.go#L314
+	State string
 }
 
 // RegistryList is a list of Registrys.

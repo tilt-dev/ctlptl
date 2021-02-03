@@ -2,6 +2,7 @@ package registry
 
 import (
 	"context"
+	"log"
 	"os"
 	"testing"
 	"time"
@@ -10,42 +11,45 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tilt-dev/ctlptl/internal/exec"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
-var kindRegistry = types.Container{
-	ID:      "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
-	Names:   []string{"/kind-registry"},
-	Image:   "registry:2",
-	ImageID: "sha256:2d4f4b5309b1e41b4f83ae59b44df6d673ef44433c734b14c1c103ebca82c116",
-	Command: "/entrypoint.sh /etc/docker/registry/config.yml",
-	Created: 1603483645,
-	Ports: []types.Port{
-		types.Port{IP: "0.0.0.0", PrivatePort: 5000, PublicPort: 5001, Type: "tcp"},
-	},
-	SizeRw:     0,
-	SizeRootFs: 0,
-	State:      "running",
-	Status:     "Up 2 hours",
-	NetworkSettings: &types.SummaryNetworkSettings{
-		Networks: map[string]*network.EndpointSettings{
-			"bridge": &network.EndpointSettings{
-				IPAddress: "172.0.1.2",
-			},
-			"kind": &network.EndpointSettings{
-				IPAddress: "172.0.1.3",
+func kindRegistry() types.Container {
+	return types.Container{
+		ID:      "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
+		Names:   []string{"/kind-registry"},
+		Image:   "registry:2",
+		ImageID: "sha256:2d4f4b5309b1e41b4f83ae59b44df6d673ef44433c734b14c1c103ebca82c116",
+		Command: "/entrypoint.sh /etc/docker/registry/config.yml",
+		Created: 1603483645,
+		Ports: []types.Port{
+			types.Port{IP: "0.0.0.0", PrivatePort: 5000, PublicPort: 5001, Type: "tcp"},
+		},
+		SizeRw:     0,
+		SizeRootFs: 0,
+		State:      "running",
+		Status:     "Up 2 hours",
+		NetworkSettings: &types.SummaryNetworkSettings{
+			Networks: map[string]*network.EndpointSettings{
+				"bridge": &network.EndpointSettings{
+					IPAddress: "172.0.1.2",
+				},
+				"kind": &network.EndpointSettings{
+					IPAddress: "172.0.1.3",
+				},
 			},
 		},
-	},
+	}
 }
 
 func TestListRegistries(t *testing.T) {
 	f := newFixture(t)
 	defer f.TearDown()
 
-	f.docker.containers = []types.Container{kindRegistry}
+	f.docker.containers = []types.Container{kindRegistry()}
 
 	list, err := f.c.List(context.Background(), ListOptions{})
 	require.NoError(t, err)
@@ -62,6 +66,7 @@ func TestListRegistries(t *testing.T) {
 			IPAddress:         "172.0.1.2",
 			Networks:          []string{"bridge", "kind"},
 			ContainerID:       "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
+			State:             "running",
 		},
 	})
 }
@@ -70,7 +75,7 @@ func TestGetRegistry(t *testing.T) {
 	f := newFixture(t)
 	defer f.TearDown()
 
-	f.docker.containers = []types.Container{kindRegistry}
+	f.docker.containers = []types.Container{kindRegistry()}
 
 	registry, err := f.c.Get(context.Background(), "kind-registry")
 	require.NoError(t, err)
@@ -85,8 +90,35 @@ func TestGetRegistry(t *testing.T) {
 			IPAddress:         "172.0.1.2",
 			Networks:          []string{"bridge", "kind"},
 			ContainerID:       "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
+			State:             "running",
 		},
 	})
+}
+
+func TestApplyDeadRegistry(t *testing.T) {
+	f := newFixture(t)
+	defer f.TearDown()
+
+	deadRegistry := kindRegistry()
+	deadRegistry.State = "dead"
+	f.docker.containers = []types.Container{deadRegistry}
+
+	// Running a command makes the registry come alive!
+	f.c.runner = exec.FakeCmdRunner(func(argv []string) {
+		assert.Equal(t, "docker", argv[0])
+		assert.Equal(t, "run", argv[1])
+		f.docker.containers = []types.Container{kindRegistry()}
+	})
+
+	registry, err := f.c.Apply(context.Background(), &api.Registry{
+		TypeMeta: typeMeta,
+		Name:     "kind-registry",
+		Port:     5001,
+	})
+	if assert.NoError(t, err) {
+		assert.Equal(t, "running", registry.Status.State)
+	}
+	assert.Equal(t, deadRegistry.ID, f.docker.lastRemovedContainer)
 }
 
 type fakeDocker struct {
@@ -113,6 +145,9 @@ func newFixture(t *testing.T) *fixture {
 	d := &fakeDocker{}
 	controller, err := NewController(
 		genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}, d)
+	controller.runner = exec.FakeCmdRunner(func(argv []string) {
+		log.Println("No runner installed")
+	})
 	require.NoError(t, err)
 	return &fixture{
 		t:      t,
