@@ -246,6 +246,8 @@ func (c *Controller) admin(ctx context.Context, product Product) (Admin, error) 
 		admin = newDockerDesktopAdmin()
 	case ProductKIND:
 		admin = newKindAdmin(c.iostreams)
+	case ProductK3D:
+		admin = newK3dAdmin(c.iostreams)
 	case ProductMinikube:
 		admin = newMinikubeAdmin(c.iostreams, dockerClient)
 	}
@@ -546,7 +548,7 @@ func FillDefaults(cluster *api.Cluster) {
 
 // TODO(nick): Add more registry-supporting clusters.
 func supportsRegistry(product Product) bool {
-	return product == ProductKIND || product == ProductMinikube
+	return product == ProductKIND || product == ProductMinikube || product == ProductK3D
 }
 
 func supportsKubernetesVersion(product Product, version string) bool {
@@ -620,7 +622,20 @@ func (c *Controller) deleteIfIrreconcilable(ctx context.Context, desired, existi
 }
 
 // Checks if a registry exists with the given name, and creates one if it doesn't.
-func (c *Controller) ensureRegistryExists(ctx context.Context, name string) (*api.Registry, error) {
+func (c *Controller) ensureRegistryExistsForCluster(ctx context.Context, desired *api.Cluster) (*api.Registry, error) {
+	regName := desired.Registry
+	if regName == "" {
+		return nil, nil
+	}
+
+	regLabels := map[string]string{}
+	if desired.Product == string(ProductK3D) {
+		// A K3d cluster will only connect to a registry
+		// with these labels.
+		regLabels["app"] = "k3d"
+		regLabels["k3d.role"] = "registry"
+	}
+
 	regCtl, err := c.registryController(ctx)
 	if err != nil {
 		return nil, err
@@ -628,7 +643,8 @@ func (c *Controller) ensureRegistryExists(ctx context.Context, name string) (*ap
 
 	return regCtl.Apply(ctx, &api.Registry{
 		TypeMeta: registry.TypeMeta(),
-		Name:     name,
+		Name:     regName,
+		Labels:   regLabels,
 	})
 }
 
@@ -698,12 +714,9 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 		}
 	}
 
-	var reg *api.Registry
-	if desired.Registry != "" {
-		reg, err = c.ensureRegistryExists(ctx, desired.Registry)
-		if err != nil {
-			return nil, err
-		}
+	reg, err := c.ensureRegistryExistsForCluster(ctx, desired)
+	if err != nil {
+		return nil, err
 	}
 
 	// Configure the cluster to match what we want.

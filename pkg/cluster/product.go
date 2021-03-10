@@ -18,6 +18,9 @@ func (p Product) DefaultClusterName() string {
 	if p == ProductKIND {
 		return "kind-kind"
 	}
+	if p == ProductK3D {
+		return "k3d-k3s-default"
+	}
 	return string(p)
 }
 

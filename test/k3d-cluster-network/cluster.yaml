@@ -1,0 +1,5 @@
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+name: k3d-ctlptl-test-cluster
+product: k3d
+registry: ctlptl-test-registry

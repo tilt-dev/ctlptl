@@ -1,0 +1,5 @@
+# Creates a k3d cluster with a registry.
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+product: k3d
+registry: ctlptl-k3d-registry
