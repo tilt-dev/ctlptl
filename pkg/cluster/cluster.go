@@ -3,7 +3,9 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	"github.com/tilt-dev/ctlptl/internal/socat"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/registry"
 	"github.com/tilt-dev/localregistry-go"
@@ -54,6 +57,10 @@ type registryController interface {
 
 type clientLoader func(*rest.Config) (kubernetes.Interface, error)
 
+type socatController interface {
+	ConnectRemoteDockerPort(ctx context.Context, port int) error
+}
+
 type Controller struct {
 	iostreams    genericclioptions.IOStreams
 	config       clientcmdapi.Config
@@ -64,8 +71,16 @@ type Controller struct {
 	configLoader configLoader
 	configWriter configWriter
 	registryCtl  registryController
-	mu           sync.Mutex
 	clientLoader clientLoader
+	socat        socatController
+
+	// TODO(nick): I deeply regret making this struct use goroutines. It makes
+	// everything so much more complex.
+	//
+	// We should try to split this up into two structs - the part that needs
+	// concurrency for performance, and the part that is fine being
+	// single-threaded.
+	mu sync.Mutex
 }
 
 func DefaultController(iostreams genericclioptions.IOStreams) (*Controller, error) {
@@ -98,6 +113,22 @@ func DefaultController(iostreams genericclioptions.IOStreams) (*Controller, erro
 		configLoader: configLoader,
 		clientLoader: clientLoader,
 	}, nil
+}
+
+func (c *Controller) getSocatController(ctx context.Context) (socatController, error) {
+	dcli, err := c.getDockerClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.socat == nil {
+		c.socat = socat.NewController(dcli)
+	}
+
+	return c.socat, nil
 }
 
 func (c *Controller) getDockerClient(ctx context.Context) (dockerClient, error) {
@@ -208,6 +239,30 @@ func (c *Controller) configCopy() *clientcmdapi.Config {
 	defer c.mu.Unlock()
 
 	return c.config.DeepCopy()
+}
+
+// Gets the port of the current API server.
+func (c *Controller) currentAPIServerPort() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	current := c.config.CurrentContext
+	context, ok := c.config.Contexts[current]
+	if !ok {
+		return 0
+	}
+
+	cluster, ok := c.config.Clusters[context.Cluster]
+	if !ok {
+		return 0
+	}
+
+	parts := strings.Split(cluster.Server, ":")
+	port, err := strconv.Atoi(parts[len(parts)-1])
+	if err != nil {
+		return 0
+	}
+	return port
 }
 
 func (c *Controller) configCurrent() string {
@@ -607,6 +662,13 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 	}
 
 	if needsCreate {
+		// If the cluster apiserver is in a remote docker cluster,
+		// set up a portforwarder.
+		err := c.maybeCreateForwarderForCurrentCluster(ctx)
+		if err != nil {
+			return nil, err
+		}
+
 		if desired.Product == string(ProductMinikube) {
 			err = c.waitForMinikubeInit(ctx, desired)
 			if err != nil {
@@ -827,4 +889,26 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Cluste
 		TypeMeta: listTypeMeta,
 		Items:    result,
 	}, nil
+}
+
+// If the current cluster is on a remote docker instance,
+// we need a port-forwarder to connect it.
+func (c *Controller) maybeCreateForwarderForCurrentCluster(ctx context.Context) error {
+	dockerHost := os.Getenv("DOCKER_HOST")
+	if dockerHost == "" {
+		return nil
+	}
+
+	port := c.currentAPIServerPort()
+	if port == 0 {
+		return nil
+	}
+
+	socat, err := c.getSocatController(ctx)
+	if err != nil {
+		return err
+	}
+
+	_, _ = fmt.Fprintf(c.iostreams.ErrOut, " 🎮 Env DOCKER_HOST set. Assuming remote Docker and forwarding apiserver to localhost:%d\n", port)
+	return socat.ConnectRemoteDockerPort(ctx, port)
 }

@@ -126,6 +126,10 @@ type fakeDocker struct {
 	lastRemovedContainer string
 }
 
+func (d *fakeDocker) ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error) {
+	return types.ContainerJSON{}, nil
+}
+
 func (d *fakeDocker) ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error) {
 	return d.containers, nil
 }

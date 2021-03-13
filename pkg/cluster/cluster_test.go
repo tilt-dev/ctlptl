@@ -408,6 +408,10 @@ func (c *fakeDockerClient) ContainerInspect(ctx context.Context, id string) (typ
 	return types.ContainerJSON{}, nil
 }
 
+func (d *fakeDockerClient) ContainerRemove(ctx context.Context, id string, options types.ContainerRemoveOptions) error {
+	return nil
+}
+
 type fakeD4MClient struct {
 	lastSettings       map[string]interface{}
 	docker             *fakeDockerClient

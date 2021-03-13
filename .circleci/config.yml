@@ -15,6 +15,17 @@ jobs:
       - slack/notify-on-failure:
           only_for_branches: master
 
+  e2e-remote-docker:
+    docker:
+      - image: gcr.io/windmill-public-containers/ctlptl-e2e-ci
+    working_directory: /go/src/github.com/tilt-dev/ctlptl
+    steps:
+      - checkout
+      - setup_remote_docker:
+          version: 19.03.12
+      - run: make install
+      - run: test/kind-cluster-network/e2e.sh
+          
   e2e:
     machine:
       image: ubuntu-1604:201903-01
@@ -35,7 +46,7 @@ jobs:
           sudo mv ./minikube-linux-amd64 /usr/local/bin/minikube
       - run: |
           set -ex
-          export KIND_VERSION=v0.9.0
+          export KIND_VERSION=v0.10.0
           curl -fLo ./kind-linux-amd64 "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
           chmod +x ./kind-linux-amd64
           sudo mv ./kind-linux-amd64 /usr/local/bin/kind
@@ -76,6 +87,9 @@ workflows:
     jobs:
       - build
       - e2e:
+          requires:
+            - build
+      - e2e-remote-docker:
           requires:
             - build
       - release-dry-run:
