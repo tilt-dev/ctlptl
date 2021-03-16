@@ -10,7 +10,7 @@ Maybe you need a `ctlptl`.
 
 ## What is ctlptl?
 
-`ctlptl` (pronounced "cattle paddle") is a CLI for declaratively setting up
+`ctlptl` (pronounced "coddle poodle") is a CLI for declaratively setting up
 local Kubernetes clusters.
 
 Inspired by `kubectl` and
@@ -37,9 +37,10 @@ scoop bucket add tilt-dev https://github.com/tilt-dev/scoop-bucket
 scoop install ctlptl
 ```
 
-### Manually (Mac/Linux/Windows)
+### Alternative Options
 
-Download the pre-compiled binaries from the [releases](https://github.com/tilt-dev/ctlptl/releases) page and copy to the desired location.
+If automatic installers aren't your cup of tea, check out the [installation
+appendix](INSTALL.md) for more options.
 
 ## How do I use it?
 
@@ -175,7 +176,7 @@ We expect everyone -- users, contributors, followers, and employees alike -- to 
 
 - To help infra engineers manage a consistent dev environment
 
-- To encourage standards that enable interop between devtools, lke [KEP 1755](https://github.com/kubernetes/enhancements/tree/master/keps/sig-cluster-lifecycle/generic/1755-communicating-a-local-registry)
+- To encourage standards that enable interop between devtools, like [KEP 1755](https://github.com/kubernetes/enhancements/tree/master/keps/sig-cluster-lifecycle/generic/1755-communicating-a-local-registry)
 
 ## Non-Goals
 
