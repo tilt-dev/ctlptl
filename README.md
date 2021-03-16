@@ -149,6 +149,7 @@ cluster](https://docs.tilt.dev/choosing_clusters.html) and example repos like
 - Docker for Windows
 - [KIND](https://kind.sigs.k8s.io/) and [KIND with a registry](https://kind.sigs.k8s.io/docs/user/local-registry/)
 - [Minikube](https://minikube.sigs.k8s.io/) and Minikube with a registry
+- Creating a cluster on a Remote Docker Host (useful in CI environments like [CircleCI](https://circleci.com/docs/2.0/building-docker-images/))
 - Allocating CPUs
 
 ### Future Work
