@@ -4,12 +4,13 @@
 # - kubectl
 # - kind
 # - socat
-# - golang build toolchain
 #
-# Similar to the release image (which contains everything BUT the build
-# toolchain)
+# Good base image for anyone that wants to use ctlptl in a CI environment
+# to set up a one-time-use cluster.
+#
+# Built with goreleaser.
 
-FROM golang:1.14-buster
+FROM debian:buster
 
 RUN apt update && apt install -y curl ca-certificates liblz4-tool rsync socat
 
@@ -42,3 +43,4 @@ RUN set -exu \
   && chmod +x ./kind-linux-amd64 \
   && mv ./kind-linux-amd64 /usr/local/bin/kind
 
+COPY ctlptl /usr/local/bin/ctlptl
