@@ -25,6 +25,7 @@ require (
 	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/phayes/freeport v0.0.0-20180830031419-95f893ade6f2
 	github.com/pkg/errors v0.9.1
+	github.com/shirou/gopsutil/v3 v3.21.2
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.6.1
@@ -42,7 +43,6 @@ require (
 	k8s.io/apimachinery v0.19.2
 	k8s.io/cli-runtime v0.19.2
 	k8s.io/client-go v0.19.2
-	k8s.io/code-generator v0.20.2 // indirect
 	k8s.io/klog/v2 v2.4.0
 	k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd // indirect
 	k8s.io/utils v0.0.0-20201015054608-420da100c033 // indirect

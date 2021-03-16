@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 const serviceName = "ctlptl-portforward-service"
@@ -70,12 +72,53 @@ func (c *Controller) StartRemotePortforwarder(ctx context.Context) error {
 	return cmd.Run()
 }
 
+// Returns the socat process listening on a port, plus its commandline.
+func (c *Controller) socatProcessOnPort(port int) (*process.Process, string, error) {
+	processes, err := process.Processes()
+	if err != nil {
+		return nil, "", err
+	}
+	for _, p := range processes {
+		cmdline, err := p.Cmdline()
+		if err != nil {
+			continue
+		}
+		if strings.HasPrefix(cmdline, fmt.Sprintf("socat TCP-LISTEN:%d,", port)) {
+			return p, cmdline, nil
+		}
+	}
+	return nil, "", nil
+}
+
 // Create a port-forwarding server on the local machine, forwarding connections
 // to the same port on the remote Docker server.
 func (c *Controller) StartLocalPortforwarder(ctx context.Context, port int) error {
-	cmd := exec.Command("socat", fmt.Sprintf("TCP-LISTEN:%d,reuseaddr,fork", port),
-		fmt.Sprintf("EXEC:'docker exec -i %s socat STDIO TCP:localhost:%d'", serviceName, port))
-	err := cmd.Start()
+	args := []string{
+		fmt.Sprintf("TCP-LISTEN:%d,reuseaddr,fork", port),
+		fmt.Sprintf("EXEC:'docker exec -i %s socat STDIO TCP:localhost:%d'", serviceName, port),
+	}
+
+	existing, cmdline, err := c.socatProcessOnPort(port)
+	if err != nil {
+		return fmt.Errorf("start portforwarder: %v", err)
+	}
+
+	if existing != nil {
+		expectedCmdline := strings.Join(append([]string{"socat"}, args...), " ")
+		if expectedCmdline == cmdline {
+			// Already running.
+			return nil
+		}
+
+		// Kill and restart.
+		err := existing.KillWithContext(ctx)
+		if err != nil {
+			return fmt.Errorf("start portforwarder: %v", err)
+		}
+	}
+
+	cmd := exec.Command("socat", args...)
+	err = cmd.Start()
 	if err != nil {
 		return fmt.Errorf("creating local portforwarder: %v", err)
 	}

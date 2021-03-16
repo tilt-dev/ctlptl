@@ -1,6 +1,6 @@
 GOPATH = $(shell go env GOPATH)
 
-.PHONY: generate test vendor
+.PHONY: generate test vendor publish-ci-image
 
 install:
 	go install ./cmd/ctlptl
@@ -23,3 +23,7 @@ golangci-lint: $(GOLANGCILINT)
 
 $(GOLANGCILINT):
 	(cd /; GO111MODULE=on GOPROXY="direct" GOSUMDB=off go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.30.0)
+
+publish-ci-image:
+	docker build -t gcr.io/windmill-public-containers/ctlptl-e2e-ci -f .circleci/Dockerfile .
+	docker push gcr.io/windmill-public-containers/ctlptl-e2e-ci

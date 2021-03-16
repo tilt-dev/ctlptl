@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/phayes/freeport"
 	"github.com/tilt-dev/ctlptl/internal/exec"
+	"github.com/tilt-dev/ctlptl/internal/socat"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,14 +46,20 @@ func FillDefaults(registry *api.Registry) {
 }
 
 type ContainerClient interface {
+	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
 	ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error)
 	ContainerRemove(ctx context.Context, id string, options types.ContainerRemoveOptions) error
+}
+
+type socatController interface {
+	ConnectRemoteDockerPort(ctx context.Context, port int) error
 }
 
 type Controller struct {
 	iostreams    genericclioptions.IOStreams
 	dockerClient ContainerClient
 	runner       exec.CmdRunner
+	socat        socatController
 }
 
 func NewController(iostreams genericclioptions.IOStreams, dockerClient ContainerClient) (*Controller, error) {
@@ -59,6 +67,7 @@ func NewController(iostreams genericclioptions.IOStreams, dockerClient Container
 		iostreams:    iostreams,
 		dockerClient: dockerClient,
 		runner:       exec.RealCmdRunner{},
+		socat:        socat.NewController(dockerClient),
 	}, nil
 }
 
@@ -220,7 +229,22 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 		return nil, err
 	}
 
+	err = c.maybeCreateForwarder(ctx, hostPort)
+	if err != nil {
+		return nil, err
+	}
+
 	return c.Get(ctx, desired.Name)
+}
+
+func (c *Controller) maybeCreateForwarder(ctx context.Context, port int) error {
+	dockerHost := os.Getenv("DOCKER_HOST")
+	if dockerHost == "" {
+		return nil
+	}
+
+	_, _ = fmt.Fprintf(c.iostreams.ErrOut, " 🎮 Env DOCKER_HOST set. Assuming remote Docker and forwarding registry to localhost:%d\n", port)
+	return c.socat.ConnectRemoteDockerPort(ctx, port)
 }
 
 // Delete the given registry.
