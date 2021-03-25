@@ -9,7 +9,7 @@
 # Similar to the release image (which contains everything BUT the build
 # toolchain)
 
-FROM golang:1.14-buster
+FROM golang:1.16-buster
 
 RUN apt update && apt install -y curl ca-certificates liblz4-tool rsync socat
 
