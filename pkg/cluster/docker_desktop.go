@@ -127,19 +127,51 @@ func (c DockerDesktopClient) SetSettingValue(ctx context.Context, key, newValue 
 	return c.writeSettings(ctx, settings)
 }
 
+// Returns true if the value changed, false if the value is unchanged.
+// Returns an error if not able to set.
 func (c DockerDesktopClient) applySet(settings map[string]interface{}, key, newValue string) (bool, error) {
-	spec, err := c.lookupMapAt(settings, key)
+	parts := strings.Split(key, ".")
+	if len(parts) <= 1 {
+		return false, fmt.Errorf("key cannot be set: %s", key)
+	}
+
+	parentKey := strings.Join(parts[:len(parts)-1], ".")
+	childKey := parts[len(parts)-1]
+	parentSpec, err := c.lookupMapAt(settings, parentKey)
 	if err != nil {
 		return false, err
 	}
 
-	switch v := spec["value"].(type) {
+	// In Docker Desktop, a boolean setting can be stored in one of two formats:
+	//
+	// {"kubernetes": {"enabled": true}}
+	// {"kubernetes": {"enabled": {"value": true}}}
+	//
+	// To resolve this problem, we create some intermediate variables:
+	// v - the value that we're replacing
+	// vParent - the map owning the value we're replacing
+	// vParentKey - the key where v lives in vParent
+	v, ok := parentSpec[childKey]
+	if !ok {
+		return false, fmt.Errorf("nothing found at DockerDesktop setting %q", key)
+	}
+
+	vParent := parentSpec
+	vParentKey := childKey
+	childMap, isMap := v.(map[string]interface{})
+	if isMap {
+		v = childMap["value"]
+		vParent = childMap
+		vParentKey = "value"
+	}
+
+	switch v := v.(type) {
 	case bool:
 		if newValue == "true" {
-			spec["value"] = true
+			vParent[vParentKey] = true
 			return !v, nil
 		} else if newValue == "false" {
-			spec["value"] = false
+			vParent[vParentKey] = false
 			return v, nil
 		}
 
@@ -151,23 +183,23 @@ func (c DockerDesktopClient) applySet(settings map[string]interface{}, key, newV
 			return false, fmt.Errorf("expected number for setting %q, got: %s. Error: %v", key, newValue, err)
 		}
 
-		max, ok := spec["max"].(float64)
+		max, ok := vParent["max"].(float64)
 		if ok && newValFloat > max {
 			return false, fmt.Errorf("setting value %q: %s greater than max allowed (%f)", key, newValue, max)
 		}
-		min, ok := spec["min"].(float64)
+		min, ok := vParent["min"].(float64)
 		if ok && newValFloat < min {
 			return false, fmt.Errorf("setting value %q: %s less than min allowed (%f)", key, newValue, min)
 		}
 
 		if newValFloat != v {
-			spec["value"] = newValFloat
+			vParent[vParentKey] = newValFloat
 			return true, nil
 		}
 		return false, nil
 	case string:
 		if newValue != v {
-			spec["value"] = newValue
+			vParent[vParentKey] = newValue
 			return true, nil
 		}
 		return false, nil
@@ -179,7 +211,7 @@ func (c DockerDesktopClient) applySet(settings map[string]interface{}, key, newV
 				pathSpec = append(pathSpec, map[string]interface{}{"path": path, "cached": false})
 			}
 
-			spec["value"] = pathSpec
+			vParent[vParentKey] = pathSpec
 
 			// Don't bother trying to optimize this.
 			return true, nil
@@ -262,22 +294,7 @@ func (c DockerDesktopClient) lookupMapAt(settings map[string]interface{}, key st
 }
 
 func (c DockerDesktopClient) setK8sEnabled(settings map[string]interface{}, newVal bool) (changed bool, err error) {
-	enabledSetting, err := c.lookupMapAt(settings, "vm.kubernetes.enabled")
-	if err != nil {
-		return false, err
-	}
-
-	isEnabled, ok := enabledSetting["value"].(bool)
-	if !ok {
-		return false, fmt.Errorf("expected bool at DockerDesktop setting vm.kubernetes.enabled.value, got: %T",
-			enabledSetting["value"])
-	}
-
-	if isEnabled == newVal {
-		return false, nil
-	}
-	enabledSetting["value"] = newVal
-	return true, nil
+	return c.applySet(settings, "vm.kubernetes.enabled", fmt.Sprintf("%v", newVal))
 }
 
 func (c DockerDesktopClient) ensureMinCPU(settings map[string]interface{}, desired int) (changed bool, err error) {
