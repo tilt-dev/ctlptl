@@ -14,7 +14,7 @@ jobs:
       - run: cd .. && go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.38.0
       - run: make golangci-lint
       - slack/notify-on-failure:
-          only_for_branches: master
+          only_for_branches: main
 
   e2e-remote-docker:
     docker:
@@ -56,7 +56,7 @@ jobs:
           go get -v -t -d ./...
           test/e2e.sh
       - slack/notify-on-failure:
-          only_for_branches: master
+          only_for_branches: main
           
   release-dry-run:
     docker:
@@ -70,7 +70,7 @@ jobs:
       - run: sudo mv ./bin/goreleaser /usr/local/bin/
       - run: goreleaser --rm-dist --skip-publish --snapshot
       - slack/notify-on-failure:
-          only_for_branches: master
+          only_for_branches: main
           
   release:
     docker:

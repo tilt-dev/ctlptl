@@ -43,7 +43,7 @@ make e2e
 ### Release
 
 CircleCI will automatically build ctlptl releases when you push
-a new tag to master.
+a new tag to main.
 
 ```
 git pull origin main
