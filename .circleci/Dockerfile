@@ -16,7 +16,7 @@ RUN apt update && apt install -y curl ca-certificates liblz4-tool rsync socat
 # Install docker
 # Adapted from https://github.com/circleci/circleci-images/blob/staging/shared/images/Dockerfile-basic.template
 # Check https://download.docker.com/linux/static/stable/x86_64/ for latest versions
-ENV DOCKER_VERSION=19.03.5
+ENV DOCKER_VERSION=20.10.7
 RUN set -exu \
   && DOCKER_URL="https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz" \
   && echo Docker URL: $DOCKER_URL \
