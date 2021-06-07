@@ -36,7 +36,7 @@ RUN apt install -y apt-transport-https gnupg \
   && apt update && apt install -y kubectl
 
 # install Kind
-ENV KIND_VERSION=v0.11.0
+ENV KIND_VERSION=v0.11.1
 RUN set -exu \
   && curl -fLo ./kind-linux-amd64 "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64" \
   && chmod +x ./kind-linux-amd64 \
