@@ -55,7 +55,7 @@ func versionStamp() string {
 	}
 
 	if version == "" {
-		version = "0.0.0-master"
+		version = "0.0.0-main"
 	}
 
 	return fmt.Sprintf("v%s, built %s", version, date)
