@@ -23,7 +23,7 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker:
-          version: 19.03.12
+          version: 20.10.6
       - run: make install
       - run: test/kind-cluster-network/e2e.sh
           
@@ -64,7 +64,7 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker:
-          version: 19.03.12
+          version: 20.10.6
       - run: git fetch --tags
       - run: curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | sh
       - run: sudo mv ./bin/goreleaser /usr/local/bin/
@@ -78,7 +78,7 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker:
-          version: 19.03.12
+          version: 20.10.6
       - run: git fetch --tags
       - run: curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | sh
       - run: sudo mv ./bin/goreleaser /usr/local/bin/
