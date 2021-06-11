@@ -40,6 +40,8 @@ func (o *ApplyOptions) Command() *cobra.Command {
 		Run: o.Run,
 	}
 
+	cmd.SetOut(o.Out)
+	cmd.SetErr(o.ErrOut)
 	o.FileNameFlags.AddFlags(cmd.Flags())
 	o.PrintFlags.AddFlags(cmd)
 
