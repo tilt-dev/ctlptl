@@ -158,8 +158,10 @@ func (a *kindAdmin) Delete(ctx context.Context, config *api.Cluster) error {
 func (a *kindAdmin) getNodeImage(ctx context.Context, kindVersion, k8sVersion string) (string, error) {
 	nodeTable, ok := kindK8sNodeTable[kindVersion]
 	if !ok {
-		return "", fmt.Errorf("No available kindest/node versions for kind version %s.\n"+
-			"Please file an issue: https://github.com/tilt-dev/ctlptl/issues/new", kindVersion)
+		return "", fmt.Errorf("unsupported Kind version %s.\n"+
+			"To set up a specific Kubernetes version in Kind, ctlptl needs an official Kubernetes image.\n"+
+			"If you're running an unofficial version of Kind, remove 'kubernetesVersion' from your cluster config to use the default image.\n"+
+			"If you're running a newly released version of Kind, please file an issue: https://github.com/tilt-dev/ctlptl/issues/new", kindVersion)
 	}
 
 	// Kind doesn't maintain Kubernetes nodes for every patch version, so just get the closest
