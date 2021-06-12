@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
@@ -18,12 +19,14 @@ import (
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/registry"
 	"github.com/tilt-dev/localregistry-go"
+	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -40,6 +43,15 @@ const clusterSpecConfigMap = "ctlptl-cluster-spec"
 var typeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "Cluster"}
 var listTypeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "ClusterList"}
 var groupResource = schema.GroupResource{Group: "ctlptl.dev", Resource: "clusters"}
+
+// Due to the way the Kubernetes apiserver works, there's no easy way to
+// distinguish between "server is taking a long time to respond because it's
+// gone" and "server is taking a long time to respond because it has a slow auth
+// plugin".
+//
+// So our health check timeout is a bit longer than we'd like.
+// Fortunately, ctlptl is mostly used for local clusters.
+const healthCheckTimeout = 3 * time.Second
 
 func TypeMeta() api.TypeMeta {
 	return typeMeta
@@ -352,16 +364,6 @@ func (c *Controller) populateLocalRegistryHosting(ctx context.Context, cluster *
 	return nil
 }
 
-func (c *Controller) populateKubernetesVersion(ctx context.Context, cluster *api.Cluster, client kubernetes.Interface) error {
-	d := client.Discovery()
-	v, err := d.ServerVersion()
-	if err != nil {
-		return err
-	}
-	cluster.Status.KubernetesVersion = v.GitVersion
-	return nil
-}
-
 func (c *Controller) populateMachineStatus(ctx context.Context, cluster *api.Cluster) error {
 	machine, err := c.machine(ctx, cluster.Name, Product(cluster.Product))
 	if err != nil {
@@ -397,6 +399,34 @@ func (c *Controller) populateClusterSpec(ctx context.Context, cluster *api.Clust
 	return nil
 }
 
+// If you have dead clusters in your kubeconfig, it's common for the requests to
+// hang indefinitely. So we do a quick health check with a short timeout.
+func (c *Controller) healthCheckCluster(ctx context.Context, client kubernetes.Interface) (*version.Info, error) {
+	ctx, cancel := context.WithTimeout(ctx, healthCheckTimeout)
+	defer cancel()
+
+	return c.serverVersion(ctx, client)
+}
+
+// A fork of DiscoveryClient ServerVersion that obeys Context timeouts.
+func (c *Controller) serverVersion(ctx context.Context, client kubernetes.Interface) (*version.Info, error) {
+	restClient := client.Discovery().RESTClient()
+	if restClient == nil {
+		return client.Discovery().ServerVersion()
+	}
+
+	body, err := restClient.Get().AbsPath("/version").Do(ctx).Raw()
+	if err != nil {
+		return nil, err
+	}
+	var info version.Info
+	err = json.Unmarshal(body, &info)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse the server version: %v", err)
+	}
+	return &info, nil
+}
+
 func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) {
 	name := cluster.Name
 	client, err := c.client(cluster.Name)
@@ -405,6 +435,21 @@ func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) 
 		return
 	}
 	wg := sync.WaitGroup{}
+	ctx, cancel := context.WithCancel(ctx)
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		v, err := c.healthCheckCluster(ctx, client)
+		if err != nil {
+			// Cancel all other fetching.
+			cancel()
+			return
+		}
+
+		cluster.Status.KubernetesVersion = v.GitVersion
+	}()
 
 	wg.Add(1)
 	go func() {
@@ -432,15 +477,6 @@ func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) 
 		err := c.populateMachineStatus(ctx, cluster)
 		if err != nil {
 			klog.V(4).Infof("WARNING: reading cluster %s machine: %v\n", name, err)
-		}
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		err := c.populateKubernetesVersion(ctx, cluster, client)
-		if err != nil {
-			klog.V(4).Infof("WARNING: reading cluster %s version: %v\n", name, err)
 		}
 	}()
 
@@ -864,25 +900,46 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Cluste
 	}
 
 	config := c.configCopy()
-	result := []api.Cluster{}
 	names := make([]string, 0, len(c.config.Contexts))
 	for name := range config.Contexts {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 
-	for _, name := range names {
+	// Listing all clusters can take a long time, so parallelize it.
+	all := make([]*api.Cluster, len(names))
+	g, ctx := errgroup.WithContext(ctx)
+
+	for i, name := range names {
 		ct := c.config.Contexts[name]
-		cluster := &api.Cluster{
-			TypeMeta: typeMeta,
-			Name:     name,
-			Product:  productFromContext(ct, config.Clusters[ct.Cluster]).String(),
-		}
-		if !selector.Matches((*clusterFields)(cluster)) {
+		name := name
+		i := i
+		g.Go(func() error {
+			cluster := &api.Cluster{
+				TypeMeta: typeMeta,
+				Name:     name,
+				Product:  productFromContext(ct, config.Clusters[ct.Cluster]).String(),
+			}
+			if !selector.Matches((*clusterFields)(cluster)) {
+				return nil
+			}
+			c.populateCluster(ctx, cluster)
+			all[i] = cluster
+			return nil
+		})
+	}
+
+	err = g.Wait()
+	if err != nil {
+		return nil, err
+	}
+
+	result := []api.Cluster{}
+	for _, c := range all {
+		if c == nil {
 			continue
 		}
-		c.populateCluster(ctx, cluster)
-		result = append(result, *cluster)
+		result = append(result, *c)
 	}
 
 	return &api.ClusterList{
