@@ -87,18 +87,18 @@ func (c DockerDesktopClient) ResetCluster(ctx context.Context) error {
 	klog.V(7).Infof("POST %s /kubernetes/reset\n", c.socketPath)
 	req, err := http.NewRequest("POST", "http://localhost/kubernetes/reset", nil)
 	if err != nil {
-		return errors.Wrap(err, "reset d4m kubernetes")
+		return errors.Wrap(err, "reset docker-desktop kubernetes")
 	}
 
 	req.Header.Add("Content-Type", "application/json")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return errors.Wrap(err, "reset d4m kubernetes")
+		return errors.Wrap(err, "reset docker-desktop kubernetes")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("reset d4m kubernetes: status code %d", resp.StatusCode)
+		return fmt.Errorf("reset docker-desktop kubernetes: status code %d", resp.StatusCode)
 	}
 	return nil
 }
@@ -226,24 +226,24 @@ func (c DockerDesktopClient) writeSettings(ctx context.Context, settings map[str
 	buf := bytes.NewBuffer(nil)
 	err := json.NewEncoder(buf).Encode(c.settingsForWrite(settings))
 	if err != nil {
-		return errors.Wrap(err, "writing d4m settings")
+		return errors.Wrap(err, "writing docker-desktop settings")
 	}
 
 	klog.V(8).Infof("Request body: %s\n", buf.String())
 	req, err := http.NewRequest("POST", "http://localhost/settings", buf)
 	if err != nil {
-		return errors.Wrap(err, "writing d4m settings")
+		return errors.Wrap(err, "writing docker-desktop settings")
 	}
 
 	req.Header.Add("Content-Type", "application/json")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return errors.Wrap(err, "writing d4m settings")
+		return errors.Wrap(err, "writing docker-desktop settings")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("writing d4m settings: status code %d", resp.StatusCode)
+		return fmt.Errorf("writing docker-desktop settings: status code %d", resp.StatusCode)
 	}
 	return nil
 }
@@ -252,23 +252,24 @@ func (c DockerDesktopClient) settings(ctx context.Context) (map[string]interface
 	klog.V(7).Infof("GET %s /settings\n", c.socketPath)
 	req, err := http.NewRequest("GET", "http://localhost/settings", nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "reading d4m settings")
+		return nil, errors.Wrap(err, "reading docker-desktop settings")
 	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "reading d4m settings")
+		return nil, fmt.Errorf("could not connect to Docker Desktop. "+
+			"Please ensure Docker is installed and up to date.\n  (caused by: %v)", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("reading d4m settings: status code %d", resp.StatusCode)
+		return nil, fmt.Errorf("reading docker-desktop settings: status code %d", resp.StatusCode)
 	}
 
 	settings := make(map[string]interface{})
 	err = json.NewDecoder(resp.Body).Decode(&settings)
 	if err != nil {
-		return nil, errors.Wrap(err, "reading d4m settings")
+		return nil, errors.Wrap(err, "reading docker settings")
 	}
 	klog.V(8).Infof("Response body: %+v\n", settings)
 	return settings, nil
