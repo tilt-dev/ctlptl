@@ -120,6 +120,11 @@ func (c *Controller) StartLocalPortforwarder(ctx context.Context, port int) erro
 	cmd := exec.Command("socat", args...)
 	err = cmd.Start()
 	if err != nil {
+		_, err := exec.LookPath("socat")
+		if err != nil {
+			return fmt.Errorf("socat not installed: ctlptl requires 'socat' to be installed when setting up clusters on a remote Docker daemon")
+		}
+
 		return fmt.Errorf("creating local portforwarder: %v", err)
 	}
 
