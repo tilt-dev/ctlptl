@@ -41,6 +41,8 @@ func (o *CreateRegistryOptions) Command() *cobra.Command {
 		Args: cobra.ExactArgs(1),
 	}
 
+	cmd.SetOut(o.Out)
+	cmd.SetErr(o.ErrOut)
 	o.PrintFlags.AddFlags(cmd)
 	cmd.Flags().IntVar(&o.Registry.Port, "port", o.Registry.Port, "The port to expose the registry on localhost. If not specified, chooses a random port")
 

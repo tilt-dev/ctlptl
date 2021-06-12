@@ -41,6 +41,8 @@ func (o *CreateClusterOptions) Command() *cobra.Command {
 		Args: cobra.ExactArgs(1),
 	}
 
+	cmd.SetOut(o.Out)
+	cmd.SetErr(o.ErrOut)
 	o.PrintFlags.AddFlags(cmd)
 	cmd.Flags().StringVar(&o.Cluster.Registry, "registry",
 		o.Cluster.Registry, "Connect the cluster to the named registry")

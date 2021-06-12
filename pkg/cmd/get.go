@@ -44,6 +44,8 @@ func (o *GetOptions) Command() *cobra.Command {
 		Args: cobra.MaximumNArgs(2),
 	}
 
+	cmd.SetOut(o.Out)
+	cmd.SetErr(o.ErrOut)
 	o.PrintFlags.AddFlags(cmd)
 
 	cmd.Flags().BoolVar(&o.IgnoreNotFound, "ignore-not-found", o.IgnoreNotFound, "If the requested object does not exist the command will return exit code 0.")

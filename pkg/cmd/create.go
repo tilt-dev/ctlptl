@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -28,6 +27,8 @@ func (o *CreateOptions) Command() *cobra.Command {
 		Run: o.Run,
 	}
 
+	cmd.SetOut(o.Out)
+	cmd.SetErr(o.ErrOut)
 	cmd.AddCommand(NewCreateClusterOptions().Command())
 	cmd.AddCommand(NewCreateRegistryOptions().Command())
 
@@ -35,6 +36,6 @@ func (o *CreateOptions) Command() *cobra.Command {
 }
 
 func (o *CreateOptions) Run(cmd *cobra.Command, args []string) {
-	_, _ = fmt.Fprintln(o.IOStreams.ErrOut, cmd.Help().Error())
+	_ = cmd.Help()
 	os.Exit(1)
 }

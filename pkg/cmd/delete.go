@@ -46,6 +46,8 @@ func (o *DeleteOptions) Command() *cobra.Command {
 		Run: o.Run,
 	}
 
+	cmd.SetOut(o.Out)
+	cmd.SetErr(o.ErrOut)
 	o.FileNameFlags.AddFlags(cmd.Flags())
 
 	cmd.Flags().BoolVar(&o.IgnoreNotFound, "ignore-not-found", o.IgnoreNotFound, "If the requested object does not exist the command will return exit code 0.")
