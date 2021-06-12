@@ -948,11 +948,26 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Cluste
 	}, nil
 }
 
+func isLocalDockerHost(dockerHost string) bool {
+	return dockerHost == "" ||
+
+		// Check all the "standard" docker localhosts.
+		// https://github.com/docker/cli/blob/a32cd16160f1b41c1c4ae7bee4dac929d1484e59/opts/hosts.go#L22
+		strings.HasPrefix(dockerHost, "tcp://localhost:") ||
+		strings.HasPrefix(dockerHost, "tcp://127.0.0.1:") ||
+
+		// https://github.com/moby/moby/blob/master/client/client_windows.go#L4
+		strings.HasPrefix(dockerHost, "npipe:") ||
+
+		// https://github.com/moby/moby/blob/master/client/client_unix.go#L6
+		strings.HasPrefix(dockerHost, "unix:")
+}
+
 // If the current cluster is on a remote docker instance,
 // we need a port-forwarder to connect it.
 func (c *Controller) maybeCreateForwarderForCurrentCluster(ctx context.Context) error {
 	dockerHost := os.Getenv("DOCKER_HOST")
-	if dockerHost == "" {
+	if isLocalDockerHost(dockerHost) {
 		return nil
 	}
 
