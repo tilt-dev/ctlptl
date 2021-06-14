@@ -80,7 +80,7 @@ ctlptl delete cluster docker-desktop
 ctlptl docker-desktop quit
 ```
 
-#### KIND: with a built-in registry
+#### KIND: with a built-in registry at a random port
 
 Create:
 
@@ -92,6 +92,37 @@ or ensure exists:
 
 ```
 cat <<EOF | ctlptl apply -f -
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+product: kind
+registry: ctlptl-registry
+EOF
+```
+
+Then fetch the URL to push images to with:
+
+```
+ctlptl get cluster kind-kind -o template --template '{{.status.localRegistryHosting.host}}'
+```
+
+#### KIND: with a built-in registry at a pre-determined port
+
+Create:
+
+```
+ctlptl create registry ctlptl-registry --port=5005
+ctlptl create cluster kind --registry=ctlptl-registry
+```
+
+or ensure exists:
+
+```
+cat <<EOF | ctlptl apply -f -
+apiVersion: ctlptl.dev/v1alpha1
+kind: Registry
+name: ctlptl-registry
+port: 5005
+---
 apiVersion: ctlptl.dev/v1alpha1
 kind: Cluster
 product: kind

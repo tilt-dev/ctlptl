@@ -37,9 +37,17 @@ func NewGetOptions() *GetOptions {
 func (o *GetOptions) Command() *cobra.Command {
 	var cmd = &cobra.Command{
 		Use:   "get [type] [name]",
-		Short: "Read the currently running clusters",
+		Short: "Read currently running clusters and registries",
+		Long: `Read the status of currently running clusters and registries.
+
+Supports the same flags as kubectl for selecting
+and printing fields. The kubectl cheat sheet may help:
+
+https://kubernetes.io/docs/reference/kubectl/cheatsheet/#formatting-output
+`,
 		Example: "  ctlptl get\n" +
-			"  ctlptl get microk8s -o yaml",
+			"  ctlptl get cluster microk8s -o yaml\n" +
+			"  ctlptl get cluster kind-kind -o template --template '{{.status.localRegistryHosting.host}}'\n",
 		Run:  o.Run,
 		Args: cobra.MaximumNArgs(2),
 	}
