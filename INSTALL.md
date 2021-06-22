@@ -34,14 +34,14 @@ On macOS:
 
 ```bash
 CTLPTL_VERSION="0.5.0"
-curl -fsSL https://github.com/tilt-dev/ctlptl/releases/download/v$CTLPTL_VERSION/ctlptl.$CTLPTL_VERSION.mac.x86_64.tar.gz | tar -xzv -C /usr/local/bin ctlptl
+curl -fsSL https://github.com/tilt-dev/ctlptl/releases/download/v$CTLPTL_VERSION/ctlptl.$CTLPTL_VERSION.mac.x86_64.tar.gz | sudo tar -xzv -C /usr/local/bin ctlptl
 ```
 
 On Linux:
 
 ```bash
 CTLPTL_VERSION="0.5.0"
-curl -fsSL https://github.com/tilt-dev/ctlptl/releases/download/v$CTLPTL_VERSION/ctlptl.$CTLPTL_VERSION.linux.x86_64.tar.gz | tar -xzv -C /usr/local/bin ctlptl
+curl -fsSL https://github.com/tilt-dev/ctlptl/releases/download/v$CTLPTL_VERSION/ctlptl.$CTLPTL_VERSION.linux.x86_64.tar.gz | sudo tar -xzv -C /usr/local/bin ctlptl
 ```
 
 On Windows:
