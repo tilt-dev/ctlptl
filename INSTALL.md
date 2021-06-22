@@ -33,17 +33,15 @@ download the pre-build binaries for your architecture.
 On macOS:
 
 ```bash
-export CTLPTL_VERSION="0.5.0"
-curl -fsSL https://github.com/tilt-dev/ctlptl/releases/download/v$CTLPTL_VERSION/ctlptl.$CTLPTL_VERSION.mac.x86_64.tar.gz | tar -xzv ctlptl && \
-  sudo mv ctlptl /usr/local/bin/ctlptl
+CTLPTL_VERSION="0.5.0"
+curl -fsSL https://github.com/tilt-dev/ctlptl/releases/download/v$CTLPTL_VERSION/ctlptl.$CTLPTL_VERSION.mac.x86_64.tar.gz | tar -xzv -C /usr/local/bin ctlptl
 ```
 
 On Linux:
 
 ```bash
-export CTLPTL_VERSION="0.5.0"
-curl -fsSL https://github.com/tilt-dev/ctlptl/releases/download/v$CTLPTL_VERSION/ctlptl.$CTLPTL_VERSION.linux.x86_64.tar.gz | tar -xzv ctlptl && \
-  sudo mv ctlptl /usr/local/bin/ctlptl
+CTLPTL_VERSION="0.5.0"
+curl -fsSL https://github.com/tilt-dev/ctlptl/releases/download/v$CTLPTL_VERSION/ctlptl.$CTLPTL_VERSION.linux.x86_64.tar.gz | tar -xzv -C /usr/local/bin ctlptl
 ```
 
 On Windows:
