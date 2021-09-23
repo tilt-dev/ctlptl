@@ -82,8 +82,7 @@ jobs:
       - run: git fetch --tags
       - run: curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | sh
       - run: sudo mv ./bin/goreleaser /usr/local/bin/
-      - run: echo "$DOCKER_TOKEN" | docker login --username "$DOCKER_USERNAME" --password-stdin
-      - run: goreleaser --rm-dist
+      - run: ./hack/release.sh
       - slack/status:
           mentions: "nick"
         
