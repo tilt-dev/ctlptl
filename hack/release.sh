@@ -24,4 +24,4 @@ goreleaser --rm-dist
 
 VERSION=$(git describe --abbrev=0 --tags)
 
-./scripts/release-update-tilt-repo.sh "$VERSION"
+./hack/release-update-tilt-repo.sh "$VERSION"
