@@ -26,6 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/duration"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
@@ -53,6 +55,8 @@ var groupResource = schema.GroupResource{Group: "ctlptl.dev", Resource: "cluster
 // Fortunately, ctlptl is mostly used for local clusters.
 const healthCheckTimeout = 3 * time.Second
 
+const waitAfterCreateTimeout = 2 * time.Minute
+
 func TypeMeta() api.TypeMeta {
 	return typeMeta
 }
@@ -74,17 +78,18 @@ type socatController interface {
 }
 
 type Controller struct {
-	iostreams    genericclioptions.IOStreams
-	config       clientcmdapi.Config
-	clients      map[string]kubernetes.Interface
-	admins       map[Product]Admin
-	dockerClient dockerClient
-	dmachine     *dockerMachine
-	configLoader configLoader
-	configWriter configWriter
-	registryCtl  registryController
-	clientLoader clientLoader
-	socat        socatController
+	iostreams              genericclioptions.IOStreams
+	config                 clientcmdapi.Config
+	clients                map[string]kubernetes.Interface
+	admins                 map[Product]Admin
+	dockerClient           dockerClient
+	dmachine               *dockerMachine
+	configLoader           configLoader
+	configWriter           configWriter
+	registryCtl            registryController
+	clientLoader           clientLoader
+	socat                  socatController
+	waitAfterCreateTimeout time.Duration
 
 	// TODO(nick): I deeply regret making this struct use goroutines. It makes
 	// everything so much more complex.
@@ -117,13 +122,14 @@ func DefaultController(iostreams genericclioptions.IOStreams) (*Controller, erro
 	}
 
 	return &Controller{
-		iostreams:    iostreams,
-		config:       config,
-		configWriter: configWriter,
-		clients:      make(map[string]kubernetes.Interface),
-		admins:       make(map[Product]Admin),
-		configLoader: configLoader,
-		clientLoader: clientLoader,
+		iostreams:              iostreams,
+		config:                 config,
+		configWriter:           configWriter,
+		clients:                make(map[string]kubernetes.Interface),
+		admins:                 make(map[Product]Admin),
+		configLoader:           configLoader,
+		clientLoader:           clientLoader,
+		waitAfterCreateTimeout: waitAfterCreateTimeout,
 	}, nil
 }
 
@@ -684,12 +690,17 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 		if err != nil {
 			return nil, err
 		}
+
+		err = c.waitForContextCreate(ctx, desired)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Update the kubectl context to match this cluster.
 	err = c.configWriter.SetContext(desired.Name)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("switching to cluster context %s: %v", desired.Name, err)
 	}
 
 	err = c.reloadConfigs()
@@ -705,11 +716,9 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 			return nil, err
 		}
 
-		if desired.Product == string(ProductMinikube) {
-			err = c.waitForMinikubeInit(ctx, desired)
-			if err != nil {
-				return nil, errors.Wrap(err, "minikube is not healthy")
-			}
+		err = c.waitForHealthCheckAfterCreate(ctx, desired)
+		if err != nil {
+			return nil, err
 		}
 
 		err = c.writeClusterSpec(ctx, desired)
@@ -726,37 +735,6 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 	}
 
 	return c.Get(ctx, desired.Name)
-}
-
-// Minikube seems to have all sorts of weird API errors during startup.
-// We have no idea why this happens. It might be a race condition.
-//
-// Errors we've seen include weird auth errors and connection closed errors.
-//
-// https://github.com/tilt-dev/ctlptl/issues/87
-//
-// For now, do a dummy get until it succeeds.
-func (c *Controller) waitForMinikubeInit(ctx context.Context, desired *api.Cluster) error {
-	var err error
-	retries := 3
-	for retries > 0 {
-		retries--
-
-		_, err = c.Get(ctx, desired.Name)
-		if err == nil {
-			return nil
-		}
-
-		if retries > 0 {
-			time.Sleep(time.Second)
-
-			err = c.reloadConfigs()
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return err
 }
 
 // Writes the cluster spec to the cluster itself, so
@@ -983,4 +961,91 @@ func (c *Controller) maybeCreateForwarderForCurrentCluster(ctx context.Context) 
 
 	_, _ = fmt.Fprintf(c.iostreams.ErrOut, " 🎮 Env DOCKER_HOST set. Assuming remote Docker and forwarding apiserver to localhost:%d\n", port)
 	return socat.ConnectRemoteDockerPort(ctx, port)
+}
+
+// Docker-Desktop may be slow to write the kubernetes context
+// back to the config, so we have to wait until it appears.
+func (c *Controller) waitForContextCreate(ctx context.Context, cluster *api.Cluster) error {
+	refreshAndCheckOK := func() error {
+		err := c.reloadConfigs()
+		if err != nil {
+			return err
+		}
+		_, err = c.client(cluster.Name)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	err := refreshAndCheckOK()
+	if err == nil {
+		return nil
+	}
+
+	_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Waiting %s for cluster %q to create kubectl context...\n",
+		duration.ShortHumanDuration(c.waitAfterCreateTimeout), cluster.Name)
+	var lastErr error
+	err = wait.PollImmediate(time.Second, c.waitAfterCreateTimeout, func() (bool, error) {
+		err := refreshAndCheckOK()
+		lastErr = err
+		isSuccess := err == nil
+		return isSuccess, nil
+	})
+	if err != nil {
+		return fmt.Errorf("kubernetes context never created: %v", lastErr)
+	}
+	return nil
+}
+
+// Our cluster creation tools aren't super trustworthy.
+//
+// After the cluster is created, we poll the kubeconfig until
+// the cluster context has been created and the cluster becomes healthy.
+//
+// https://github.com/tilt-dev/ctlptl/issues/87
+// https://github.com/tilt-dev/ctlptl/issues/131
+func (c *Controller) waitForHealthCheckAfterCreate(ctx context.Context, cluster *api.Cluster) error {
+	checkOK := func() error {
+		client, err := c.client(cluster.Name)
+		if err != nil {
+			return err
+		}
+
+		// quick apiserver health check.
+		_, err = c.healthCheckCluster(ctx, client)
+		if err != nil {
+			return err
+		}
+
+		// make sure the kube-public namespace exists,
+		// because this is where ctlptl writes its configs.
+		_, err = client.CoreV1().Namespaces().Get(ctx, "kube-public", metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	// If the tool properly waited for the cluster to init,
+	// return immediately.
+	err := checkOK()
+	if err == nil {
+		return nil
+	}
+
+	_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Waiting %s for Kubernetes cluster %q to start...\n",
+		duration.ShortHumanDuration(c.waitAfterCreateTimeout), cluster.Name)
+	var lastErr error
+	err = wait.PollImmediate(time.Second, c.waitAfterCreateTimeout, func() (bool, error) {
+		err := checkOK()
+		lastErr = err
+		isSuccess := err == nil
+		return isSuccess, nil
+	})
+	if err != nil {
+		return fmt.Errorf("timed out waiting for cluster to start: %v", lastErr)
+	}
+	return nil
 }
