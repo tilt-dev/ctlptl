@@ -34,6 +34,6 @@ git add .
 git config --global user.email "hi@tilt.dev"
 git config --global user.name "Tilt Dev"
 git commit -a -m "Update version numbers: $VERSION"
-#git push origin master
+git push origin master
 
-#rm -fR "$ROOT"
+rm -fR "$ROOT"
