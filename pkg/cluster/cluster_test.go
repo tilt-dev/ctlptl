@@ -107,6 +107,30 @@ func TestClusterApplyKIND(t *testing.T) {
 	assert.Equal(t, "kind-kind", result.Name)
 }
 
+func TestClusterApplyFailsToStart(t *testing.T) {
+	f := newFixture(t)
+	f.dmachine.os = "darwin"
+
+	out := bytes.NewBuffer(nil)
+	f.controller.iostreams.ErrOut = out
+
+	assert.Equal(t, false, f.d4m.started)
+	_ = f.newFakeAdmin(ProductKIND)
+
+	// Pretend that the kube-public namespace is never created.
+	err := f.fakeK8s.CoreV1().Namespaces().Delete(
+		context.Background(), "kube-public", metav1.DeleteOptions{})
+	require.NoError(t, err)
+
+	_, err = f.controller.Apply(context.Background(), &api.Cluster{
+		Product: string(ProductKIND),
+	})
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "timed out waiting for cluster to start")
+		assert.Contains(t, out.String(), "Waiting 2m for Kubernetes cluster \"kind-kind\" to start")
+	}
+}
+
 func TestClusterApplyKINDWithCluster(t *testing.T) {
 	f := newFixture(t)
 	f.dmachine.os = "linux"
@@ -366,22 +390,29 @@ func newFixture(t *testing.T) *fixture {
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 		},
 	}
-	fakeK8s := fake.NewSimpleClientset(node)
+	ns := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "kube-public",
+			CreationTimestamp: metav1.Time{Time: time.Now()},
+		},
+	}
+	fakeK8s := fake.NewSimpleClientset(node, ns)
 	clientLoader := clientLoader(func(restConfig *rest.Config) (kubernetes.Interface, error) {
 		return fakeK8s, nil
 	})
 
 	registryCtl := &fakeRegistryController{}
 	controller := &Controller{
-		iostreams:    iostreams,
-		admins:       make(map[Product]Admin),
-		config:       *config,
-		configWriter: configWriter,
-		dmachine:     dmachine,
-		configLoader: configLoader,
-		clientLoader: clientLoader,
-		clients:      make(map[string]kubernetes.Interface),
-		registryCtl:  registryCtl,
+		iostreams:              iostreams,
+		admins:                 make(map[Product]Admin),
+		config:                 *config,
+		configWriter:           configWriter,
+		dmachine:               dmachine,
+		configLoader:           configLoader,
+		clientLoader:           clientLoader,
+		clients:                make(map[string]kubernetes.Interface),
+		registryCtl:            registryCtl,
+		waitAfterCreateTimeout: time.Millisecond,
 	}
 	return &fixture{
 		t:            t,

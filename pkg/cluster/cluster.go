@@ -26,6 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/duration"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
@@ -53,6 +55,8 @@ var groupResource = schema.GroupResource{Group: "ctlptl.dev", Resource: "cluster
 // Fortunately, ctlptl is mostly used for local clusters.
 const healthCheckTimeout = 3 * time.Second
 
+const waitAfterCreateTimeout = 2 * time.Minute
+
 func TypeMeta() api.TypeMeta {
 	return typeMeta
 }
@@ -74,17 +78,18 @@ type socatController interface {
 }
 
 type Controller struct {
-	iostreams    genericclioptions.IOStreams
-	config       clientcmdapi.Config
-	clients      map[string]kubernetes.Interface
-	admins       map[Product]Admin
-	dockerClient dockerClient
-	dmachine     *dockerMachine
-	configLoader configLoader
-	configWriter configWriter
-	registryCtl  registryController
-	clientLoader clientLoader
-	socat        socatController
+	iostreams              genericclioptions.IOStreams
+	config                 clientcmdapi.Config
+	clients                map[string]kubernetes.Interface
+	admins                 map[Product]Admin
+	dockerClient           dockerClient
+	dmachine               *dockerMachine
+	configLoader           configLoader
+	configWriter           configWriter
+	registryCtl            registryController
+	clientLoader           clientLoader
+	socat                  socatController
+	waitAfterCreateTimeout time.Duration
 
 	// TODO(nick): I deeply regret making this struct use goroutines. It makes
 	// everything so much more complex.
@@ -117,13 +122,14 @@ func DefaultController(iostreams genericclioptions.IOStreams) (*Controller, erro
 	}
 
 	return &Controller{
-		iostreams:    iostreams,
-		config:       config,
-		configWriter: configWriter,
-		clients:      make(map[string]kubernetes.Interface),
-		admins:       make(map[Product]Admin),
-		configLoader: configLoader,
-		clientLoader: clientLoader,
+		iostreams:              iostreams,
+		config:                 config,
+		configWriter:           configWriter,
+		clients:                make(map[string]kubernetes.Interface),
+		admins:                 make(map[Product]Admin),
+		configLoader:           configLoader,
+		clientLoader:           clientLoader,
+		waitAfterCreateTimeout: waitAfterCreateTimeout,
 	}, nil
 }
 
@@ -684,12 +690,17 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 		if err != nil {
 			return nil, err
 		}
+
+		err = c.waitForHealthCheckAfterCreate(ctx, desired)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Update the kubectl context to match this cluster.
 	err = c.configWriter.SetContext(desired.Name)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("switching to cluster context %s: %v", desired.Name, err)
 	}
 
 	err = c.reloadConfigs()
@@ -983,4 +994,57 @@ func (c *Controller) maybeCreateForwarderForCurrentCluster(ctx context.Context) 
 
 	_, _ = fmt.Fprintf(c.iostreams.ErrOut, " 🎮 Env DOCKER_HOST set. Assuming remote Docker and forwarding apiserver to localhost:%d\n", port)
 	return socat.ConnectRemoteDockerPort(ctx, port)
+}
+
+// Our cluster creation tools aren't super trustworthy.
+// After the cluster is created, we poll the kubeconfig until
+// the cluster context has been created and the cluster becomes healthy.
+func (c *Controller) waitForHealthCheckAfterCreate(ctx context.Context, cluster *api.Cluster) error {
+	refreshAndCheckOK := func() error {
+		err := c.reloadConfigs()
+		if err != nil {
+			return err
+		}
+		client, err := c.client(cluster.Name)
+		if err != nil {
+			return err
+		}
+
+		// quick apiserver health check.
+		_, err = c.healthCheckCluster(ctx, client)
+		if err != nil {
+			return err
+		}
+
+		// make sure the kube-public namespace exists,
+		// because this is where ctlptl writes its configs.
+		_, err = client.CoreV1().Namespaces().Get(ctx, "kube-public", metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	// If the tool properly waited for the cluster to init,
+	// return immediately.
+	err := refreshAndCheckOK()
+	if err == nil {
+		return nil
+	}
+
+	dur := 2 * time.Minute
+	_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Waiting %s for Kubernetes cluster %q to start...\n",
+		duration.ShortHumanDuration(dur), cluster.Name)
+	var lastErr error
+	err = wait.PollImmediate(time.Second, c.waitAfterCreateTimeout, func() (bool, error) {
+		err := refreshAndCheckOK()
+		lastErr = err
+		isSuccess := err == nil
+		return isSuccess, nil
+	})
+	if err != nil {
+		return fmt.Errorf("timed out waiting for cluster to start: %v", lastErr)
+	}
+	return nil
 }
