@@ -24,15 +24,16 @@ func (p Product) DefaultClusterName() string {
 func (p Product) String() string { return string(p) }
 
 const (
-	ProductUnknown       Product = "unknown"
-	ProductGKE           Product = "gke"
-	ProductMinikube      Product = "minikube"
-	ProductDockerDesktop Product = "docker-desktop"
-	ProductMicroK8s      Product = "microk8s"
-	ProductCRC           Product = "crc"
-	ProductKrucible      Product = "krucible"
-	ProductKIND          Product = "kind"
-	ProductK3D           Product = "k3d"
+	ProductUnknown        Product = "unknown"
+	ProductGKE            Product = "gke"
+	ProductMinikube       Product = "minikube"
+	ProductDockerDesktop  Product = "docker-desktop"
+	ProductMicroK8s       Product = "microk8s"
+	ProductCRC            Product = "crc"
+	ProductKrucible       Product = "krucible"
+	ProductKIND           Product = "kind"
+	ProductK3D            Product = "k3d"
+	ProductRancherDesktop Product = "rancher-desktop"
 )
 
 func (e Product) UsesLocalDockerRegistry() bool {
@@ -48,7 +49,8 @@ func (e Product) IsDevCluster() bool {
 		e == ProductCRC ||
 		e == ProductKIND ||
 		e == ProductK3D ||
-		e == ProductKrucible
+		e == ProductKrucible ||
+		e == ProductRancherDesktop
 }
 
 func productFromContext(c *clientcmdapi.Context, cl *clientcmdapi.Cluster) Product {
@@ -73,6 +75,10 @@ func productFromContext(c *clientcmdapi.Context, cl *clientcmdapi.Cluster) Produ
 		return ProductCRC
 	} else if strings.HasPrefix(cn, "krucible-") {
 		return ProductKrucible
+	} else if strings.HasPrefix(cn, "k3d-") {
+		return ProductK3D
+	} else if strings.HasPrefix(cn, "rancher-desktop") {
+		return ProductRancherDesktop
 	}
 
 	loc := c.LocationOfOrigin
