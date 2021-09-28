@@ -3,7 +3,6 @@ package registry
 import (
 	"context"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/tilt-dev/ctlptl/internal/exec"
 	"github.com/tilt-dev/ctlptl/internal/socat"
 	"github.com/tilt-dev/ctlptl/pkg/api"
+	"github.com/tilt-dev/ctlptl/pkg/docker"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -238,8 +238,7 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 }
 
 func (c *Controller) maybeCreateForwarder(ctx context.Context, port int) error {
-	dockerHost := os.Getenv("DOCKER_HOST")
-	if dockerHost == "" {
+	if docker.IsLocalHost(docker.GetHostEnv()) {
 		return nil
 	}
 

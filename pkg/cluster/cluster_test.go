@@ -315,29 +315,6 @@ func TestClusterApplyKindConfig(t *testing.T) {
 	assert.Contains(t, f.errOut.String(), "desired Kind config does not match current")
 }
 
-type dockerHostTestCase struct {
-	host     string
-	expected bool
-}
-
-func TestIsLocalDockerHost(t *testing.T) {
-	cases := []dockerHostTestCase{
-		dockerHostTestCase{"", true},
-		dockerHostTestCase{"tcp://localhost:2375", true},
-		dockerHostTestCase{"tcp://127.0.0.1:2375", true},
-		dockerHostTestCase{"npipe:////./pipe/docker_engine", true},
-		dockerHostTestCase{"unix:///var/run/docker.sock", true},
-		dockerHostTestCase{"tcp://cluster:2375", false},
-		dockerHostTestCase{"http://cluster:2375", false},
-	}
-	for i, c := range cases {
-		c := c
-		t.Run(fmt.Sprintf("%s-%d", t.Name(), i), func(t *testing.T) {
-			assert.Equal(t, c.expected, isLocalDockerHost(c.host))
-		})
-	}
-}
-
 type fixture struct {
 	t            *testing.T
 	errOut       *bytes.Buffer
@@ -439,8 +416,13 @@ func newFakeController(t *testing.T) *Controller {
 }
 
 type fakeDockerClient struct {
-	started bool
-	ncpu    int
+	isRemoteHost bool
+	started      bool
+	ncpu         int
+}
+
+func (c *fakeDockerClient) IsLocalHost() bool {
+	return !c.isRemoteHost
 }
 
 func (c *fakeDockerClient) ServerVersion(ctx context.Context) (types.Version, error) {
