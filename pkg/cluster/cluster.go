@@ -55,7 +55,8 @@ var groupResource = schema.GroupResource{Group: "ctlptl.dev", Resource: "cluster
 // Fortunately, ctlptl is mostly used for local clusters.
 const healthCheckTimeout = 3 * time.Second
 
-const waitAfterCreateTimeout = 2 * time.Minute
+const waitForKubeConfigTimeout = time.Minute
+const waitForClusterCreateTimeout = 5 * time.Minute
 
 func TypeMeta() api.TypeMeta {
 	return typeMeta
@@ -78,18 +79,19 @@ type socatController interface {
 }
 
 type Controller struct {
-	iostreams              genericclioptions.IOStreams
-	config                 clientcmdapi.Config
-	clients                map[string]kubernetes.Interface
-	admins                 map[Product]Admin
-	dockerClient           dockerClient
-	dmachine               *dockerMachine
-	configLoader           configLoader
-	configWriter           configWriter
-	registryCtl            registryController
-	clientLoader           clientLoader
-	socat                  socatController
-	waitAfterCreateTimeout time.Duration
+	iostreams                   genericclioptions.IOStreams
+	config                      clientcmdapi.Config
+	clients                     map[string]kubernetes.Interface
+	admins                      map[Product]Admin
+	dockerClient                dockerClient
+	dmachine                    *dockerMachine
+	configLoader                configLoader
+	configWriter                configWriter
+	registryCtl                 registryController
+	clientLoader                clientLoader
+	socat                       socatController
+	waitForKubeConfigTimeout    time.Duration
+	waitForClusterCreateTimeout time.Duration
 
 	// TODO(nick): I deeply regret making this struct use goroutines. It makes
 	// everything so much more complex.
@@ -122,14 +124,15 @@ func DefaultController(iostreams genericclioptions.IOStreams) (*Controller, erro
 	}
 
 	return &Controller{
-		iostreams:              iostreams,
-		config:                 config,
-		configWriter:           configWriter,
-		clients:                make(map[string]kubernetes.Interface),
-		admins:                 make(map[Product]Admin),
-		configLoader:           configLoader,
-		clientLoader:           clientLoader,
-		waitAfterCreateTimeout: waitAfterCreateTimeout,
+		iostreams:                   iostreams,
+		config:                      config,
+		configWriter:                configWriter,
+		clients:                     make(map[string]kubernetes.Interface),
+		admins:                      make(map[Product]Admin),
+		configLoader:                configLoader,
+		clientLoader:                clientLoader,
+		waitForKubeConfigTimeout:    waitForKubeConfigTimeout,
+		waitForClusterCreateTimeout: waitForClusterCreateTimeout,
 	}, nil
 }
 
@@ -984,9 +987,9 @@ func (c *Controller) waitForContextCreate(ctx context.Context, cluster *api.Clus
 	}
 
 	_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Waiting %s for cluster %q to create kubectl context...\n",
-		duration.ShortHumanDuration(c.waitAfterCreateTimeout), cluster.Name)
+		duration.ShortHumanDuration(c.waitForKubeConfigTimeout), cluster.Name)
 	var lastErr error
-	err = wait.PollImmediate(time.Second, c.waitAfterCreateTimeout, func() (bool, error) {
+	err = wait.Poll(time.Second, c.waitForKubeConfigTimeout, func() (bool, error) {
 		err := refreshAndCheckOK()
 		lastErr = err
 		isSuccess := err == nil
@@ -1036,9 +1039,9 @@ func (c *Controller) waitForHealthCheckAfterCreate(ctx context.Context, cluster 
 	}
 
 	_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Waiting %s for Kubernetes cluster %q to start...\n",
-		duration.ShortHumanDuration(c.waitAfterCreateTimeout), cluster.Name)
+		duration.ShortHumanDuration(c.waitForClusterCreateTimeout), cluster.Name)
 	var lastErr error
-	err = wait.PollImmediate(time.Second, c.waitAfterCreateTimeout, func() (bool, error) {
+	err = wait.Poll(time.Second, c.waitForClusterCreateTimeout, func() (bool, error) {
 		err := checkOK()
 		lastErr = err
 		isSuccess := err == nil

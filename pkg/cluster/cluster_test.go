@@ -403,16 +403,17 @@ func newFixture(t *testing.T) *fixture {
 
 	registryCtl := &fakeRegistryController{}
 	controller := &Controller{
-		iostreams:              iostreams,
-		admins:                 make(map[Product]Admin),
-		config:                 *config,
-		configWriter:           configWriter,
-		dmachine:               dmachine,
-		configLoader:           configLoader,
-		clientLoader:           clientLoader,
-		clients:                make(map[string]kubernetes.Interface),
-		registryCtl:            registryCtl,
-		waitAfterCreateTimeout: time.Millisecond,
+		iostreams:                   iostreams,
+		admins:                      make(map[Product]Admin),
+		config:                      *config,
+		configWriter:                configWriter,
+		dmachine:                    dmachine,
+		configLoader:                configLoader,
+		clientLoader:                clientLoader,
+		clients:                     make(map[string]kubernetes.Interface),
+		registryCtl:                 registryCtl,
+		waitForKubeConfigTimeout:    time.Millisecond,
+		waitForClusterCreateTimeout: time.Millisecond,
 	}
 	return &fixture{
 		t:            t,
