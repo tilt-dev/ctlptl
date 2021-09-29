@@ -70,6 +70,10 @@ func TestProductFromContext(t *testing.T) {
 	kind6Context := &api.Context{
 		Cluster: "kind-custom-name",
 	}
+	k3d3xContext := &api.Context{
+		Cluster: "k3d-k3s-default",
+	}
+	rancherDesktopContext := &api.Context{Cluster: "rancher-desktop"}
 	minikubeRandomName := &api.Context{
 		Cluster: "custom-name",
 	}
@@ -96,6 +100,8 @@ func TestProductFromContext(t *testing.T) {
 		{ProductKIND, kind6Context, defaultCluster},
 		{ProductUnknown, minikubeRandomName, defaultCluster},
 		{ProductMinikube, minikubeRandomName, minikubeRandomNameCluster},
+		{ProductK3D, k3d3xContext, defaultCluster},
+		{ProductRancherDesktop, rancherDesktopContext, defaultCluster},
 	}
 
 	for i, tt := range table {
