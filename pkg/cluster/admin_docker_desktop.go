@@ -6,6 +6,7 @@ import (
 	"runtime"
 
 	"github.com/tilt-dev/ctlptl/pkg/api"
+	"github.com/tilt-dev/ctlptl/pkg/docker"
 	"github.com/tilt-dev/localregistry-go"
 )
 
@@ -13,17 +14,24 @@ import (
 // This is a bit different than the other admins, due to the overlap
 //
 type dockerDesktopAdmin struct {
-	os string
+	os   string
+	host string
 }
 
 func newDockerDesktopAdmin() *dockerDesktopAdmin {
-	return &dockerDesktopAdmin{os: runtime.GOOS}
+	return &dockerDesktopAdmin{os: runtime.GOOS, host: docker.GetHostEnv()}
 }
 
 func (a *dockerDesktopAdmin) EnsureInstalled(ctx context.Context) error { return nil }
 func (a *dockerDesktopAdmin) Create(ctx context.Context, desired *api.Cluster, registry *api.Registry) error {
 	if registry != nil {
 		return fmt.Errorf("ctlptl currently does not support connecting a registry to docker-desktop")
+	}
+
+	isLocalHost := docker.IsLocalHost(a.host)
+	if !isLocalHost {
+		return fmt.Errorf("docker-desktop clusters are only available on a local Docker engine. Current DOCKER_HOST: %s",
+			a.host)
 	}
 
 	if a.os == "darwin" || a.os == "windows" {
@@ -37,6 +45,10 @@ func (a *dockerDesktopAdmin) LocalRegistryHosting(ctx context.Context, desired *
 }
 
 func (a *dockerDesktopAdmin) Delete(ctx context.Context, config *api.Cluster) error {
+	isLocalHost := docker.IsLocalHost(a.host)
+	if !isLocalHost {
+		return fmt.Errorf("docker-desktop cannot be deleted from a remote DOCKER_HOST: %s", a.host)
+	}
 	if a.os != "darwin" && a.os != "windows" {
 		return fmt.Errorf("docker-desktop delete not implemented on: %s", runtime.GOOS)
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/tilt-dev/ctlptl/pkg/api"
+	"github.com/tilt-dev/ctlptl/pkg/docker"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/wait"
 	klog "k8s.io/klog/v2"
@@ -88,6 +89,10 @@ func (m dockerMachine) EnsureExists(ctx context.Context) error {
 		return nil
 	}
 
+	if !m.dockerClient.IsLocalHost() {
+		return fmt.Errorf("Detected remote DOCKER_HOST, but no Docker running: %s", docker.GetHostEnv())
+	}
+
 	klog.V(2).Infoln("No Docker daemon running. Attempting to start Docker.")
 	if m.os == "darwin" || m.os == "windows" {
 		err := m.d4m.Open(ctx)
@@ -113,14 +118,21 @@ func (m dockerMachine) EnsureExists(ctx context.Context) error {
 }
 
 func (m dockerMachine) Restart(ctx context.Context, desired, existing *api.Cluster) error {
-	canChangeCPUs :=
-		m.os == "darwin" || m.os == "windows" || // DockerForMac and DockerForWindows can change the CPU on the VM
-			Product(desired.Product) == ProductMinikube // Minikube can change the CPU on the VM or on the container itself
+	canChangeCPUs := false
+	isLocalDockerDesktop := false
+	if m.dockerClient.IsLocalHost() && (m.os == "darwin" || m.os == "windows") {
+		canChangeCPUs = true // DockerForMac and DockerForWindows can change the CPU on the VM
+		isLocalDockerDesktop = true
+	} else if Product(desired.Product) == ProductMinikube {
+		// Minikube can change the CPU on the VM or on the container itself
+		canChangeCPUs = true
+	}
+
 	if existing.Status.CPUs < desired.MinCPUs && !canChangeCPUs {
 		return fmt.Errorf("Cannot automatically set minimum CPU to %d on this platform", desired.MinCPUs)
 	}
 
-	if m.os == "darwin" || m.os == "windows" {
+	if isLocalDockerDesktop {
 		settings, err := m.d4m.settings(ctx)
 		if err != nil {
 			return err
