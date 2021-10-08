@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"sort"
 	"strconv"
 	"strings"
@@ -439,8 +441,25 @@ func (c *Controller) serverVersion(ctx context.Context, client kubernetes.Interf
 	return &info, nil
 }
 
+// Query the cluster for its attributes and populate the given object.
 func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) {
+	// When setting up clusters on remote Docker, we set up a socat
+	// tunnel. But sometimes that socat tunnel dies! This makes it impossible
+	// to populate the cluster attributes because we can't even talk to the cluster.
+	//
+	// If this looks like it might be running on a remote Docker instance,
+	// ensure the socat tunnel is running. It's semantically odd that 'ctlptl get'
+	// creates a persistent tunnel, but is probably closer to what users expect.
 	name := cluster.Name
+	product := Product(cluster.Product)
+	if product == ProductKIND || product == ProductK3D || product == ProductMinikube {
+		err := c.maybeCreateForwarderForCurrentCluster(ctx, ioutil.Discard)
+		if err != nil {
+			// If creating the forwarder fails, that's OK. We may still be able to populate things.
+			klog.V(4).Infof("WARNING: connecting socat tunnel to cluster %s: %v\n", name, err)
+		}
+	}
+
 	client, err := c.client(cluster.Name)
 	if err != nil {
 		klog.V(4).Infof("WARNING: creating cluster %s client: %v\n", name, err)
@@ -717,7 +736,7 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 	if needsCreate {
 		// If the cluster apiserver is in a remote docker cluster,
 		// set up a portforwarder.
-		err := c.maybeCreateForwarderForCurrentCluster(ctx)
+		err := c.maybeCreateForwarderForCurrentCluster(ctx, c.iostreams.ErrOut)
 		if err != nil {
 			return nil, err
 		}
@@ -934,7 +953,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Cluste
 
 // If the current cluster is on a remote docker instance,
 // we need a port-forwarder to connect it.
-func (c *Controller) maybeCreateForwarderForCurrentCluster(ctx context.Context) error {
+func (c *Controller) maybeCreateForwarderForCurrentCluster(ctx context.Context, errOut io.Writer) error {
 	if docker.IsLocalHost(docker.GetHostEnv()) {
 		return nil
 	}
@@ -949,7 +968,7 @@ func (c *Controller) maybeCreateForwarderForCurrentCluster(ctx context.Context) 
 		return err
 	}
 
-	_, _ = fmt.Fprintf(c.iostreams.ErrOut, " 🎮 Env DOCKER_HOST set. Assuming remote Docker and forwarding apiserver to localhost:%d\n", port)
+	_, _ = fmt.Fprintf(errOut, " 🎮 Env DOCKER_HOST set. Assuming remote Docker and forwarding apiserver to localhost:%d\n", port)
 	return socat.ConnectRemoteDockerPort(ctx, port)
 }
 
