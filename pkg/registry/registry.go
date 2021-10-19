@@ -11,15 +11,16 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/phayes/freeport"
-	"github.com/tilt-dev/ctlptl/internal/exec"
-	"github.com/tilt-dev/ctlptl/internal/socat"
-	"github.com/tilt-dev/ctlptl/pkg/api"
-	"github.com/tilt-dev/ctlptl/pkg/docker"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+
+	"github.com/tilt-dev/ctlptl/internal/exec"
+	"github.com/tilt-dev/ctlptl/internal/socat"
+	"github.com/tilt-dev/ctlptl/pkg/api"
+	"github.com/tilt-dev/ctlptl/pkg/docker"
 )
 
 var typeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "Registry"}
@@ -221,7 +222,9 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 		hostPort = freePort
 	}
 
-	portSpec := fmt.Sprintf("%d:5000", hostPort)
+	// explicitly bind to IPv4 to prevent issues with the port forward when connected to a Docker network with IPv6 enabled
+	// see https://github.com/docker/for-mac/issues/6015
+	portSpec := fmt.Sprintf("0.0.0.0:%d:5000", hostPort)
 
 	_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Creating registry %q...\n", desired.Name)
 	err = c.runner.Run(ctx, "docker", "run", "-d", "--restart=always", "-p", portSpec, "--name", desired.Name, "registry:2")
