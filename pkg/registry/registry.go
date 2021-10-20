@@ -222,9 +222,15 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 		hostPort = freePort
 	}
 
+	// keep old behavior as default
+	ListenAddress := "127.0.0.1"
+	if desired.ListenAddress != "" {
+		ListenAddress = desired.ListenAddress
+	}
+
 	// explicitly bind to IPv4 to prevent issues with the port forward when connected to a Docker network with IPv6 enabled
 	// see https://github.com/docker/for-mac/issues/6015
-	portSpec := fmt.Sprintf("0.0.0.0:%d:5000", hostPort)
+	portSpec := fmt.Sprintf("%s:%d:5000", ListenAddress, hostPort)
 
 	_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Creating registry %q...\n", desired.Name)
 	err = c.runner.Run(ctx, "docker", "run", "-d", "--restart=always", "-p", portSpec, "--name", desired.Name, "registry:2")
