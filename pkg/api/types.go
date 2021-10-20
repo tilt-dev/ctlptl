@@ -130,6 +130,9 @@ type RegistryStatus struct {
 	// The IPv4 address for the bridge network.
 	IPAddress string `json:"ipAddress,omitempty" yaml:"ipAddress,omitempty"`
 
+	// The public IPv4 address that the registry is listening on on the host machine.
+	ListenAddress string `json:"listenAddress,omitempty" yaml:"listenAddress,omitempty"`
+
 	// The public port that the registry is listening on on the host machine.
 	HostPort int `json:"hostPort,omitempty" yaml:"hostPort,omitempty"`
 

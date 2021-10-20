@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/cluster"
+	"github.com/tilt-dev/ctlptl/pkg/registry"
 	"github.com/tilt-dev/localregistry-go"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -42,6 +43,39 @@ var clusterList = &api.ClusterList{
 	},
 }
 
+var registryType = registry.TypeMeta()
+var registryList = &api.RegistryList{
+	TypeMeta: registry.ListTypeMeta(),
+	Items: []api.Registry{
+		api.Registry{
+			TypeMeta:      registryType,
+			Name:          "ctlptl-registry",
+			ListenAddress: "127.0.0.1",
+			Port:          5001,
+			Status: api.RegistryStatus{
+				CreationTimestamp: metav1.Time{Time: createTime},
+				IPAddress:         "172.17.0.2",
+				ListenAddress:     "0.0.0.0",
+				ContainerPort:     5000,
+				HostPort:          5001,
+			},
+		},
+		api.Registry{
+			TypeMeta:      registryType,
+			Name:          "ctlptl-registry-loopback",
+			ListenAddress: "127.0.0.1",
+			Port:          5002,
+			Status: api.RegistryStatus{
+				CreationTimestamp: metav1.Time{Time: createTime},
+				IPAddress:         "172.17.0.3",
+				ListenAddress:     "127.0.0.1",
+				ContainerPort:     5000,
+				HostPort:          5002,
+			},
+		},
+	},
+}
+
 func TestDefaultPrint(t *testing.T) {
 	streams, _, out, _ := genericclioptions.NewTestIOStreams()
 	o := NewGetOptions()
@@ -62,7 +96,7 @@ func TestYAML(t *testing.T) {
 	o.IOStreams = streams
 	o.StartTime = startTime
 
-	err:= o.Command().Flags().Set("output", "yaml")
+	err := o.Command().Flags().Set("output", "yaml")
 	require.NoError(t, err)
 
 	err = o.Print(o.transformForOutput(clusterList))
@@ -85,5 +119,19 @@ items:
     localRegistryHosting:
       host: localhost:5000
 kind: ClusterList
+`, out.String())
+}
+
+func TestRegistryPrint(t *testing.T) {
+	streams, _, out, _ := genericclioptions.NewTestIOStreams()
+	o := NewGetOptions()
+	o.IOStreams = streams
+	o.StartTime = startTime
+
+	err := o.Print(o.transformForOutput(registryList))
+	require.NoError(t, err)
+	assert.Equal(t, `NAME                       HOST ADDRESS     CONTAINER ADDRESS   AGE
+ctlptl-registry            0.0.0.0:5001     172.17.0.2:5000     3y
+ctlptl-registry-loopback   127.0.0.1:5002   172.17.0.3:5000     3y
 `, out.String())
 }
