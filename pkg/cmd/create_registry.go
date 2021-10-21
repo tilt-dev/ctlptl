@@ -36,7 +36,8 @@ func (o *CreateRegistryOptions) Command() *cobra.Command {
 		Use:   "registry [name]",
 		Short: "Create a registry with the given name",
 		Example: "  ctlptl create registry ctlptl-registry\n" +
-			"  ctlptl create registry ctlptl-registry --port=5000",
+			"  ctlptl create registry ctlptl-registry --port=5000\n" +
+			"  ctlptl create registry ctlptl-registry --port=5000 --listen-address 0.0.0.0",
 		Run:  o.Run,
 		Args: cobra.ExactArgs(1),
 	}
