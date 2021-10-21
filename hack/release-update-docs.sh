@@ -1,6 +1,7 @@
 #!/bin/bash
 #
-# Updates the Tilt repo with the latest version info.
+# Updates the Tilt repo with the latest version info
+# and regenerates the CLI docs.
 #
 # Usage:
 # scripts/update-tilt-repo.sh $VERSION
@@ -30,6 +31,7 @@ set -x
 cd "$ROOT"
 sed -i -E "s/CTLPTL_VERSION=\".*\"/CTLPTL_VERSION=\"$VERSION\"/" INSTALL.md
 sed -i -E "s/CTLPTL_VERSION = \".*\"/CTLPTL_VERSION = \"$VERSION\"/" INSTALL.md
+go run ./cmd/ctlptl docs ./docs
 git add .
 git config --global user.email "hi@tilt.dev"
 git config --global user.name "Tilt Dev"
