@@ -111,6 +111,9 @@ type Registry struct {
 	// The registry name. Get/set from the Docker container name.
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 
+	// The host IPv4 address to bind the container to.
+	ListenAddress string `json:"listenAddress,omitempty" yaml:"listenAddress,omitempty"`
+
 	// The desired host port. Set to 0 to choose a random port.
 	Port int `json:"port,omitempty" yaml:"port,omitempty"`
 
@@ -126,6 +129,9 @@ type RegistryStatus struct {
 
 	// The IPv4 address for the bridge network.
 	IPAddress string `json:"ipAddress,omitempty" yaml:"ipAddress,omitempty"`
+
+	// The public IPv4 address that the registry is listening on on the host machine.
+	ListenAddress string `json:"listenAddress,omitempty" yaml:"listenAddress,omitempty"`
 
 	// The public port that the registry is listening on on the host machine.
 	HostPort int `json:"hostPort,omitempty" yaml:"hostPort,omitempty"`

@@ -11,13 +11,14 @@ ctlptl create registry [name] [flags]
 ```
   ctlptl create registry ctlptl-registry
   ctlptl create registry ctlptl-registry --port=5000
-```
+  ctlptl create registry ctlptl-registry --port=5000 --listen-address 0.0.0.0
 
 ### Options
 
 ```
       --allow-missing-template-keys   If true, ignore any errors in templates when a field or map key is missing in the template. Only applies to golang and jsonpath output formats. (default true)
   -h, --help                          help for registry
+      --listen-address string         The host IP address to bind the container to. If not set deafult to 127.0.0.1
   -o, --output string                 Output format. One of: json|yaml|name|go-template|go-template-file|template|templatefile|jsonpath|jsonpath-as-json|jsonpath-file.
       --port int                      The port to expose the registry on localhost. If not specified, chooses a random port
       --template string               Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].

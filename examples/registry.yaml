@@ -1,4 +1,5 @@
-# Creates a registry called ctlptl-registry on port 5002
+# Creates a registry called ctlptl-registry available on 127.0.0.1:5002
 apiVersion: ctlptl.dev/v1alpha1
 kind: Registry
 port: 5002
+listenAddress: 127.0.0.1

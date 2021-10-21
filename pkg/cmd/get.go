@@ -279,7 +279,7 @@ func (o *GetOptions) registriesAsTable(registries []api.Registry) runtime.Object
 
 		hostAddress := "none"
 		if registry.Status.HostPort != 0 {
-			hostAddress = fmt.Sprintf("localhost:%d", registry.Status.HostPort)
+			hostAddress = fmt.Sprintf("%s:%d", registry.Status.ListenAddress, registry.Status.HostPort)
 		}
 
 		containerAddress := "none"

@@ -45,16 +45,44 @@ func kindRegistry() types.Container {
 	}
 }
 
+func kindRegistryLoopback() types.Container {
+	return types.Container{
+		ID:      "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
+		Names:   []string{"/kind-registry-loopback"},
+		Image:   "registry:2",
+		ImageID: "sha256:2d4f4b5309b1e41b4f83ae59b44df6d673ef44433c734b14c1c103ebca82c116",
+		Command: "/entrypoint.sh /etc/docker/registry/config.yml",
+		Created: 1603483645,
+		Ports: []types.Port{
+			types.Port{IP: "127.0.0.1", PrivatePort: 5000, PublicPort: 5001, Type: "tcp"},
+		},
+		SizeRw:     0,
+		SizeRootFs: 0,
+		State:      "running",
+		Status:     "Up 2 hours",
+		NetworkSettings: &types.SummaryNetworkSettings{
+			Networks: map[string]*network.EndpointSettings{
+				"bridge": &network.EndpointSettings{
+					IPAddress: "172.0.1.2",
+				},
+				"kind": &network.EndpointSettings{
+					IPAddress: "172.0.1.3",
+				},
+			},
+		},
+	}
+}
+
 func TestListRegistries(t *testing.T) {
 	f := newFixture(t)
 	defer f.TearDown()
 
-	f.docker.containers = []types.Container{kindRegistry()}
+	f.docker.containers = []types.Container{kindRegistry(), kindRegistryLoopback()}
 
 	list, err := f.c.List(context.Background(), ListOptions{})
 	require.NoError(t, err)
 
-	require.Equal(t, 1, len(list.Items))
+	require.Equal(t, 2, len(list.Items))
 	assert.Equal(t, list.Items[0], api.Registry{
 		TypeMeta: typeMeta,
 		Name:     "kind-registry",
@@ -64,6 +92,22 @@ func TestListRegistries(t *testing.T) {
 			HostPort:          5001,
 			ContainerPort:     5000,
 			IPAddress:         "172.0.1.2",
+			ListenAddress:     "0.0.0.0",
+			Networks:          []string{"bridge", "kind"},
+			ContainerID:       "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
+			State:             "running",
+		},
+	})
+	assert.Equal(t, list.Items[1], api.Registry{
+		TypeMeta: typeMeta,
+		Name:     "kind-registry-loopback",
+		Port:     5001,
+		Status: api.RegistryStatus{
+			CreationTimestamp: metav1.Time{Time: time.Unix(1603483645, 0)},
+			HostPort:          5001,
+			ContainerPort:     5000,
+			IPAddress:         "172.0.1.2",
+			ListenAddress:     "127.0.0.1",
 			Networks:          []string{"bridge", "kind"},
 			ContainerID:       "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
 			State:             "running",
@@ -88,6 +132,7 @@ func TestGetRegistry(t *testing.T) {
 			HostPort:          5001,
 			ContainerPort:     5000,
 			IPAddress:         "172.0.1.2",
+			ListenAddress:     "0.0.0.0",
 			Networks:          []string{"bridge", "kind"},
 			ContainerID:       "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
 			State:             "running",

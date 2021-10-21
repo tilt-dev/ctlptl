@@ -136,7 +136,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 		}
 		sort.Strings(networks)
 
-		hostPort, containerPort := c.portsFrom(container.Ports)
+		listenAddress, hostPort, containerPort := c.ipAndPortsFrom(container.Ports)
 
 		registry := &api.Registry{
 			TypeMeta: typeMeta,
@@ -147,6 +147,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 				ContainerID:       container.ID,
 				IPAddress:         ipAddress,
 				HostPort:          hostPort,
+				ListenAddress:     listenAddress,
 				ContainerPort:     containerPort,
 				Networks:          networks,
 				State:             container.State,
@@ -164,18 +165,13 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 	}, nil
 }
 
-func (c *Controller) portsFrom(ports []types.Port) (hostPort int, containerPort int) {
+func (c *Controller) ipAndPortsFrom(ports []types.Port) (listenAddress string, hostPort int, containerPort int) {
 	for _, port := range ports {
-		if port.IP != "0.0.0.0" {
-			continue
+		if port.PrivatePort == 5000 {
+			return port.IP, int(port.PublicPort), int(port.PrivatePort)
 		}
-		if port.PublicPort == 0 {
-			continue
-		}
-
-		return int(port.PublicPort), int(port.PrivatePort)
 	}
-	return 0, 0
+	return "unknown", 0, 0
 }
 
 // Compare the desired registry against the existing registry, and reconcile
@@ -222,9 +218,15 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 		hostPort = freePort
 	}
 
+	// keep old behavior as default
+	ListenAddress := "127.0.0.1"
+	if desired.ListenAddress != "" {
+		ListenAddress = desired.ListenAddress
+	}
+
 	// explicitly bind to IPv4 to prevent issues with the port forward when connected to a Docker network with IPv6 enabled
 	// see https://github.com/docker/for-mac/issues/6015
-	portSpec := fmt.Sprintf("0.0.0.0:%d:5000", hostPort)
+	portSpec := fmt.Sprintf("%s:%d:5000", ListenAddress, hostPort)
 
 	_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Creating registry %q...\n", desired.Name)
 	err = c.runner.Run(ctx, "docker", "run", "-d", "--restart=always", "-p", portSpec, "--name", desired.Name, "registry:2")
