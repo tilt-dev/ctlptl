@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"fmt"
+	osexec "os/exec"
 	"sort"
 	"strings"
 	"time"
@@ -26,6 +27,8 @@ import (
 var typeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "Registry"}
 var listTypeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "RegistryList"}
 var groupResource = schema.GroupResource{Group: "ctlptl.dev", Resource: "registries"}
+
+const registryImageRef = "docker.io/library/registry:2" // The registry everyone uses.
 
 // https://github.com/moby/moby/blob/v20.10.3/api/types/types.go#L313
 const containerStateRunning = "running"
@@ -104,7 +107,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 	}
 
 	filterArgs := filters.NewArgs()
-	filterArgs.Add("ancestor", "registry:2") // The registry everyone uses.
+	filterArgs.Add("ancestor", registryImageRef)
 
 	containers, err := c.dockerClient.ContainerList(ctx, types.ContainerListOptions{
 		Filters: filterArgs,
@@ -174,6 +177,23 @@ func (c *Controller) ipAndPortsFrom(ports []types.Port) (listenAddress string, h
 	return "unknown", 0, 0
 }
 
+func (c *Controller) ensureContainerDeleted(ctx context.Context, name string) error {
+	container, err := c.dockerClient.ContainerInspect(ctx, name)
+	if err != nil {
+		if client.IsErrNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if container.ContainerJSONBase == nil {
+		return nil
+	}
+
+	return c.dockerClient.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{
+		Force: true,
+	})
+}
+
 // Compare the desired registry against the existing registry, and reconcile
 // the two to match.
 func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Registry, error) {
@@ -229,8 +249,19 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 	portSpec := fmt.Sprintf("%s:%d:5000", ListenAddress, hostPort)
 
 	_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Creating registry %q...\n", desired.Name)
-	err = c.runner.Run(ctx, "docker", "run", "-d", "--restart=always", "-p", portSpec, "--name", desired.Name, "registry:2")
+
+	err = c.ensureContainerDeleted(ctx, desired.Name)
 	if err != nil {
+		return nil, err
+	}
+
+	err = c.runner.Run(ctx, "docker", "run", "-d", "--restart=always", "-p", portSpec, "--name",
+		desired.Name, registryImageRef)
+	if err != nil {
+		exitErr, ok := err.(*osexec.ExitError)
+		if ok {
+			_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Error: %s", string(exitErr.Stderr))
+		}
 		return nil, err
 	}
 

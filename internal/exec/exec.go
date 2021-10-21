@@ -14,7 +14,9 @@ type CmdRunner interface {
 type RealCmdRunner struct{}
 
 func (RealCmdRunner) Run(ctx context.Context, cmd string, args ...string) error {
-	return exec.CommandContext(ctx, cmd, args...).Run()
+	// For some reason, ExitError only gets populated with Stderr if we call Output().
+	_, err := exec.CommandContext(ctx, cmd, args...).Output()
+	return err
 }
 
 type FakeCmdRunner func(argv []string)
