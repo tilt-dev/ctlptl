@@ -191,6 +191,8 @@ type fixture struct {
 }
 
 func newFixture(t *testing.T) *fixture {
+	_ = os.Setenv("DOCKER_HOST", "")
+
 	d := &fakeDocker{}
 	controller, err := NewController(
 		genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}, d)

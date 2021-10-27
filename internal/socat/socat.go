@@ -53,7 +53,7 @@ func (c *Controller) ConnectRemoteDockerPort(ctx context.Context, port int) erro
 // on the same machine.
 func (c *Controller) StartRemotePortforwarder(ctx context.Context) error {
 	container, err := c.client.ContainerInspect(ctx, serviceName)
-	if err == nil && container.State.Running {
+	if err == nil && (container.ContainerJSONBase != nil && container.State.Running) {
 		// The service is already running!
 		return nil
 	} else if err == nil {
