@@ -5,7 +5,7 @@ orbs:
 jobs:
   build:
     docker:
-      - image: circleci/golang:1.16
+      - image: circleci/golang:1.17
     working_directory: /go/src/github.com/tilt-dev/ctlptl
     steps:
       - checkout
@@ -36,9 +36,9 @@ jobs:
       - kubernetes/install-kubectl
       - run: |
           set -ex
-          wget https://golang.org/dl/go1.16.2.linux-amd64.tar.gz
+          wget https://golang.org/dl/go1.17.2.linux-amd64.tar.gz
           sudo rm -fR /usr/local/go
-          sudo tar -C /usr/local -xzf go1.16.2.linux-amd64.tar.gz
+          sudo tar -C /usr/local -xzf go1.17.2.linux-amd64.tar.gz
       - run: |
           set -ex
           export MINIKUBE_VERSION=v1.15.0
@@ -60,7 +60,7 @@ jobs:
           
   release-dry-run:
     docker:
-      - image: circleci/golang:1.16
+      - image: circleci/golang:1.17
     steps:
       - checkout
       - setup_remote_docker:
@@ -74,7 +74,7 @@ jobs:
           
   release:
     docker:
-      - image: circleci/golang:1.16
+      - image: circleci/golang:1.17
     steps:
       - checkout
       - setup_remote_docker:

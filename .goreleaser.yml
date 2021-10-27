@@ -8,6 +8,10 @@ builds:
   goarch:
   - amd64
   - arm64
+  # https://goreleaser.com/deprecations/#builds-for-windowsarm64
+  ignore:
+  - goos: windows
+    goarch: arm64
 archives:
 - name_template: "{{ .ProjectName }}.{{ .Version }}.{{ .Os }}.{{ .Arch }}"
   replacements:
