@@ -328,6 +328,8 @@ type fixture struct {
 }
 
 func newFixture(t *testing.T) *fixture {
+	_ = os.Setenv("DOCKER_HOST", "")
+
 	dockerClient := &fakeDockerClient{ncpu: 1}
 	d4m := &fakeD4MClient{docker: dockerClient}
 	dmachine := &dockerMachine{

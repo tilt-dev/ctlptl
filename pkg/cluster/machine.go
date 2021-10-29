@@ -90,7 +90,8 @@ func (m dockerMachine) EnsureExists(ctx context.Context) error {
 	}
 
 	if !m.dockerClient.IsLocalHost() {
-		return fmt.Errorf("Detected remote DOCKER_HOST, but no Docker running: %s", docker.GetHostEnv())
+		return fmt.Errorf("Detected remote DOCKER_HOST, but no Docker running. Host: %q. Error: %v",
+			docker.GetHostEnv(), err)
 	}
 
 	klog.V(2).Infoln("No Docker daemon running. Attempting to start Docker.")
