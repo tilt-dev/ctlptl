@@ -40,8 +40,7 @@ curl -fsSL https://github.com/tilt-dev/ctlptl/releases/download/v$CTLPTL_VERSION
 On Linux:
 
 ```bash
-CTLPTL_VERSION="0.6.1"
-curl -fsSL https://github.com/tilt-dev/ctlptl/releases/download/v$CTLPTL_VERSION/ctlptl.$CTLPTL_VERSION.linux.x86_64.tar.gz | sudo tar -xzv -C /usr/local/bin ctlptl
+CTLPTL_VERSION="0.6.1" curl -fsSL https://github.com/tilt-dev/ctlptl/releases/download/v$CTLPTL_VERSION/ctlptl.$CTLPTL_VERSION.linux.x86_64.tar.gz | sudo tar -xzv -C /usr/local/bin ctlptl
 ```
 
 On Windows:
