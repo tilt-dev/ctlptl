@@ -4,12 +4,14 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/tilt-dev/ctlptl/pkg/cmd"
 	"k8s.io/klog/v2"
+
+	"github.com/tilt-dev/ctlptl/pkg/cmd"
 )
 
 // Magic variables set by goreleaser
@@ -56,6 +58,9 @@ func versionStamp() string {
 
 	if version == "" {
 		version = "0.0.0-main"
+		if buildInfo, ok := debug.ReadBuildInfo(); ok {
+			version = buildInfo.Main.Version
+		}
 	}
 
 	return fmt.Sprintf("v%s, built %s", version, date)

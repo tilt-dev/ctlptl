@@ -28,6 +28,13 @@ Contains the most recent version of `kind` and `ctlptl` for use in CI environmen
 Visit [the releases page](https://github.com/tilt-dev/ctlptl/releases) and
 download the pre-build binaries for your architecture.
 
+### Go install
+
+For global installation with go use the following command:
+```bash
+go install github.com/tilt-dev/ctlptl/cmd/ctlptl@latest
+```
+
 ### Command-line
 
 On macOS:
