@@ -33,7 +33,7 @@ sed -i -E "s/CTLPTL_VERSION=\".*\"/CTLPTL_VERSION=\"$VERSION\"/" INSTALL.md
 sed -i -E "s/CTLPTL_VERSION = \".*\"/CTLPTL_VERSION = \"$VERSION\"/" INSTALL.md
 go run ./cmd/ctlptl docs ./docs
 git add .
-git config --global user.email "hi@tilt.dev"
+git config --global user.email "it@tilt.dev"
 git config --global user.name "Tilt Dev"
 git commit -a -m "Update version numbers: $VERSION"
 git push origin main
