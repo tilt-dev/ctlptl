@@ -154,6 +154,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 				ContainerPort:     containerPort,
 				Networks:          networks,
 				State:             container.State,
+				Labels:            container.Labels,
 			},
 		}
 
@@ -216,6 +217,13 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 		// If the registry has died, we need to recreate.
 		needsDelete = true
 	}
+	for key, value := range existing.Labels {
+		if existing.Status.Labels[key] != value {
+			// If the user asked for a label that's not currently on
+			// the container, the only way to add it is to re-create the whole container.
+			needsDelete = true
+		}
+	}
 	if needsDelete && existing.Name != "" {
 		err = c.Delete(ctx, existing.Name)
 		if err != nil {
@@ -255,8 +263,13 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 		return nil, err
 	}
 
-	err = c.runner.Run(ctx, "docker", "run", "-d", "--restart=always", "-p", portSpec, "--name",
-		desired.Name, registryImageRef)
+	args := []string{"run", "-d", "--restart=always", "-p", portSpec, "--name", desired.Name}
+	args = append(args, c.labelArgs(existing, desired)...)
+	args = append(args, registryImageRef)
+
+	// TODO(nick): This sould be better as a docker ContainerCreate()/ContainerStart() call
+	// rather than assuming the user has a docker cli.
+	err = c.runner.Run(ctx, "docker", args...)
 	if err != nil {
 		exitErr, ok := err.(*osexec.ExitError)
 		if ok {
@@ -271,6 +284,29 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 	}
 
 	return c.Get(ctx, desired.Name)
+}
+
+// Compute the label arguments to the 'docker run' command.
+func (c *Controller) labelArgs(existing *api.Registry, desired *api.Registry) []string {
+	newLabels := make(map[string]string, len(existing.Status.Labels)+len(desired.Labels))
+
+	// Preserve existing labels.
+	for k, v := range existing.Status.Labels {
+		newLabels[k] = v
+	}
+
+	// Overwrite with new labels.
+	for k, v := range desired.Labels {
+		newLabels[k] = v
+	}
+
+	// Convert to --label k=v format
+	args := make([]string, 0, len(newLabels))
+	for k, v := range newLabels {
+		args = append(args, fmt.Sprintf("-l=%s=%s", k, v))
+	}
+	sort.Strings(args)
+	return args
 }
 
 func (c *Controller) maybeCreateForwarder(ctx context.Context, port int) error {

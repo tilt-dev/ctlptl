@@ -114,8 +114,18 @@ type Registry struct {
 	// The host IPv4 address to bind the container to.
 	ListenAddress string `json:"listenAddress,omitempty" yaml:"listenAddress,omitempty"`
 
-	// The desired host port. Set to 0 to choose a random port.
+	// The desired host port. Set to 0 to choose a random port,
+	// or to preserve the existing port.
 	Port int `json:"port,omitempty" yaml:"port,omitempty"`
+
+	// Labels that must be attached to the running registry.
+	//
+	// If you change the set of labels, the registry must be stopped and
+	// restarted.
+	//
+	// Important for K3d, which will only connect to registries
+	// that are tagged "app: k3d".
+	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 
 	// Most recently observed status of the registry.
 	// Populated by the system.
@@ -152,6 +162,9 @@ type RegistryStatus struct {
 	// Reflects underlying ContainerState.Status
 	// https://github.com/moby/moby/blob/v20.10.3/api/types/types.go#L314
 	State string
+
+	// Labels attached to the running container.
+	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
 
 // RegistryList is a list of Registrys.
