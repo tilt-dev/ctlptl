@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/blang/semver/v4 v4.0.0
-	github.com/docker/docker v17.12.0-ce-rc1.0.20200730172259-9f28837c1d93+incompatible
+	github.com/docker/docker v20.10.12+incompatible
 	github.com/google/go-cmp v0.5.5
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/phayes/freeport v0.0.0-20180830031419-95f893ade6f2
