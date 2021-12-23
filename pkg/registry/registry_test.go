@@ -26,7 +26,7 @@ func kindRegistry() types.Container {
 		Command: "/entrypoint.sh /etc/docker/registry/config.yml",
 		Created: 1603483645,
 		Ports: []types.Port{
-			types.Port{IP: "0.0.0.0", PrivatePort: 5000, PublicPort: 5001, Type: "tcp"},
+			types.Port{IP: "127.0.0.1", PrivatePort: 5000, PublicPort: 5001, Type: "tcp"},
 		},
 		SizeRw:     0,
 		SizeRootFs: 0,
@@ -92,7 +92,7 @@ func TestListRegistries(t *testing.T) {
 			HostPort:          5001,
 			ContainerPort:     5000,
 			IPAddress:         "172.0.1.2",
-			ListenAddress:     "0.0.0.0",
+			ListenAddress:     "127.0.0.1",
 			Networks:          []string{"bridge", "kind"},
 			ContainerID:       "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
 			State:             "running",
@@ -132,7 +132,7 @@ func TestGetRegistry(t *testing.T) {
 			HostPort:          5001,
 			ContainerPort:     5000,
 			IPAddress:         "172.0.1.2",
-			ListenAddress:     "0.0.0.0",
+			ListenAddress:     "127.0.0.1",
 			Networks:          []string{"bridge", "kind"},
 			ContainerID:       "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
 			State:             "running",
@@ -170,10 +170,6 @@ func TestApplyLabels(t *testing.T) {
 	f := newFixture(t)
 	defer f.TearDown()
 
-	deadRegistry := kindRegistry()
-	deadRegistry.State = "dead"
-	f.docker.containers = []types.Container{deadRegistry}
-
 	// Running a command makes the registry come alive!
 	f.runner = exec.NewFakeCmdRunner(func(argv []string) {
 		f.docker.containers = []types.Container{kindRegistry()}
@@ -189,11 +185,41 @@ func TestApplyLabels(t *testing.T) {
 	if assert.NoError(t, err) {
 		assert.Equal(t, "running", registry.Status.State)
 	}
-	assert.Equal(t, deadRegistry.ID, f.docker.lastRemovedContainer)
 	assert.Equal(t, f.runner.LastArgs, []string{
-		"docker", "run", "-d", "--restart=always", "-p", "127.0.0.1:5001:5000",
+		"docker", "run", "-d", "--restart=always",
 		"--name", "kind-registry",
+		"-p", "127.0.0.1:5001:5000",
 		"-l=managed-by=ctlptl",
+		"docker.io/library/registry:2",
+	})
+}
+
+func TestPreservePort(t *testing.T) {
+	f := newFixture(t)
+	defer f.TearDown()
+
+	existingRegistry := kindRegistry()
+	existingRegistry.State = "dead"
+	existingRegistry.Ports[0].PublicPort = 5010
+	f.docker.containers = []types.Container{existingRegistry}
+
+	// Running a command makes the registry come alive!
+	f.runner = exec.NewFakeCmdRunner(func(argv []string) {
+		f.docker.containers = []types.Container{kindRegistry()}
+	})
+	f.c.runner = f.runner
+
+	registry, err := f.c.Apply(context.Background(), &api.Registry{
+		TypeMeta: typeMeta,
+		Name:     "kind-registry",
+	})
+	if assert.NoError(t, err) {
+		assert.Equal(t, "running", registry.Status.State)
+	}
+	assert.Equal(t, f.runner.LastArgs, []string{
+		"docker", "run", "-d", "--restart=always",
+		"--name", "kind-registry",
+		"-p", "127.0.0.1:5010:5000",
 		"docker.io/library/registry:2",
 	})
 }
