@@ -229,32 +229,14 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 		if err != nil {
 			return nil, err
 		}
-		existing = &api.Registry{}
+		existing = existing.DeepCopy()
+		existing.Status.ContainerID = ""
 	}
 
 	if existing.Status.ContainerID != "" {
 		// If we got to this point, and the container id exists, then the registry is up to date!
 		return existing, nil
 	}
-
-	hostPort := desired.Port
-	if hostPort == 0 {
-		freePort, err := freeport.GetFreePort()
-		if err != nil {
-			return nil, err
-		}
-		hostPort = freePort
-	}
-
-	// keep old behavior as default
-	ListenAddress := "127.0.0.1"
-	if desired.ListenAddress != "" {
-		ListenAddress = desired.ListenAddress
-	}
-
-	// explicitly bind to IPv4 to prevent issues with the port forward when connected to a Docker network with IPv6 enabled
-	// see https://github.com/docker/for-mac/issues/6015
-	portSpec := fmt.Sprintf("%s:%d:5000", ListenAddress, hostPort)
 
 	_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Creating registry %q...\n", desired.Name)
 
@@ -263,7 +245,13 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 		return nil, err
 	}
 
-	args := []string{"run", "-d", "--restart=always", "-p", portSpec, "--name", desired.Name}
+	portArgs, hostPort, err := c.portArgs(existing, desired)
+	if err != nil {
+		return nil, err
+	}
+
+	args := []string{"run", "-d", "--restart=always", "--name", desired.Name}
+	args = append(args, portArgs...)
 	args = append(args, c.labelArgs(existing, desired)...)
 	args = append(args, registryImageRef)
 
@@ -284,6 +272,39 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 	}
 
 	return c.Get(ctx, desired.Name)
+}
+
+// Compute the port arguments to the 'docker run' command
+func (c *Controller) portArgs(existing *api.Registry, desired *api.Registry) ([]string, int, error) {
+	// Preserve existing address by default
+	hostPort := existing.Status.HostPort
+	listenAddress := existing.Status.ListenAddress
+
+	// Overwrite with desired behavior if specified.
+	if desired.Port != 0 {
+		hostPort = desired.Port
+	}
+	if desired.ListenAddress != "" {
+		listenAddress = desired.ListenAddress
+	}
+
+	// Fill in defaults.
+	if hostPort == 0 {
+		freePort, err := freeport.GetFreePort()
+		if err != nil {
+			return nil, 0, fmt.Errorf("creating registry: %v", err)
+		}
+		hostPort = freePort
+	}
+
+	if listenAddress == "" {
+		// explicitly bind to IPv4 to prevent issues with the port forward when connected to a Docker network with IPv6 enabled
+		// see https://github.com/docker/for-mac/issues/6015
+		listenAddress = "127.0.0.1"
+	}
+
+	portSpec := fmt.Sprintf("%s:%d:5000", listenAddress, hostPort)
+	return []string{"-p", portSpec}, hostPort, nil
 }
 
 // Compute the label arguments to the 'docker run' command.
