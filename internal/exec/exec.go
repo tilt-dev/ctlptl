@@ -19,9 +19,17 @@ func (RealCmdRunner) Run(ctx context.Context, cmd string, args ...string) error 
 	return err
 }
 
-type FakeCmdRunner func(argv []string)
+type FakeCmdRunner struct {
+	handler  func(argv []string)
+	LastArgs []string
+}
 
-func (f FakeCmdRunner) Run(ctx context.Context, cmd string, args ...string) error {
-	f(append([]string{cmd}, args...))
+func NewFakeCmdRunner(handler func(argv []string)) *FakeCmdRunner {
+	return &FakeCmdRunner{handler: handler}
+}
+
+func (f *FakeCmdRunner) Run(ctx context.Context, cmd string, args ...string) error {
+	f.LastArgs = append([]string{cmd}, args...)
+	f.handler(append([]string{cmd}, args...))
 	return nil
 }

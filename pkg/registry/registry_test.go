@@ -149,7 +149,7 @@ func TestApplyDeadRegistry(t *testing.T) {
 	f.docker.containers = []types.Container{deadRegistry}
 
 	// Running a command makes the registry come alive!
-	f.c.runner = exec.FakeCmdRunner(func(argv []string) {
+	f.c.runner = exec.NewFakeCmdRunner(func(argv []string) {
 		assert.Equal(t, "docker", argv[0])
 		assert.Equal(t, "run", argv[1])
 		f.docker.containers = []types.Container{kindRegistry()}
@@ -164,6 +164,38 @@ func TestApplyDeadRegistry(t *testing.T) {
 		assert.Equal(t, "running", registry.Status.State)
 	}
 	assert.Equal(t, deadRegistry.ID, f.docker.lastRemovedContainer)
+}
+
+func TestApplyLabels(t *testing.T) {
+	f := newFixture(t)
+	defer f.TearDown()
+
+	deadRegistry := kindRegistry()
+	deadRegistry.State = "dead"
+	f.docker.containers = []types.Container{deadRegistry}
+
+	// Running a command makes the registry come alive!
+	f.runner = exec.NewFakeCmdRunner(func(argv []string) {
+		f.docker.containers = []types.Container{kindRegistry()}
+	})
+	f.c.runner = f.runner
+
+	registry, err := f.c.Apply(context.Background(), &api.Registry{
+		TypeMeta: typeMeta,
+		Name:     "kind-registry",
+		Port:     5001,
+		Labels:   map[string]string{"managed-by": "ctlptl"},
+	})
+	if assert.NoError(t, err) {
+		assert.Equal(t, "running", registry.Status.State)
+	}
+	assert.Equal(t, deadRegistry.ID, f.docker.lastRemovedContainer)
+	assert.Equal(t, f.runner.LastArgs, []string{
+		"docker", "run", "-d", "--restart=always", "-p", "127.0.0.1:5001:5000",
+		"--name", "kind-registry",
+		"-l=managed-by=ctlptl",
+		"docker.io/library/registry:2",
+	})
 }
 
 type fakeDocker struct {
@@ -188,6 +220,7 @@ type fixture struct {
 	t      *testing.T
 	c      *Controller
 	docker *fakeDocker
+	runner *exec.FakeCmdRunner
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -196,14 +229,16 @@ func newFixture(t *testing.T) *fixture {
 	d := &fakeDocker{}
 	controller, err := NewController(
 		genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}, d)
-	controller.runner = exec.FakeCmdRunner(func(argv []string) {
+	runner := exec.NewFakeCmdRunner(func(argv []string) {
 		log.Println("No runner installed")
 	})
+	controller.runner = runner
 	require.NoError(t, err)
 	return &fixture{
 		t:      t,
 		docker: d,
 		c:      controller,
+		runner: runner,
 	}
 }
 

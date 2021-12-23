@@ -1,0 +1,7 @@
+apiVersion: ctlptl.dev/v1alpha1
+kind: Registry
+name: k3d-test-registry
+labels:
+  "app": "k3d"
+  "k3d.role": "registry"
+
