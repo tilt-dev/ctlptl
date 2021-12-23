@@ -66,8 +66,7 @@ jobs:
       - setup_remote_docker:
           version: 20.10.6
       - run: git fetch --tags
-      - run: curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | sh
-      - run: sudo mv ./bin/goreleaser /usr/local/bin/
+      - run: go install github.com/goreleaser/goreleaser@latest
       - run: goreleaser --rm-dist --skip-publish --snapshot
       - slack/notify-on-failure:
           only_for_branches: main
@@ -80,8 +79,7 @@ jobs:
       - setup_remote_docker:
           version: 20.10.6
       - run: git fetch --tags
-      - run: curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | sh
-      - run: sudo mv ./bin/goreleaser /usr/local/bin/
+      - run: go install github.com/goreleaser/goreleaser@latest
       - run: ./hack/release.sh
       - slack/status:
           mentions: "nick"
