@@ -43,6 +43,20 @@ brews:
   url_template: "https://github.com/tilt-dev/ctlptl/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
   homepage: "https://ctlptl.dev/"
   description: "Making local Kubernetes clusters easy to set up and tear down"
+  install: |
+    bin.install "ctlptl"
+    
+    # Install bash completion
+    output = Utils.safe_popen_read("#{bin}/ctlptl", "completion", "bash")
+    (bash_completion/"ctlptl").write output
+
+    # Install zsh completion
+    output = Utils.safe_popen_read("#{bin}/ctlptl", "completion", "zsh")
+    (zsh_completion/"_ctlptl").write output
+
+    # Install fish completion
+    output = Utils.safe_popen_read("#{bin}/ctlptl", "completion", "fish")
+    (fish_completion/"ctlptl.fish").write output
   test: |
     system "#{bin}/ctlptl version"
 scoop:
