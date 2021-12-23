@@ -217,7 +217,7 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 		// If the registry has died, we need to recreate.
 		needsDelete = true
 	}
-	for key, value := range existing.Labels {
+	for key, value := range desired.Labels {
 		if existing.Status.Labels[key] != value {
 			// If the user asked for a label that's not currently on
 			// the container, the only way to add it is to re-create the whole container.
