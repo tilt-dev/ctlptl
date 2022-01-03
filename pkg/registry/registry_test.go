@@ -170,7 +170,10 @@ func TestApplyLabels(t *testing.T) {
 	f := newFixture(t)
 	defer f.TearDown()
 
-	// Running a command makes the registry come alive!
+	// Make sure the previous registry is wiped out
+	// because it doesn't have the labels we want.
+	f.docker.containers = []types.Container{kindRegistry()}
+
 	f.runner = exec.NewFakeCmdRunner(func(argv []string) {
 		f.docker.containers = []types.Container{kindRegistry()}
 	})
@@ -179,19 +182,18 @@ func TestApplyLabels(t *testing.T) {
 	registry, err := f.c.Apply(context.Background(), &api.Registry{
 		TypeMeta: typeMeta,
 		Name:     "kind-registry",
-		Port:     5001,
 		Labels:   map[string]string{"managed-by": "ctlptl"},
 	})
 	if assert.NoError(t, err) {
 		assert.Equal(t, "running", registry.Status.State)
 	}
-	assert.Equal(t, f.runner.LastArgs, []string{
+	assert.Equal(t, []string{
 		"docker", "run", "-d", "--restart=always",
 		"--name", "kind-registry",
 		"-p", "127.0.0.1:5001:5000",
 		"-l=managed-by=ctlptl",
 		"docker.io/library/registry:2",
-	})
+	}, f.runner.LastArgs)
 }
 
 func TestPreservePort(t *testing.T) {
@@ -216,12 +218,12 @@ func TestPreservePort(t *testing.T) {
 	if assert.NoError(t, err) {
 		assert.Equal(t, "running", registry.Status.State)
 	}
-	assert.Equal(t, f.runner.LastArgs, []string{
+	assert.Equal(t, []string{
 		"docker", "run", "-d", "--restart=always",
 		"--name", "kind-registry",
 		"-p", "127.0.0.1:5010:5000",
 		"docker.io/library/registry:2",
-	})
+	}, f.runner.LastArgs)
 }
 
 type fakeDocker struct {
