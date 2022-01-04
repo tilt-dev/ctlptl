@@ -6,6 +6,7 @@
 set -exo pipefail
 
 cd $(dirname $(realpath $0))
+CLUSTER_NAME="kind-ctlptl-test-cluster"
 ctlptl apply -f registry.yaml
 ctlptl apply -f cluster.yaml
 
@@ -14,14 +15,20 @@ docker build -t localhost:5005/ko-builder .
 docker push localhost:5005/ko-builder
 
 # The ko-builder builds an image tagged with the host as visible from the cluster network.
-HOST=$(ctlptl get cluster kind-ctlptl-test-cluster -o template --template '{{.status.localRegistryHosting.hostFromClusterNetwork}}')
-cat builder.yaml | sed "s/REGISTRY_HOST_PLACEHOLDER/$HOST/" | kubectl apply -f -
+HOST_FROM_CONTAINER_RUNTIME=$(ctlptl get cluster "$CLUSTER_NAME" -o template --template '{{.status.localRegistryHosting.host}}')
+HOST_FROM_CLUSTER_NETWORK=$(ctlptl get cluster "$CLUSTER_NAME" -o template --template '{{.status.localRegistryHosting.hostFromClusterNetwork}}')
+cat builder.yaml | \
+    sed "s/HOST_FROM_CONTAINER_RUNTIME/$HOST_FROM_CONTAINER_RUNTIME/g" | \
+    sed "s/HOST_FROM_CLUSTER_NETWORK/$HOST_FROM_CLUSTER_NETWORK/g" | \
+    kubectl apply -f -
 kubectl wait --for=condition=complete job/ko-builder --timeout=180s
-cat simple-server.yaml | sed "s/REGISTRY_HOST_PLACEHOLDER/$HOST/" | kubectl apply -f -
-kubectl wait --for=condition=available deployment/simple-server --timeout=60s
+cat simple-server.yaml | \
+    sed "s/HOST_FROM_CONTAINER_RUNTIME/$HOST_FROM_CONTAINER_RUNTIME/g" | \
+    sed "s/HOST_FROM_CLUSTER_NETWORK/$HOST_FROM_CLUSTER_NETWORK/g" | \
+    kubectl apply -f -
 
 # Check to see we started the right kubernetes version.
-k8sVersion=$(ctlptl get cluster kind-ctlptl-test-cluster -o go-template --template='{{.status.kubernetesVersion}}')
+k8sVersion=$(ctlptl get cluster "$CLUSTER_NAME" -o go-template --template='{{.status.kubernetesVersion}}')
 
 ctlptl delete -f cluster.yaml
 
