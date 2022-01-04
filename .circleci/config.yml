@@ -23,13 +23,13 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker:
-          version: 20.10.6
+          version: 20.10.11
       - run: make install
       - run: test/kind-cluster-network/e2e.sh
           
   e2e:
     machine:
-      image: ubuntu-1604:201903-01
+      image: ubuntu-2004:202111-02
     working_directory: /home/circleci/.go_workspace/src/github.com/tilt-dev/ctlptl
     steps:
       - checkout
@@ -39,18 +39,31 @@ jobs:
           wget https://golang.org/dl/go1.17.2.linux-amd64.tar.gz
           sudo rm -fR /usr/local/go
           sudo tar -C /usr/local -xzf go1.17.2.linux-amd64.tar.gz
+      # We need a newer Docker version to work around a k3d/containerd bug.
+      # https://github.com/rancher/k3d/issues/807
       - run: |
           set -ex
-          export MINIKUBE_VERSION=v1.15.0
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+            $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+          sudo apt update
+          sudo apt upgrade containerd.io
+      - run: |
+          set -ex
+          export MINIKUBE_VERSION=v1.23.2
           curl -fLo ./minikube-linux-amd64 "https://github.com/kubernetes/minikube/releases/download/${MINIKUBE_VERSION}/minikube-linux-amd64"
           chmod +x ./minikube-linux-amd64
           sudo mv ./minikube-linux-amd64 /usr/local/bin/minikube
       - run: |
           set -ex
-          export KIND_VERSION=v0.11.0
+          export KIND_VERSION=v0.11.1
           curl -fLo ./kind-linux-amd64 "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
           chmod +x ./kind-linux-amd64
           sudo mv ./kind-linux-amd64 /usr/local/bin/kind
+      - run: |
+          set -ex
+          export TAG=v5.2.2
+          curl -s https://raw.githubusercontent.com/rancher/k3d/main/install.sh | bash
       - run: |
           set -ex
           go get -v -t -d ./...
