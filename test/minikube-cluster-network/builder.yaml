@@ -10,12 +10,12 @@ spec:
     spec:
       containers:
       - name: builder
-        image: localhost:5005/ko-builder
+        image: HOST_FROM_CONTAINER_RUNTIME/ko-builder
         command: ["bash", "-c",
           "go get github.com/tilt-dev/ctlptl/test/simple-server && ko publish --insecure-registry github.com/tilt-dev/ctlptl/test/simple-server"]
         env:
         - name: KO_DOCKER_REPO
-          value: REGISTRY_HOST_PLACEHOLDER
+          value: HOST_FROM_CLUSTER_NETWORK
         - name: GO111MODULE
           value: "off"
       restartPolicy: Never
