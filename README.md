@@ -130,6 +130,31 @@ registry: ctlptl-registry
 EOF
 ```
 
+#### K3D: with a built-in registry at a pre-determined port
+
+Create:
+
+```
+ctlptl create registry ctlptl-registry --port=5005
+ctlptl create cluster k3d --registry=ctlptl-registry
+```
+
+or ensure exists:
+
+```
+cat <<EOF | ctlptl apply -f -
+apiVersion: ctlptl.dev/v1alpha1
+kind: Registry
+name: ctlptl-registry
+port: 5005
+---
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+product: k3d
+registry: ctlptl-registry
+EOF
+```
+
 #### Minikube: with a built-in registry at Kubernetes v1.18.8
 
 Create:
@@ -180,13 +205,16 @@ cluster](https://docs.tilt.dev/choosing_clusters.html) and example repos like
 - Docker for Windows
 - [KIND](https://kind.sigs.k8s.io/) and [KIND with a registry](https://kind.sigs.k8s.io/docs/user/local-registry/)
 - [Minikube](https://minikube.sigs.k8s.io/) and Minikube with a registry
+- [K3D](https://k3d.io/) with a registry
 - Creating a cluster on a Remote Docker Host (useful in CI environments like [CircleCI](https://circleci.com/docs/2.0/building-docker-images/))
 - Allocating CPUs
 
 ### Future Work
 
-- K3D
 - Microk8s
+- Rancher Desktop
+- Podman
+- Minikube on Hyperkit
 - Allocating Memory
 - Allocating Storage
 
