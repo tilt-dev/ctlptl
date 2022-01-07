@@ -44,9 +44,29 @@ func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, regist
 	}
 
 	clusterName := desired.Name
+	containerRuntime := "containerd"
+	if desired.Minikube != nil && desired.Minikube.ContainerRuntime != "" {
+		containerRuntime = desired.Minikube.ContainerRuntime
+	}
+
+	extraConfigs := []string{"kubelet.max-pods=500"}
+	if desired.Minikube != nil && len(desired.Minikube.ExtraConfigs) > 0 {
+		extraConfigs = desired.Minikube.ExtraConfigs
+	}
 
 	// TODO(nick): Let the user pass in their own Minikube configuration.
-	args := []string{"start", "--driver=docker", "--container-runtime=containerd", "--extra-config=kubelet.max-pods=500", "-p", clusterName}
+	args := []string{
+		"start",
+		"--driver=docker",
+		fmt.Sprintf("--container-runtime=%s", containerRuntime),
+	}
+
+	for _, c := range extraConfigs {
+		args = append(args, fmt.Sprintf("--extra-config=%s", c))
+	}
+
+	args = append(args, "-p", clusterName)
+
 	if desired.MinCPUs != 0 {
 		args = append(args, fmt.Sprintf("--cpus=%d", desired.MinCPUs))
 	}
