@@ -315,6 +315,46 @@ func TestClusterApplyKindConfig(t *testing.T) {
 	assert.Contains(t, f.errOut.String(), "desired Kind config does not match current")
 }
 
+func TestClusterApplyMinikubeConfig(t *testing.T) {
+	f := newFixture(t)
+	f.dmachine.os = "darwin"
+
+	assert.Equal(t, false, f.d4m.started)
+	minikubeAdmin := f.newFakeAdmin(ProductMinikube)
+
+	cluster := &api.Cluster{
+		Product: string(ProductMinikube),
+		Minikube: &api.MinikubeCluster{
+			ContainerRuntime: "docker",
+		},
+	}
+	_, err := f.controller.Apply(context.Background(), cluster)
+	assert.NoError(t, err)
+	assert.Equal(t, "minikube", minikubeAdmin.created.Name)
+	minikubeAdmin.created = nil
+
+	// Assert that re-applying the same config doesn't create a new cluster.
+	_, err = f.controller.Apply(context.Background(), cluster)
+	assert.NoError(t, err)
+	assert.Nil(t, minikubeAdmin.created)
+	assert.Nil(t, minikubeAdmin.deleted)
+
+	// Assert that applying a different config deletes and re-creates.
+	cluster2 := &api.Cluster{
+		Product: string(ProductMinikube),
+		Minikube: &api.MinikubeCluster{
+			ContainerRuntime: "containerd",
+		},
+	}
+
+	f.errOut.Truncate(0)
+	_, err = f.controller.Apply(context.Background(), cluster2)
+	assert.NoError(t, err)
+	assert.Equal(t, "minikube", minikubeAdmin.created.Name)
+	assert.Equal(t, "minikube", minikubeAdmin.deleted.Name)
+	assert.Contains(t, f.errOut.String(), "desired Minikube config does not match current")
+}
+
 type fixture struct {
 	t            *testing.T
 	errOut       *bytes.Buffer

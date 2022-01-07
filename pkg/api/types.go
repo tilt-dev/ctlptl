@@ -59,6 +59,9 @@ type Cluster struct {
 	// wins over one specified in the Kind config.
 	KindV1Alpha4Cluster *v1alpha4.Cluster `json:"kindV1Alpha4Cluster,omitempty" yaml:"kindV1Alpha4Cluster,omitempty"`
 
+	// The Minikube cluster config. Only applicable for clusters with product: minikube.
+	Minikube *MinikubeCluster `json:"minikube,omitempty" yaml:"minikube,omitempty"`
+
 	// Most recently observed status of the cluster.
 	// Populated by the system.
 	// Read-only.
@@ -87,6 +90,28 @@ type ClusterStatus struct {
 	// v1.18.10-gke.601
 	// v1.19.3-34+fa32ff1c160058
 	KubernetesVersion string `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
+}
+
+// MinikubeCluster describes minikube-specific options for starting a cluster.
+//
+// Options in this struct, when possible, should match the flags
+// to `minikube start`.
+//
+// Prefer setting features on the ClusterSpec rather than on the MinikubeCluster
+// object when possible. For example, this object doesn't have a `kubernetesVersion`
+// field, because it's supported by ClusterSpec.
+//
+// ctlptl's logic for diffing clusters and applying changes is less robust
+// for cluster-specific config flags.
+type MinikubeCluster struct {
+	// The container runtime of the cluster. Defaults to containerd.
+	ContainerRuntime string `json:"containerRuntime,omitempty" yaml:"containerRuntime,omitempty"`
+
+	// Extra config options passed directly to Minikube's --extra-config flags.
+	// When not set, we will default to starting minikube with these configs:
+	//
+	// kubelet.max-pods=500
+	ExtraConfigs []string `json:"extraConfigs,omitempty" yaml:"extraConfigs,omitempty"`
 }
 
 // ClusterList is a list of Clusters.

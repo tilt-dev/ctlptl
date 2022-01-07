@@ -412,6 +412,7 @@ func (c *Controller) populateClusterSpec(ctx context.Context, cluster *api.Clust
 	cluster.KubernetesVersion = spec.KubernetesVersion
 	cluster.MinCPUs = spec.MinCPUs
 	cluster.KindV1Alpha4Cluster = spec.KindV1Alpha4Cluster
+	cluster.Minikube = spec.Minikube
 	return nil
 }
 
@@ -607,6 +608,11 @@ func (c *Controller) deleteIfIrreconcilable(ctx context.Context, desired, existi
 			"Deleting cluster %s because desired Kind config does not match current.\nCluster config diff: %s\n",
 			desired.Name, cmp.Diff(existing.KindV1Alpha4Cluster, desired.KindV1Alpha4Cluster))
 		needsDelete = true
+	} else if desired.Minikube != nil && !cmp.Equal(existing.Minikube, desired.Minikube) {
+		_, _ = fmt.Fprintf(c.iostreams.ErrOut,
+			"Deleting cluster %s because desired Minikube config does not match current.\nCluster config diff: %s\n",
+			desired.Name, cmp.Diff(existing.Minikube, desired.Minikube))
+		needsDelete = true
 	}
 
 	if !needsDelete {
@@ -662,6 +668,9 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 	}
 	if desired.KindV1Alpha4Cluster != nil && Product(desired.Product) != ProductKIND {
 		return nil, fmt.Errorf("kind config may only be set on clusters with product: kind. Actual product: %s", desired.Product)
+	}
+	if desired.Minikube != nil && Product(desired.Product) != ProductMinikube {
+		return nil, fmt.Errorf("minikube config may only be set on clusters with product: minikube. Actual product: %s", desired.Product)
 	}
 
 	FillDefaults(desired)
