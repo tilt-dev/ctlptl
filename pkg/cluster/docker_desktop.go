@@ -27,11 +27,10 @@ type HTTPClient interface {
 // for this, so we do the best we can.
 type DockerDesktopClient struct {
 	httpClient HTTPClient
-	socketPath string
 }
 
 func NewDockerDesktopClient() (DockerDesktopClient, error) {
-	socketPath, err := dockerDesktopSocketPath()
+	socketPaths, err := dockerDesktopSocketPaths()
 	if err != nil {
 		return DockerDesktopClient{}, err
 	}
@@ -39,13 +38,24 @@ func NewDockerDesktopClient() (DockerDesktopClient, error) {
 	httpClient := &http.Client{
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-				return dialDockerDesktop(socketPath)
+				var lastErr error
+
+				// Different versions of docker use different socket paths,
+				// so return all of them and connect to the first one that
+				// accepts a TCP dial.
+				for _, socketPath := range socketPaths {
+					conn, err := dialDockerDesktop(socketPath)
+					if err == nil {
+						return conn, nil
+					}
+					lastErr = err
+				}
+				return nil, lastErr
 			},
 		},
 	}
 	return DockerDesktopClient{
 		httpClient: httpClient,
-		socketPath: socketPath,
 	}, nil
 }
 
@@ -84,7 +94,7 @@ func (c DockerDesktopClient) Quit(ctx context.Context) error {
 }
 
 func (c DockerDesktopClient) ResetCluster(ctx context.Context) error {
-	klog.V(7).Infof("POST %s /kubernetes/reset\n", c.socketPath)
+	klog.V(7).Infof("POST /kubernetes/reset\n")
 	req, err := http.NewRequest("POST", "http://localhost/kubernetes/reset", nil)
 	if err != nil {
 		return errors.Wrap(err, "reset docker-desktop kubernetes")
@@ -222,7 +232,7 @@ func (c DockerDesktopClient) applySet(settings map[string]interface{}, key, newV
 }
 
 func (c DockerDesktopClient) writeSettings(ctx context.Context, settings map[string]interface{}) error {
-	klog.V(7).Infof("POST %s /settings\n", c.socketPath)
+	klog.V(7).Infof("POST /settings\n")
 	buf := bytes.NewBuffer(nil)
 	err := json.NewEncoder(buf).Encode(c.settingsForWrite(settings))
 	if err != nil {
@@ -249,7 +259,7 @@ func (c DockerDesktopClient) writeSettings(ctx context.Context, settings map[str
 }
 
 func (c DockerDesktopClient) settings(ctx context.Context) (map[string]interface{}, error) {
-	klog.V(7).Infof("GET %s /settings\n", c.socketPath)
+	klog.V(7).Infof("GET /settings\n")
 	req, err := http.NewRequest("GET", "http://localhost/settings", nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "reading docker-desktop settings")

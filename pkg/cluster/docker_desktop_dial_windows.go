@@ -8,8 +8,8 @@ import (
 	"gopkg.in/natefinch/npipe.v2"
 )
 
-func dockerDesktopSocketPath() (string, error) {
-	return `\\.\pipe\dockerWebApiServer`, nil
+func dockerDesktopSocketPaths() ([]string, error) {
+	return []string{`\\.\pipe\dockerWebApiServer`}, nil
 }
 
 func dialDockerDesktop(socketPath string) (net.Conn, error) {
