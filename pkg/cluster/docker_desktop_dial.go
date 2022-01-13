@@ -11,13 +11,19 @@ import (
 	"github.com/mitchellh/go-homedir"
 )
 
-func dockerDesktopSocketPath() (string, error) {
+func dockerDesktopSocketPaths() ([]string, error) {
 	homedir, err := homedir.Dir()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return filepath.Join(homedir, "Library/Containers/com.docker.docker/Data/gui-api.sock"), nil
+	return []string{
+		// Older versions of docker desktop use this socket.
+		filepath.Join(homedir, "Library/Containers/com.docker.docker/Data/gui-api.sock"),
+
+		// Newer versions of docker desktop use this socket.
+		filepath.Join(homedir, "Library/Containers/com.docker.docker/Data/backend.sock"),
+	}, nil
 }
 
 func dialDockerDesktop(socketPath string) (net.Conn, error) {
