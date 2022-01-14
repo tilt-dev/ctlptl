@@ -22,7 +22,7 @@ func dockerDesktopSocketPaths() ([]string, error) {
 		filepath.Join(homedir, "Library/Containers/com.docker.docker/Data/gui-api.sock"),
 
 		// Newer versions of docker desktop use this socket.
-		filepath.Join(homedir, "Library/Containers/com.docker.docker/Data/backend.sock"),
+		filepath.Join(homedir, "Library/Containers/com.docker.docker/Data/backend.native.sock"),
 	}, nil
 }
 
