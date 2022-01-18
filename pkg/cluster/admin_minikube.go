@@ -44,6 +44,16 @@ func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, regist
 	}
 
 	clusterName := desired.Name
+	if registry != nil {
+		// Assume the network name is the same as the cluster name,
+		// which is true in minikube 0.15+. It's OK if it doesn't,
+		// because we double-check if the registry is in the network.
+		err := a.ensureRegistryDisconnected(ctx, registry, container.NetworkMode(clusterName))
+		if err != nil {
+			return err
+		}
+	}
+
 	containerRuntime := "containerd"
 	if desired.Minikube != nil && desired.Minikube.ContainerRuntime != "" {
 		containerRuntime = desired.Minikube.ContainerRuntime
@@ -91,6 +101,10 @@ func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, regist
 			return errors.Wrap(err, "inspecting minikube cluster")
 		}
 		networkMode := container.HostConfig.NetworkMode
+		err = a.ensureRegistryConnected(ctx, registry, networkMode)
+		if err != nil {
+			return err
+		}
 
 		err = a.applyContainerdPatch(ctx, desired, registry, networkMode)
 		if err != nil {
@@ -98,6 +112,34 @@ func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, regist
 		}
 	}
 
+	return nil
+}
+
+// Minikube v0.15.0+ creates a unique network for each minikube cluster.
+func (a *minikubeAdmin) ensureRegistryConnected(ctx context.Context, registry *api.Registry, networkMode container.NetworkMode) error {
+	if networkMode.IsUserDefined() && !a.inRegistryNetwork(registry, networkMode) {
+		cmd := exec.CommandContext(ctx, "docker", "network", "connect", networkMode.UserDefined(), registry.Name)
+		err := cmd.Run()
+		if err != nil {
+			return errors.Wrap(err, "connecting registry")
+		}
+	}
+	return nil
+}
+
+// Minikube hard-codes IP addresses in the cluster network.
+// So make sure the registry is disconnected from the network before running
+// "minikube start".
+//
+// https://github.com/tilt-dev/ctlptl/issues/144
+func (a *minikubeAdmin) ensureRegistryDisconnected(ctx context.Context, registry *api.Registry, networkMode container.NetworkMode) error {
+	if networkMode.IsUserDefined() && a.inRegistryNetwork(registry, networkMode) {
+		cmd := exec.CommandContext(ctx, "docker", "network", "disconnect", networkMode.UserDefined(), registry.Name)
+		err := cmd.Run()
+		if err != nil {
+			return errors.Wrap(err, "disconnecting registry")
+		}
+	}
 	return nil
 }
 
@@ -125,15 +167,6 @@ func (a *minikubeAdmin) applyContainerdPatch(ctx context.Context, desired *api.C
 			continue
 		}
 		nodes = append(nodes, node)
-	}
-
-	// Minikube v0.15.0+ creates a unique network for each minikube cluster.
-	if networkMode.IsUserDefined() && !a.inRegistryNetwork(registry, networkMode) {
-		cmd := exec.CommandContext(ctx, "docker", "network", "connect", networkMode.UserDefined(), registry.Name)
-		err := cmd.Run()
-		if err != nil {
-			return errors.Wrap(err, "connecting registry")
-		}
 	}
 
 	for _, node := range nodes {
