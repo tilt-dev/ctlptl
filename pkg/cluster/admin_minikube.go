@@ -181,10 +181,10 @@ func (a *minikubeAdmin) applyContainerdPatch(ctx context.Context, desired *api.C
 		cmd := exec.CommandContext(ctx, "minikube", "-p", desired.Name, "--node", node,
 			"ssh", "sudo", "sed", `\-i`,
 			fmt.Sprintf(
-				`s,\\\[plugins.cri.registry.mirrors\\\],[plugins.cri.registry.mirrors]\\\n`+
-					`\ \ \ \ \ \ \ \ [plugins.cri.registry.mirrors.\\\"localhost:%d\\\"]\\\n`+
+				`s,\\\[plugins.\\\(\\\"\\\?.*cri\\\"\\\?\\\).registry.mirrors\\\],[plugins.\\\1.registry.mirrors]\\\n`+
+					`\ \ \ \ \ \ \ \ [plugins.\\\1.registry.mirrors.\\\"localhost:%d\\\"]\\\n`+
 					`\ \ \ \ \ \ \ \ \ \ endpoint\ =\ [\\\"http://%s:%d\\\"]\\\n`+
-					`\ \ \ \ \ \ \ \ [plugins.cri.registry.mirrors.\\\"%s:%d\\\"]\\\n`+
+					`\ \ \ \ \ \ \ \ [plugins.\\\1.registry.mirrors.\\\"%s:%d\\\"]\\\n`+
 					`\ \ \ \ \ \ \ \ \ \ endpoint\ =\ [\\\"http://%s:%d\\\"],`,
 				registry.Status.HostPort, networkHost, registry.Status.ContainerPort,
 				networkHost, registry.Status.ContainerPort,
