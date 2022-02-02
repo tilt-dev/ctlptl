@@ -139,6 +139,16 @@ func (a *minikubeAdmin) ensureRegistryDisconnected(ctx context.Context, registry
 		if err != nil {
 			return errors.Wrap(err, "disconnecting registry")
 		}
+
+		// Remove the network from the current set of networks attached to the registry. This allows the registry to be reconnected after
+		// a cluster delete and create operation without removing the registry
+		networks := []string{}
+		for _, n := range registry.Status.Networks {
+			if n != networkMode.UserDefined() {
+				networks = append(networks, n)
+			}
+		}
+		registry.Status.Networks = networks
 	}
 	return nil
 }
