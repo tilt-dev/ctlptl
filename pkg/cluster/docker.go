@@ -24,7 +24,11 @@ type dockerWrapper struct {
 func (w *dockerWrapper) IsLocalHost() bool { return w.isLocalHost }
 
 func newDockerWrapperFromEnv(ctx context.Context) (*dockerWrapper, error) {
-	c, err := client.NewClientWithOpts(client.FromEnv)
+	opts, err := docker.ClientOpts()
+	if err != nil {
+		return nil, err
+	}
+	c, err := client.NewClientWithOpts(opts...)
 	if err != nil {
 		return nil, err
 	}
