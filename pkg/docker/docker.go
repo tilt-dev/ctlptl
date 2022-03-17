@@ -33,15 +33,15 @@ func IsLocalHost(dockerHost string) bool {
 // environment variable is an SSH url, otherwise it will return client.FromEnv for a standard
 // connection. This function returns an error if DOCKER_HOST is an invalid URL.
 func ClientOpts() ([]client.Opt, error) {
+	opts := []client.Opt{client.FromEnv}
 	connHelperOpts, err := connectionHelperOpts()
 	if err != nil {
 		return nil, err
 	}
 	if connHelperOpts != nil {
-		return connHelperOpts, nil
-	} else {
-		return []client.Opt{client.FromEnv}, nil
+		opts = append(opts, connHelperOpts...)
 	}
+	return opts, nil
 }
 
 // connectionHelperOpts uses the Docker CLI's connection helpers to check if the DOCKER_HOST
