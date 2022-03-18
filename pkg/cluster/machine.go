@@ -12,6 +12,7 @@ import (
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
+	"github.com/tilt-dev/clusterid"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/docker"
 	"k8s.io/apimachinery/pkg/util/duration"
@@ -26,7 +27,7 @@ type Machine interface {
 }
 
 type unknownMachine struct {
-	product Product
+	product clusterid.Product
 }
 
 func (m unknownMachine) EnsureExists(ctx context.Context) error {
@@ -124,7 +125,7 @@ func (m dockerMachine) Restart(ctx context.Context, desired, existing *api.Clust
 	if m.dockerClient.IsLocalHost() && (m.os == "darwin" || m.os == "windows") {
 		canChangeCPUs = true // DockerForMac and DockerForWindows can change the CPU on the VM
 		isLocalDockerDesktop = true
-	} else if Product(desired.Product) == ProductMinikube {
+	} else if clusterid.Product(desired.Product) == clusterid.ProductMinikube {
 		// Minikube can change the CPU on the VM or on the container itself
 		canChangeCPUs = true
 	}
@@ -140,7 +141,7 @@ func (m dockerMachine) Restart(ctx context.Context, desired, existing *api.Clust
 		}
 
 		k8sChanged := false
-		if desired.Product == string(ProductDockerDesktop) {
+		if desired.Product == string(clusterid.ProductDockerDesktop) {
 			k8sChanged, err = m.d4m.setK8sEnabled(settings, true)
 			if err != nil {
 				return err

@@ -15,6 +15,7 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	"github.com/tilt-dev/clusterid"
 	"github.com/tilt-dev/ctlptl/internal/socat"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/docker"
@@ -83,7 +84,7 @@ type Controller struct {
 	iostreams                   genericclioptions.IOStreams
 	config                      clientcmdapi.Config
 	clients                     map[string]kubernetes.Interface
-	admins                      map[Product]Admin
+	admins                      map[clusterid.Product]Admin
 	dockerClient                dockerClient
 	dmachine                    *dockerMachine
 	configLoader                configLoader
@@ -129,7 +130,7 @@ func DefaultController(iostreams genericclioptions.IOStreams) (*Controller, erro
 		config:                      config,
 		configWriter:                configWriter,
 		clients:                     make(map[string]kubernetes.Interface),
-		admins:                      make(map[Product]Admin),
+		admins:                      make(map[clusterid.Product]Admin),
 		configLoader:                configLoader,
 		clientLoader:                clientLoader,
 		waitForKubeConfigTimeout:    waitForKubeConfigTimeout,
@@ -170,7 +171,7 @@ func (c *Controller) getDockerClient(ctx context.Context) (dockerClient, error) 
 	return client, nil
 }
 
-func (c *Controller) machine(ctx context.Context, name string, product Product) (Machine, error) {
+func (c *Controller) machine(ctx context.Context, name string, product clusterid.Product) (Machine, error) {
 	dockerClient, err := c.getDockerClient(ctx)
 	if err != nil {
 		return nil, err
@@ -180,7 +181,7 @@ func (c *Controller) machine(ctx context.Context, name string, product Product) 
 	defer c.mu.Unlock()
 
 	switch product {
-	case ProductDockerDesktop, ProductKIND, ProductK3D:
+	case clusterid.ProductDockerDesktop, clusterid.ProductKIND, clusterid.ProductK3D:
 		if c.dmachine == nil {
 			machine, err := NewDockerMachine(ctx, dockerClient, c.iostreams.ErrOut)
 			if err != nil {
@@ -190,7 +191,7 @@ func (c *Controller) machine(ctx context.Context, name string, product Product) 
 		}
 		return c.dmachine, nil
 
-	case ProductMinikube:
+	case clusterid.ProductMinikube:
 		if c.dmachine == nil {
 			machine, err := NewDockerMachine(ctx, dockerClient, c.iostreams.ErrOut)
 			if err != nil {
@@ -222,7 +223,7 @@ func (c *Controller) registryController(ctx context.Context) (registryController
 
 // A cluster admin provides the basic start/stop functionality of a cluster,
 // independent of the configuration of the machine it's running on.
-func (c *Controller) admin(ctx context.Context, product Product) (Admin, error) {
+func (c *Controller) admin(ctx context.Context, product clusterid.Product) (Admin, error) {
 	dockerClient, err := c.getDockerClient(ctx)
 	if err != nil {
 		return nil, err
@@ -237,18 +238,18 @@ func (c *Controller) admin(ctx context.Context, product Product) (Admin, error) 
 	}
 
 	switch product {
-	case ProductDockerDesktop:
+	case clusterid.ProductDockerDesktop:
 		if !dockerClient.IsLocalHost() {
 			return nil, fmt.Errorf("Detected remote DOCKER_HOST. Remote Docker engines do not support Docker Desktop clusters: %s",
 				docker.GetHostEnv())
 		}
 
 		admin = newDockerDesktopAdmin()
-	case ProductKIND:
+	case clusterid.ProductKIND:
 		admin = newKindAdmin(c.iostreams)
-	case ProductK3D:
+	case clusterid.ProductK3D:
 		admin = newK3dAdmin(c.iostreams)
-	case ProductMinikube:
+	case clusterid.ProductMinikube:
 		admin = newMinikubeAdmin(c.iostreams, dockerClient)
 	}
 
@@ -381,7 +382,7 @@ func (c *Controller) populateLocalRegistryHosting(ctx context.Context, cluster *
 }
 
 func (c *Controller) populateMachineStatus(ctx context.Context, cluster *api.Cluster) error {
-	machine, err := c.machine(ctx, cluster.Name, Product(cluster.Product))
+	machine, err := c.machine(ctx, cluster.Name, clusterid.Product(cluster.Product))
 	if err != nil {
 		return err
 	}
@@ -454,8 +455,8 @@ func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) 
 	// ensure the socat tunnel is running. It's semantically odd that 'ctlptl get'
 	// creates a persistent tunnel, but is probably closer to what users expect.
 	name := cluster.Name
-	product := Product(cluster.Product)
-	if product == ProductKIND || product == ProductK3D || product == ProductMinikube {
+	product := clusterid.Product(cluster.Product)
+	if product == clusterid.ProductKIND || product == clusterid.ProductK3D || product == clusterid.ProductMinikube {
 		err := c.maybeCreateForwarderForCurrentCluster(ctx, ioutil.Discard)
 		if err != nil {
 			// If creating the forwarder fails, that's OK. We may still be able to populate things.
@@ -538,7 +539,7 @@ func FillDefaults(cluster *api.Cluster) {
 	// Create a default name if one isn't in the YAML.
 	// The default name is determined by the underlying product.
 	if cluster.Name == "" {
-		cluster.Name = Product(cluster.Product).DefaultClusterName()
+		cluster.Name = clusterid.Product(cluster.Product).DefaultClusterName()
 	}
 
 	// Override the Kind config if necessary.
@@ -548,12 +549,12 @@ func FillDefaults(cluster *api.Cluster) {
 }
 
 // TODO(nick): Add more registry-supporting clusters.
-func supportsRegistry(product Product) bool {
-	return product == ProductKIND || product == ProductMinikube || product == ProductK3D
+func supportsRegistry(product clusterid.Product) bool {
+	return product == clusterid.ProductKIND || product == clusterid.ProductMinikube || product == clusterid.ProductK3D
 }
 
-func supportsKubernetesVersion(product Product, version string) bool {
-	return product == ProductKIND || product == ProductMinikube
+func supportsKubernetesVersion(product clusterid.Product, version string) bool {
+	return product == clusterid.ProductKIND || product == clusterid.ProductMinikube
 }
 
 func (c *Controller) canReconcileK8sVersion(ctx context.Context, desired, existing *api.Cluster) bool {
@@ -566,7 +567,7 @@ func (c *Controller) canReconcileK8sVersion(ctx context.Context, desired, existi
 	}
 
 	// On KIND, it's ok if the patch doesn't match.
-	if Product(desired.Product) == ProductKIND {
+	if clusterid.Product(desired.Product) == clusterid.ProductKIND {
 		dv, err := semver.ParseTolerant(desired.KubernetesVersion)
 		if err != nil {
 			return false
@@ -635,7 +636,7 @@ func (c *Controller) ensureRegistryExistsForCluster(ctx context.Context, desired
 	}
 
 	regLabels := map[string]string{}
-	if desired.Product == string(ProductK3D) {
+	if desired.Product == string(clusterid.ProductK3D) {
 		// A K3d cluster will only connect to a registry
 		// with these labels.
 		regLabels["app"] = "k3d"
@@ -660,16 +661,16 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 	if desired.Product == "" {
 		return nil, fmt.Errorf("product field must be non-empty")
 	}
-	if desired.Registry != "" && !supportsRegistry(Product(desired.Product)) {
+	if desired.Registry != "" && !supportsRegistry(clusterid.Product(desired.Product)) {
 		return nil, fmt.Errorf("product %s does not support a registry", desired.Product)
 	}
-	if desired.KubernetesVersion != "" && !supportsKubernetesVersion(Product(desired.Product), desired.KubernetesVersion) {
+	if desired.KubernetesVersion != "" && !supportsKubernetesVersion(clusterid.Product(desired.Product), desired.KubernetesVersion) {
 		return nil, fmt.Errorf("product %s does not support a custom Kubernetes version", desired.Product)
 	}
-	if desired.KindV1Alpha4Cluster != nil && Product(desired.Product) != ProductKIND {
+	if desired.KindV1Alpha4Cluster != nil && clusterid.Product(desired.Product) != clusterid.ProductKIND {
 		return nil, fmt.Errorf("kind config may only be set on clusters with product: kind. Actual product: %s", desired.Product)
 	}
-	if desired.Minikube != nil && Product(desired.Product) != ProductMinikube {
+	if desired.Minikube != nil && clusterid.Product(desired.Product) != clusterid.ProductMinikube {
 		return nil, fmt.Errorf("minikube config may only be set on clusters with product: minikube. Actual product: %s", desired.Product)
 	}
 
@@ -677,7 +678,7 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 
 	// Fetch the machine driver for this product and cluster name,
 	// and use it to apply the constraints to the underlying VM.
-	machine, err := c.machine(ctx, desired.Name, Product(desired.Product))
+	machine, err := c.machine(ctx, desired.Name, clusterid.Product(desired.Product))
 	if err != nil {
 		return nil, err
 	}
@@ -708,7 +709,7 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 
 	// Fetch the admin driver for this product, for setting up the cluster on top of
 	// the machine.
-	admin, err := c.admin(ctx, Product(desired.Product))
+	admin, err := c.admin(ctx, clusterid.Product(desired.Product))
 	if err != nil {
 		return nil, err
 	}
@@ -858,7 +859,7 @@ func (c *Controller) Delete(ctx context.Context, name string) error {
 		return err
 	}
 
-	admin, err := c.admin(ctx, Product(existing.Product))
+	admin, err := c.admin(ctx, clusterid.Product(existing.Product))
 	if err != nil {
 		return err
 	}
@@ -911,7 +912,7 @@ func (c *Controller) Get(ctx context.Context, name string) (*api.Cluster, error)
 	cluster := &api.Cluster{
 		TypeMeta: typeMeta,
 		Name:     name,
-		Product:  productFromContext(ct, config.Clusters[ct.Cluster]).String(),
+		Product:  clusterid.ProductFromContext(ct, config.Clusters[ct.Cluster]).String(),
 	}
 	c.populateCluster(ctx, cluster)
 
@@ -943,7 +944,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Cluste
 			cluster := &api.Cluster{
 				TypeMeta: typeMeta,
 				Name:     name,
-				Product:  productFromContext(ct, config.Clusters[ct.Cluster]).String(),
+				Product:  clusterid.ProductFromContext(ct, config.Clusters[ct.Cluster]).String(),
 			}
 			if !selector.Matches((*clusterFields)(cluster)) {
 				return nil
