@@ -24,9 +24,11 @@ import (
 	"github.com/tilt-dev/ctlptl/pkg/docker"
 )
 
-var typeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "Registry"}
-var listTypeMeta = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "RegistryList"}
-var groupResource = schema.GroupResource{Group: "ctlptl.dev", Resource: "registries"}
+var (
+	typeMeta      = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "Registry"}
+	listTypeMeta  = api.TypeMeta{APIVersion: "ctlptl.dev/v1alpha1", Kind: "RegistryList"}
+	groupResource = schema.GroupResource{Group: "ctlptl.dev", Resource: "registries"}
+)
 
 const registryImageRef = "docker.io/library/registry:2" // The registry everyone uses.
 
@@ -76,7 +78,11 @@ func NewController(iostreams genericclioptions.IOStreams, dockerClient Container
 }
 
 func DefaultController(ctx context.Context, iostreams genericclioptions.IOStreams) (*Controller, error) {
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
+	opts, err := docker.ClientOpts()
+	if err != nil {
+		return nil, err
+	}
+	dockerClient, err := client.NewClientWithOpts(opts...)
 	if err != nil {
 		return nil, err
 	}

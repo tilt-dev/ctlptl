@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/shirou/gopsutil/v3/process"
+	"github.com/tilt-dev/ctlptl/pkg/docker"
 )
 
 const serviceName = "ctlptl-portforward-service"
@@ -30,7 +31,11 @@ func NewController(client ContainerClient) *Controller {
 }
 
 func DefaultController(ctx context.Context) (*Controller, error) {
-	client, err := client.NewClientWithOpts(client.FromEnv)
+	opts, err := docker.ClientOpts()
+	if err != nil {
+		return nil, err
+	}
+	client, err := client.NewClientWithOpts(opts...)
 	if err != nil {
 		return nil, err
 	}
