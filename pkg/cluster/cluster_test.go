@@ -11,6 +11,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tilt-dev/clusterid"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/registry"
 	"github.com/tilt-dev/localregistry-go"
@@ -96,10 +97,10 @@ func TestClusterApplyKIND(t *testing.T) {
 	f.dmachine.os = "darwin"
 
 	assert.Equal(t, false, f.d4m.started)
-	kindAdmin := f.newFakeAdmin(ProductKIND)
+	kindAdmin := f.newFakeAdmin(clusterid.ProductKIND)
 
 	result, err := f.controller.Apply(context.Background(), &api.Cluster{
-		Product: string(ProductKIND),
+		Product: string(clusterid.ProductKIND),
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, true, f.d4m.started)
@@ -115,7 +116,7 @@ func TestClusterApplyFailsToStart(t *testing.T) {
 	f.controller.iostreams.ErrOut = out
 
 	assert.Equal(t, false, f.d4m.started)
-	_ = f.newFakeAdmin(ProductKIND)
+	_ = f.newFakeAdmin(clusterid.ProductKIND)
 
 	// Pretend that the kube-public namespace is never created.
 	err := f.fakeK8s.CoreV1().Namespaces().Delete(
@@ -123,7 +124,7 @@ func TestClusterApplyFailsToStart(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = f.controller.Apply(context.Background(), &api.Cluster{
-		Product: string(ProductKIND),
+		Product: string(clusterid.ProductKIND),
 	})
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "timed out waiting for cluster to start")
@@ -137,10 +138,10 @@ func TestClusterApplyKINDWithCluster(t *testing.T) {
 
 	f.dockerClient.started = true
 
-	kindAdmin := f.newFakeAdmin(ProductKIND)
+	kindAdmin := f.newFakeAdmin(clusterid.ProductKIND)
 
 	result, err := f.controller.Apply(context.Background(), &api.Cluster{
-		Product:  string(ProductKIND),
+		Product:  string(clusterid.ProductKIND),
 		Registry: "kind-registry",
 	})
 	assert.NoError(t, err)
@@ -157,7 +158,7 @@ func TestClusterApplyDockerDesktop(t *testing.T) {
 
 	assert.Equal(t, false, f.d4m.started)
 	assert.Equal(t, 1, f.dockerClient.ncpu)
-	f, _ = controllerApply(f, ProductDockerDesktop, 3)
+	f, _ = controllerApply(f, clusterid.ProductDockerDesktop, 3)
 	assert.Equal(t, true, f.d4m.started)
 	assert.Equal(t, 3, f.dockerClient.ncpu)
 }
@@ -171,7 +172,7 @@ func TestClusterApplyDockerDesktopCPUOnly(t *testing.T) {
 
 	assert.Equal(t, true, f.d4m.started)
 	assert.Equal(t, 1, f.dockerClient.ncpu)
-	f, _ = controllerApply(f, ProductDockerDesktop, 3)
+	f, _ = controllerApply(f, clusterid.ProductDockerDesktop, 3)
 	assert.Equal(t, true, f.d4m.started)
 	assert.Equal(t, 3, f.dockerClient.ncpu)
 }
@@ -182,12 +183,12 @@ func TestClusterApplyDockerDesktopStartClusterOnly(t *testing.T) {
 
 	assert.Equal(t, false, f.d4m.started)
 	assert.Equal(t, 1, f.dockerClient.ncpu)
-	f, _ = controllerApply(f, ProductDockerDesktop, 0)
+	f, _ = controllerApply(f, clusterid.ProductDockerDesktop, 0)
 	assert.Equal(t, true, f.d4m.started)
 	assert.Equal(t, 1, f.dockerClient.ncpu)
 }
 
-func controllerApply(f *fixture, product Product, cpus int) (*fixture, error) {
+func controllerApply(f *fixture, product clusterid.Product, cpus int) (*fixture, error) {
 	cluster := &api.Cluster{
 		Product: string(product),
 		MinCPUs: cpus,
@@ -205,9 +206,9 @@ func TestClusterApplyDockerDesktopNoRestart(t *testing.T) {
 	// Pretend the cluster isn't running.
 	err := f.fakeK8s.Tracker().Delete(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "nodes"}, "", "node-1")
 	assert.NoError(t, err)
-	f, _ = controllerApply(f, ProductDockerDesktop, 0)
+	f, _ = controllerApply(f, clusterid.ProductDockerDesktop, 0)
 	assert.Equal(t, 1, f.d4m.settingsWriteCount)
-	f, _ = controllerApply(f, ProductDockerDesktop, 0)
+	f, _ = controllerApply(f, clusterid.ProductDockerDesktop, 0)
 	assert.Equal(t, 1, f.d4m.settingsWriteCount)
 }
 
@@ -216,10 +217,10 @@ func TestClusterApplyMinikubeVersion(t *testing.T) {
 	f.dmachine.os = "darwin"
 
 	assert.Equal(t, false, f.d4m.started)
-	minikubeAdmin := f.newFakeAdmin(ProductMinikube)
+	minikubeAdmin := f.newFakeAdmin(clusterid.ProductMinikube)
 
 	result, err := f.controller.Apply(context.Background(), &api.Cluster{
-		Product:           string(ProductMinikube),
+		Product:           string(clusterid.ProductMinikube),
 		KubernetesVersion: "v1.14.0",
 	})
 	assert.NoError(t, err)
@@ -231,7 +232,7 @@ func TestClusterApplyMinikubeVersion(t *testing.T) {
 	minikubeAdmin.created = nil
 
 	_, err = f.controller.Apply(context.Background(), &api.Cluster{
-		Product:           string(ProductMinikube),
+		Product:           string(clusterid.ProductMinikube),
 		KubernetesVersion: "v1.14.0",
 	})
 	assert.NoError(t, err)
@@ -244,7 +245,7 @@ func TestClusterApplyMinikubeVersion(t *testing.T) {
 	f.controller.iostreams.ErrOut = out
 
 	_, err = f.controller.Apply(context.Background(), &api.Cluster{
-		Product:           string(ProductMinikube),
+		Product:           string(clusterid.ProductMinikube),
 		KubernetesVersion: "v1.15.0",
 	})
 	assert.NoError(t, err)
@@ -275,10 +276,10 @@ func TestClusterApplyKindConfig(t *testing.T) {
 	f.dmachine.os = "darwin"
 
 	assert.Equal(t, false, f.d4m.started)
-	kindAdmin := f.newFakeAdmin(ProductKIND)
+	kindAdmin := f.newFakeAdmin(clusterid.ProductKIND)
 
 	cluster := &api.Cluster{
-		Product: string(ProductKIND),
+		Product: string(clusterid.ProductKIND),
 		KindV1Alpha4Cluster: &v1alpha4.Cluster{
 			Nodes: []v1alpha4.Node{
 				v1alpha4.Node{Role: "control-plane"},
@@ -298,7 +299,7 @@ func TestClusterApplyKindConfig(t *testing.T) {
 
 	// Assert that applying a different config deletes and re-creates.
 	cluster2 := &api.Cluster{
-		Product: string(ProductKIND),
+		Product: string(clusterid.ProductKIND),
 		KindV1Alpha4Cluster: &v1alpha4.Cluster{
 			Nodes: []v1alpha4.Node{
 				v1alpha4.Node{Role: "control-plane"},
@@ -320,10 +321,10 @@ func TestClusterApplyMinikubeConfig(t *testing.T) {
 	f.dmachine.os = "darwin"
 
 	assert.Equal(t, false, f.d4m.started)
-	minikubeAdmin := f.newFakeAdmin(ProductMinikube)
+	minikubeAdmin := f.newFakeAdmin(clusterid.ProductMinikube)
 
 	cluster := &api.Cluster{
-		Product: string(ProductMinikube),
+		Product: string(clusterid.ProductMinikube),
 		Minikube: &api.MinikubeCluster{
 			ContainerRuntime: "docker",
 		},
@@ -341,7 +342,7 @@ func TestClusterApplyMinikubeConfig(t *testing.T) {
 
 	// Assert that applying a different config deletes and re-creates.
 	cluster2 := &api.Cluster{
-		Product: string(ProductMinikube),
+		Product: string(clusterid.ProductMinikube),
 		Minikube: &api.MinikubeCluster{
 			ContainerRuntime: "containerd",
 		},
@@ -423,7 +424,7 @@ func newFixture(t *testing.T) *fixture {
 	registryCtl := &fakeRegistryController{}
 	controller := &Controller{
 		iostreams:                   iostreams,
-		admins:                      make(map[Product]Admin),
+		admins:                      make(map[clusterid.Product]Admin),
 		config:                      *config,
 		configWriter:                configWriter,
 		dmachine:                    dmachine,
@@ -447,7 +448,7 @@ func newFixture(t *testing.T) *fixture {
 	}
 }
 
-func (f *fixture) newFakeAdmin(p Product) *fakeAdmin {
+func (f *fixture) newFakeAdmin(p clusterid.Product) *fakeAdmin {
 	admin := newFakeAdmin(f.config, f.fakeK8s)
 	f.controller.admins[p] = admin
 	return admin
