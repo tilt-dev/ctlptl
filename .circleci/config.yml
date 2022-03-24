@@ -5,13 +5,12 @@ orbs:
 jobs:
   build:
     docker:
-      - image: circleci/golang:1.17
-    working_directory: /go/src/github.com/tilt-dev/ctlptl
+      - image: cimg/go:1.18
     steps:
       - checkout
       - run: go get -v -t -d ./...
       - run: go test -v ./...
-      - run: cd .. && go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.38.0
+      - run: cd .. && go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
       - run: make golangci-lint
       - slack/notify-on-failure:
           only_for_branches: main
@@ -19,7 +18,6 @@ jobs:
   e2e-remote-docker:
     docker:
       - image: gcr.io/windmill-public-containers/ctlptl-e2e-ci
-    working_directory: /go/src/github.com/tilt-dev/ctlptl
     steps:
       - checkout
       - setup_remote_docker:
@@ -30,15 +28,14 @@ jobs:
   e2e:
     machine:
       image: ubuntu-2004:202111-02
-    working_directory: /home/circleci/.go_workspace/src/github.com/tilt-dev/ctlptl
     steps:
       - checkout
       - kubernetes/install-kubectl
       - run: |
           set -ex
-          wget https://golang.org/dl/go1.17.2.linux-amd64.tar.gz
+          wget https://golang.org/dl/go1.18.linux-amd64.tar.gz
           sudo rm -fR /usr/local/go
-          sudo tar -C /usr/local -xzf go1.17.2.linux-amd64.tar.gz
+          sudo tar -C /usr/local -xzf go1.18.linux-amd64.tar.gz
       # We need a newer Docker version to work around a k3d/containerd bug.
       # https://github.com/rancher/k3d/issues/807
       - run: |
@@ -74,7 +71,7 @@ jobs:
           
   release-dry-run:
     docker:
-      - image: circleci/golang:1.17
+      - image: cimg/go:1.18
     steps:
       - checkout
       - setup_remote_docker:
@@ -87,7 +84,7 @@ jobs:
           
   release:
     docker:
-      - image: circleci/golang:1.17
+      - image: cimg/go:1.18
     steps:
       - checkout
       - setup_remote_docker:
