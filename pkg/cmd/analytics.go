@@ -9,7 +9,10 @@ import (
 var Version string
 
 func newAnalytics() (analytics.Analytics, error) {
-	return analytics.NewRemoteAnalytics("ctlptl", analytics.WithGlobalTags(globalTags()))
+	return analytics.NewRemoteAnalytics(
+		"ctlptl",
+		analytics.WithLogger(discardLogger{}),
+		analytics.WithGlobalTags(globalTags()))
 }
 
 func globalTags() map[string]string {
@@ -18,3 +21,7 @@ func globalTags() map[string]string {
 		"os":      runtime.GOOS,
 	}
 }
+
+type discardLogger struct{}
+
+func (dl discardLogger) Printf(fmt string, v ...interface{}) {}
