@@ -23,12 +23,14 @@ const kindNetworkName = "kind"
 // kindAdmin uses the kind CLI to manipulate a kind cluster,
 // once the underlying machine has been setup.
 type kindAdmin struct {
-	iostreams genericclioptions.IOStreams
+	iostreams    genericclioptions.IOStreams
+	dockerClient dockerClient
 }
 
-func newKindAdmin(iostreams genericclioptions.IOStreams) *kindAdmin {
+func newKindAdmin(iostreams genericclioptions.IOStreams, dockerClient dockerClient) *kindAdmin {
 	return &kindAdmin{
-		iostreams: iostreams,
+		iostreams:    iostreams,
+		dockerClient: dockerClient,
 	}
 }
 
@@ -110,8 +112,7 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 
 	if registry != nil && !a.inKindNetwork(registry) {
 		_, _ = fmt.Fprintf(a.iostreams.ErrOut, "   Connecting kind to registry %s\n", registry.Name)
-		cmd := exec.CommandContext(ctx, "docker", "network", "connect", kindNetworkName, registry.Name)
-		err := cmd.Run()
+		err := a.dockerClient.NetworkConnect(ctx, kindNetworkName, registry.Name, nil)
 		if err != nil {
 			return errors.Wrap(err, "connecting registry")
 		}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/network"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tilt-dev/clusterid"
@@ -489,6 +490,14 @@ func (c *fakeDockerClient) ContainerInspect(ctx context.Context, id string) (typ
 }
 
 func (d *fakeDockerClient) ContainerRemove(ctx context.Context, id string, options types.ContainerRemoveOptions) error {
+	return nil
+}
+
+func (d *fakeDockerClient) NetworkConnect(ctx context.Context, networkID, containerID string, config *network.EndpointSettings) error {
+	return nil
+}
+
+func (d *fakeDockerClient) NetworkDisconnect(ctx context.Context, networkID, containerID string, force bool) error {
 	return nil
 }
 
