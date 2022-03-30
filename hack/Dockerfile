@@ -10,7 +10,7 @@
 #
 # Built with goreleaser.
 
-FROM debian:11.2
+FROM debian:11
 
 RUN apt update && apt install -y curl ca-certificates liblz4-tool rsync socat
 
