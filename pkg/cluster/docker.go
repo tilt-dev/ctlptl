@@ -10,7 +10,7 @@ import (
 )
 
 type dockerClient interface {
-	IsLocalHost() bool
+	IsLocalDockerEngine() bool
 	ServerVersion(ctx context.Context) (types.Version, error)
 	Info(ctx context.Context) (types.Info, error)
 	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
@@ -21,10 +21,10 @@ type dockerClient interface {
 
 type dockerWrapper struct {
 	*client.Client
-	isLocalHost bool
+	isLocalDE bool
 }
 
-func (w *dockerWrapper) IsLocalHost() bool { return w.isLocalHost }
+func (w *dockerWrapper) IsLocalDockerEngine() bool { return w.isLocalDE }
 
 func newDockerWrapperFromEnv(ctx context.Context) (*dockerWrapper, error) {
 	opts, err := docker.ClientOpts()
@@ -37,9 +37,9 @@ func newDockerWrapperFromEnv(ctx context.Context) (*dockerWrapper, error) {
 	}
 
 	c.NegotiateAPIVersion(ctx)
-	isLocalHost := docker.IsLocalHost(docker.GetHostEnv())
+	isLocalDE := docker.IsLocalDockerEngineHost(docker.GetHostEnv())
 	return &dockerWrapper{
-		Client:      c,
-		isLocalHost: isLocalHost,
+		Client:    c,
+		isLocalDE: isLocalDE,
 	}, nil
 }

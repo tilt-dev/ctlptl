@@ -13,6 +13,8 @@ func GetHostEnv() string {
 	return os.Getenv("DOCKER_HOST")
 }
 
+// Checks whether the Docker daemon is running on a local machine.
+// Remote docker daemons will likely need a port forwarder to work properly.
 func IsLocalHost(dockerHost string) bool {
 	return dockerHost == "" ||
 
@@ -25,9 +27,23 @@ func IsLocalHost(dockerHost string) bool {
 		strings.HasPrefix(dockerHost, "npipe:") ||
 
 		// https://github.com/moby/moby/blob/master/client/client_unix.go#L6
-		(strings.HasPrefix(dockerHost, "unix:") &&
-			// https://docs.docker.com/desktop/faqs/#how-do-i-connect-to-the-remote-docker-engine-api
-			strings.Contains(dockerHost, "/var/run/docker.sock"))
+		strings.HasPrefix(dockerHost, "unix:")
+}
+
+// Checks whether the DOCKER_HOST looks like a local Docker Engine.
+// A local Docker Engine has some additional APIs for VM management (i.e., Docker Desktop).
+func IsLocalDockerEngineHost(dockerHost string) bool {
+	if strings.HasPrefix(dockerHost, "unix:") {
+		// Many tools (like colima) try to masquerade as Docker Desktop but run
+		// on a different socket.
+		// see:
+		// https://github.com/tilt-dev/ctlptl/issues/196
+		// https://docs.docker.com/desktop/faqs/#how-do-i-connect-to-the-remote-docker-engine-api
+		return strings.Contains(dockerHost, "/var/run/docker.sock")
+	}
+
+	// Docker daemons on other local protocols are treated as docker desktop.
+	return IsLocalHost(dockerHost)
 }
 
 // ClientOpts returns an appropiate slice of client.Opt values for connecting to a Docker client.

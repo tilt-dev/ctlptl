@@ -239,7 +239,7 @@ func (c *Controller) admin(ctx context.Context, product clusterid.Product) (Admi
 
 	switch product {
 	case clusterid.ProductDockerDesktop:
-		if !dockerClient.IsLocalHost() {
+		if !dockerClient.IsLocalDockerEngine() {
 			return nil, fmt.Errorf("Detected remote DOCKER_HOST. Remote Docker engines do not support Docker Desktop clusters: %s",
 				docker.GetHostEnv())
 		}

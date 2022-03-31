@@ -465,7 +465,7 @@ type fakeDockerClient struct {
 	ncpu         int
 }
 
-func (c *fakeDockerClient) IsLocalHost() bool {
+func (c *fakeDockerClient) IsLocalDockerEngine() bool {
 	return !c.isRemoteHost
 }
 
