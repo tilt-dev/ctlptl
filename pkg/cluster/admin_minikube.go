@@ -118,8 +118,7 @@ func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, regist
 // Minikube v0.15.0+ creates a unique network for each minikube cluster.
 func (a *minikubeAdmin) ensureRegistryConnected(ctx context.Context, registry *api.Registry, networkMode container.NetworkMode) error {
 	if networkMode.IsUserDefined() && !a.inRegistryNetwork(registry, networkMode) {
-		cmd := exec.CommandContext(ctx, "docker", "network", "connect", networkMode.UserDefined(), registry.Name)
-		err := cmd.Run()
+		err := a.dockerClient.NetworkConnect(ctx, networkMode.UserDefined(), registry.Name, nil)
 		if err != nil {
 			return errors.Wrap(err, "connecting registry")
 		}
@@ -134,8 +133,7 @@ func (a *minikubeAdmin) ensureRegistryConnected(ctx context.Context, registry *a
 // https://github.com/tilt-dev/ctlptl/issues/144
 func (a *minikubeAdmin) ensureRegistryDisconnected(ctx context.Context, registry *api.Registry, networkMode container.NetworkMode) error {
 	if networkMode.IsUserDefined() && a.inRegistryNetwork(registry, networkMode) {
-		cmd := exec.CommandContext(ctx, "docker", "network", "disconnect", networkMode.UserDefined(), registry.Name)
-		err := cmd.Run()
+		err := a.dockerClient.NetworkDisconnect(ctx, networkMode.UserDefined(), registry.Name, false)
 		if err != nil {
 			return errors.Wrap(err, "disconnecting registry")
 		}

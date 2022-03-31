@@ -15,7 +15,7 @@ func TestNodeImage(t *testing.T) {
 		Out:    os.Stdout,
 		ErrOut: os.Stderr,
 	}
-	a := newKindAdmin(iostreams)
+	a := newKindAdmin(iostreams, &fakeDockerClient{})
 	ctx := context.Background()
 
 	img, err := a.getNodeImage(ctx, "v0.9.0", "v1.19")
