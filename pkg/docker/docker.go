@@ -25,7 +25,9 @@ func IsLocalHost(dockerHost string) bool {
 		strings.HasPrefix(dockerHost, "npipe:") ||
 
 		// https://github.com/moby/moby/blob/master/client/client_unix.go#L6
-		strings.HasPrefix(dockerHost, "unix:")
+		(strings.HasPrefix(dockerHost, "unix:") &&
+			// https://docs.docker.com/desktop/faqs/#how-do-i-connect-to-the-remote-docker-engine-api
+			strings.Contains(dockerHost, "/var/run/docker.sock"))
 }
 
 // ClientOpts returns an appropiate slice of client.Opt values for connecting to a Docker client.
