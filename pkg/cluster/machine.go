@@ -90,7 +90,7 @@ func (m dockerMachine) EnsureExists(ctx context.Context) error {
 		return nil
 	}
 
-	if !m.dockerClient.IsLocalHost() {
+	if !m.dockerClient.IsLocalDockerEngine() {
 		return fmt.Errorf("Detected remote DOCKER_HOST, but no Docker running. Host: %q. Error: %v",
 			docker.GetHostEnv(), err)
 	}
@@ -122,7 +122,7 @@ func (m dockerMachine) EnsureExists(ctx context.Context) error {
 func (m dockerMachine) Restart(ctx context.Context, desired, existing *api.Cluster) error {
 	canChangeCPUs := false
 	isLocalDockerDesktop := false
-	if m.dockerClient.IsLocalHost() && (m.os == "darwin" || m.os == "windows") {
+	if m.dockerClient.IsLocalDockerEngine() && (m.os == "darwin" || m.os == "windows") {
 		canChangeCPUs = true // DockerForMac and DockerForWindows can change the CPU on the VM
 		isLocalDockerDesktop = true
 	} else if clusterid.Product(desired.Product) == clusterid.ProductMinikube {

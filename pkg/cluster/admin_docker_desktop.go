@@ -28,8 +28,8 @@ func (a *dockerDesktopAdmin) Create(ctx context.Context, desired *api.Cluster, r
 		return fmt.Errorf("ctlptl currently does not support connecting a registry to docker-desktop")
 	}
 
-	isLocalHost := docker.IsLocalHost(a.host)
-	if !isLocalHost {
+	isLocalDockerEngine := docker.IsLocalDockerEngineHost(a.host)
+	if !isLocalDockerEngine {
 		return fmt.Errorf("docker-desktop clusters are only available on a local Docker engine. Current DOCKER_HOST: %s",
 			a.host)
 	}
@@ -45,8 +45,8 @@ func (a *dockerDesktopAdmin) LocalRegistryHosting(ctx context.Context, desired *
 }
 
 func (a *dockerDesktopAdmin) Delete(ctx context.Context, config *api.Cluster) error {
-	isLocalHost := docker.IsLocalHost(a.host)
-	if !isLocalHost {
+	isLocalDockerEngine := docker.IsLocalDockerEngineHost(a.host)
+	if !isLocalDockerEngine {
 		return fmt.Errorf("docker-desktop cannot be deleted from a remote DOCKER_HOST: %s", a.host)
 	}
 	if a.os != "darwin" && a.os != "windows" {
