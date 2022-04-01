@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tilt-dev/clusterid"
@@ -490,6 +493,21 @@ func (c *fakeDockerClient) ContainerInspect(ctx context.Context, id string) (typ
 }
 
 func (d *fakeDockerClient) ContainerRemove(ctx context.Context, id string, options types.ContainerRemoveOptions) error {
+	return nil
+}
+
+func (d *fakeDockerClient) ImagePull(ctx context.Context, image string, options types.ImagePullOptions) (io.ReadCloser, error) {
+	return nil, nil
+}
+
+func (d *fakeDockerClient) ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error) {
+	return nil, nil
+}
+
+func (d *fakeDockerClient) ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.ContainerCreateCreatedBody, error) {
+	return container.ContainerCreateCreatedBody{}, nil
+}
+func (d *fakeDockerClient) ContainerStart(ctx context.Context, containerID string, options types.ContainerStartOptions) error {
 	return nil
 }
 
