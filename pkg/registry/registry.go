@@ -3,14 +3,16 @@ package registry
 import (
 	"context"
 	"fmt"
-	osexec "os/exec"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
+	"github.com/docker/go-connections/nat"
 	"github.com/phayes/freeport"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
-	"github.com/tilt-dev/ctlptl/internal/exec"
+	"github.com/tilt-dev/ctlptl/internal/dctr"
 	"github.com/tilt-dev/ctlptl/internal/socat"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/docker"
@@ -51,28 +53,20 @@ func FillDefaults(registry *api.Registry) {
 	}
 }
 
-type ContainerClient interface {
-	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
-	ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error)
-	ContainerRemove(ctx context.Context, id string, options types.ContainerRemoveOptions) error
-}
-
 type socatController interface {
 	ConnectRemoteDockerPort(ctx context.Context, port int) error
 }
 
 type Controller struct {
 	iostreams    genericclioptions.IOStreams
-	dockerClient ContainerClient
-	runner       exec.CmdRunner
+	dockerClient dctr.Client
 	socat        socatController
 }
 
-func NewController(iostreams genericclioptions.IOStreams, dockerClient ContainerClient) (*Controller, error) {
+func NewController(iostreams genericclioptions.IOStreams, dockerClient dctr.Client) (*Controller, error) {
 	return &Controller{
 		iostreams:    iostreams,
 		dockerClient: dockerClient,
-		runner:       exec.RealCmdRunner{},
 		socat:        socat.NewController(dockerClient),
 	}, nil
 }
@@ -184,23 +178,6 @@ func (c *Controller) ipAndPortsFrom(ports []types.Port) (listenAddress string, h
 	return "unknown", 0, 0
 }
 
-func (c *Controller) ensureContainerDeleted(ctx context.Context, name string) error {
-	container, err := c.dockerClient.ContainerInspect(ctx, name)
-	if err != nil {
-		if client.IsErrNotFound(err) {
-			return nil
-		}
-		return err
-	}
-	if container.ContainerJSONBase == nil {
-		return nil
-	}
-
-	return c.dockerClient.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{
-		Force: true,
-	})
-}
-
 // Compare the desired registry against the existing registry, and reconcile
 // the two to match.
 func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Registry, error) {
@@ -246,29 +223,32 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 
 	_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Creating registry %q...\n", desired.Name)
 
-	err = c.ensureContainerDeleted(ctx, desired.Name)
+	err = dctr.RemoveIfNecessary(ctx, c.dockerClient, desired.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	portArgs, hostPort, err := c.portArgs(existing, desired)
+	exposedPorts, portBindings, hostPort, err := c.portConfigs(existing, desired)
 	if err != nil {
 		return nil, err
 	}
 
-	args := []string{"run", "-d", "--restart=always", "--name", desired.Name}
-	args = append(args, portArgs...)
-	args = append(args, c.labelArgs(existing, desired)...)
-	args = append(args, registryImageRef)
-
-	// TODO(nick): This sould be better as a docker ContainerCreate()/ContainerStart() call
-	// rather than assuming the user has a docker cli.
-	err = c.runner.Run(ctx, "docker", args...)
+	err = dctr.Run(
+		ctx,
+		c.dockerClient,
+		desired.Name,
+		&container.Config{
+			Hostname:     desired.Name,
+			Image:        registryImageRef,
+			ExposedPorts: exposedPorts,
+			Labels:       c.labelConfigs(existing, desired),
+		},
+		&container.HostConfig{
+			RestartPolicy: container.RestartPolicy{Name: "always"},
+			PortBindings:  portBindings,
+		},
+		&network.NetworkingConfig{})
 	if err != nil {
-		exitErr, ok := err.(*osexec.ExitError)
-		if ok {
-			_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Error: %s", string(exitErr.Stderr))
-		}
 		return nil, err
 	}
 
@@ -280,8 +260,8 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 	return c.Get(ctx, desired.Name)
 }
 
-// Compute the port arguments to the 'docker run' command
-func (c *Controller) portArgs(existing *api.Registry, desired *api.Registry) ([]string, int, error) {
+// Compute the ports to ContainerCreate() call
+func (c *Controller) portConfigs(existing *api.Registry, desired *api.Registry) (map[nat.Port]struct{}, map[nat.Port][]nat.PortBinding, int, error) {
 	// Preserve existing address by default
 	hostPort := existing.Status.HostPort
 	listenAddress := existing.Status.ListenAddress
@@ -298,7 +278,7 @@ func (c *Controller) portArgs(existing *api.Registry, desired *api.Registry) ([]
 	if hostPort == 0 {
 		freePort, err := freeport.GetFreePort()
 		if err != nil {
-			return nil, 0, fmt.Errorf("creating registry: %v", err)
+			return nil, nil, 0, fmt.Errorf("creating registry: %v", err)
 		}
 		hostPort = freePort
 	}
@@ -309,12 +289,23 @@ func (c *Controller) portArgs(existing *api.Registry, desired *api.Registry) ([]
 		listenAddress = "127.0.0.1"
 	}
 
-	portSpec := fmt.Sprintf("%s:%d:5000", listenAddress, hostPort)
-	return []string{"-p", portSpec}, hostPort, nil
+	port := nat.Port("5000/tcp")
+	portSet := map[nat.Port]struct{}{
+		port: struct{}{},
+	}
+	portMap := map[nat.Port][]nat.PortBinding{
+		port: []nat.PortBinding{
+			{
+				HostIP:   listenAddress,
+				HostPort: fmt.Sprintf("%d", hostPort),
+			},
+		},
+	}
+	return portSet, portMap, hostPort, nil
 }
 
-// Compute the label arguments to the 'docker run' command.
-func (c *Controller) labelArgs(existing *api.Registry, desired *api.Registry) []string {
+// Compute the label configs to the container create call.
+func (c *Controller) labelConfigs(existing *api.Registry, desired *api.Registry) map[string]string {
 	newLabels := make(map[string]string, len(existing.Status.Labels)+len(desired.Labels))
 
 	// Preserve existing labels.
@@ -327,13 +318,7 @@ func (c *Controller) labelArgs(existing *api.Registry, desired *api.Registry) []
 		newLabels[k] = v
 	}
 
-	// Convert to --label k=v format
-	args := make([]string, 0, len(newLabels))
-	for k, v := range newLabels {
-		args = append(args, fmt.Sprintf("-l=%s=%s", k, v))
-	}
-	sort.Strings(args)
-	return args
+	return newLabels
 }
 
 func (c *Controller) maybeCreateForwarder(ctx context.Context, port int) error {

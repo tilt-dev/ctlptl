@@ -9,24 +9,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/shirou/gopsutil/v3/process"
+	"github.com/tilt-dev/ctlptl/internal/dctr"
 	"github.com/tilt-dev/ctlptl/pkg/docker"
 )
 
 const serviceName = "ctlptl-portforward-service"
 
-type ContainerClient interface {
-	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
-	ContainerRemove(ctx context.Context, id string, options types.ContainerRemoveOptions) error
-}
-
 type Controller struct {
-	client ContainerClient
+	client dctr.Client
 }
 
-func NewController(client ContainerClient) *Controller {
+func NewController(client dctr.Client) *Controller {
 	return &Controller{client: client}
 }
 
@@ -57,24 +54,21 @@ func (c *Controller) ConnectRemoteDockerPort(ctx context.Context, port int) erro
 // Docker. This server accepts connections and routes them to localhost ports
 // on the same machine.
 func (c *Controller) StartRemotePortforwarder(ctx context.Context) error {
-	container, err := c.client.ContainerInspect(ctx, serviceName)
-	if err == nil && (container.ContainerJSONBase != nil && container.State.Running) {
-		// The service is already running!
-		return nil
-	} else if err == nil {
-		// The service exists, but is not running
-		err := c.client.ContainerRemove(ctx, serviceName, types.ContainerRemoveOptions{Force: true})
-		if err != nil {
-			return fmt.Errorf("creating remote portforwarder: %v", err)
-		}
-	} else if !client.IsErrNotFound(err) {
-		return fmt.Errorf("inspecting remote portforwarder: %v", err)
-	}
-
-	cmd := exec.Command("docker", "run", "-d", "-it",
-		"--name", serviceName, "--net=host", "--restart=always",
-		"--entrypoint", "/bin/sh", "alpine/socat", "-c", "while true; do sleep 1000; done")
-	return cmd.Run()
+	return dctr.Run(
+		ctx,
+		c.client,
+		serviceName,
+		&container.Config{
+			Hostname:   serviceName,
+			Image:      "alpine/socat",
+			Entrypoint: []string{"/bin/sh"},
+			Cmd:        []string{"-c", "while true; do sleep 1000; done"},
+		},
+		&container.HostConfig{
+			NetworkMode:   "host",
+			RestartPolicy: container.RestartPolicy{Name: "always"},
+		},
+		&network.NetworkingConfig{})
 }
 
 // Returns the socat process listening on a port, plus its commandline.

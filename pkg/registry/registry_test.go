@@ -2,16 +2,18 @@ package registry
 
 import (
 	"context"
-	"log"
+	"fmt"
+	"io"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tilt-dev/ctlptl/internal/exec"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -148,12 +150,9 @@ func TestApplyDeadRegistry(t *testing.T) {
 	deadRegistry.State = "dead"
 	f.docker.containers = []types.Container{deadRegistry}
 
-	// Running a command makes the registry come alive!
-	f.c.runner = exec.NewFakeCmdRunner(func(argv []string) {
-		assert.Equal(t, "docker", argv[0])
-		assert.Equal(t, "run", argv[1])
+	f.docker.onCreate = func() {
 		f.docker.containers = []types.Container{kindRegistry()}
-	})
+	}
 
 	registry, err := f.c.Apply(context.Background(), &api.Registry{
 		TypeMeta: typeMeta,
@@ -174,10 +173,9 @@ func TestApplyLabels(t *testing.T) {
 	// because it doesn't have the labels we want.
 	f.docker.containers = []types.Container{kindRegistry()}
 
-	f.runner = exec.NewFakeCmdRunner(func(argv []string) {
+	f.docker.onCreate = func() {
 		f.docker.containers = []types.Container{kindRegistry()}
-	})
-	f.c.runner = f.runner
+	}
 
 	registry, err := f.c.Apply(context.Background(), &api.Registry{
 		TypeMeta: typeMeta,
@@ -187,13 +185,12 @@ func TestApplyLabels(t *testing.T) {
 	if assert.NoError(t, err) {
 		assert.Equal(t, "running", registry.Status.State)
 	}
-	assert.Equal(t, []string{
-		"docker", "run", "-d", "--restart=always",
-		"--name", "kind-registry",
-		"-p", "127.0.0.1:5001:5000",
-		"-l=managed-by=ctlptl",
-		"docker.io/library/registry:2",
-	}, f.runner.LastArgs)
+	config := f.docker.lastCreateConfig
+	if assert.NotNil(t, config) {
+		assert.Equal(t, map[string]string{"managed-by": "ctlptl"}, config.Labels)
+		assert.Equal(t, "kind-registry", config.Hostname)
+		assert.Equal(t, "docker.io/library/registry:2", config.Image)
+	}
 }
 
 func TestPreservePort(t *testing.T) {
@@ -206,10 +203,9 @@ func TestPreservePort(t *testing.T) {
 	f.docker.containers = []types.Container{existingRegistry}
 
 	// Running a command makes the registry come alive!
-	f.runner = exec.NewFakeCmdRunner(func(argv []string) {
+	f.docker.onCreate = func() {
 		f.docker.containers = []types.Container{kindRegistry()}
-	})
-	f.c.runner = f.runner
+	}
 
 	registry, err := f.c.Apply(context.Background(), &api.Registry{
 		TypeMeta: typeMeta,
@@ -218,21 +214,48 @@ func TestPreservePort(t *testing.T) {
 	if assert.NoError(t, err) {
 		assert.Equal(t, "running", registry.Status.State)
 	}
-	assert.Equal(t, []string{
-		"docker", "run", "-d", "--restart=always",
-		"--name", "kind-registry",
-		"-p", "127.0.0.1:5010:5000",
-		"docker.io/library/registry:2",
-	}, f.runner.LastArgs)
+
+	config := f.docker.lastCreateConfig
+	if assert.NotNil(t, config) {
+		assert.Equal(t, map[string]string{}, config.Labels)
+		assert.Equal(t, "kind-registry", config.Hostname)
+		assert.Equal(t, "docker.io/library/registry:2", config.Image)
+	}
 }
 
 type fakeDocker struct {
 	containers           []types.Container
 	lastRemovedContainer string
+	lastCreateConfig     *container.Config
+	lastCreateHostConfig *container.HostConfig
+	onCreate             func()
+}
+
+type objectNotFoundError struct {
+	object string
+	id     string
+}
+
+func (e objectNotFoundError) NotFound() {}
+
+func (e objectNotFoundError) Error() string {
+	return fmt.Sprintf("Error: No such %s: %s", e.object, e.id)
 }
 
 func (d *fakeDocker) ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error) {
-	return types.ContainerJSON{}, nil
+	for _, c := range d.containers {
+		if c.ID == containerID {
+			return types.ContainerJSON{
+				ContainerJSONBase: &types.ContainerJSONBase{
+					State: &types.ContainerState{
+						Running: c.State == "running",
+					},
+				},
+			}, nil
+		}
+	}
+
+	return types.ContainerJSON{}, objectNotFoundError{"container", containerID}
 }
 
 func (d *fakeDocker) ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error) {
@@ -244,11 +267,26 @@ func (d *fakeDocker) ContainerRemove(ctx context.Context, id string, options typ
 	return nil
 }
 
+func (d *fakeDocker) ImagePull(ctx context.Context, image string, options types.ImagePullOptions) (io.ReadCloser, error) {
+	return nil, nil
+}
+
+func (d *fakeDocker) ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.ContainerCreateCreatedBody, error) {
+	d.lastCreateConfig = config
+	d.lastCreateHostConfig = hostConfig
+	if d.onCreate != nil {
+		d.onCreate()
+	}
+	return container.ContainerCreateCreatedBody{}, nil
+}
+func (d *fakeDocker) ContainerStart(ctx context.Context, containerID string, options types.ContainerStartOptions) error {
+	return nil
+}
+
 type fixture struct {
 	t      *testing.T
 	c      *Controller
 	docker *fakeDocker
-	runner *exec.FakeCmdRunner
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -257,16 +295,11 @@ func newFixture(t *testing.T) *fixture {
 	d := &fakeDocker{}
 	controller, err := NewController(
 		genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}, d)
-	runner := exec.NewFakeCmdRunner(func(argv []string) {
-		log.Println("No runner installed")
-	})
-	controller.runner = runner
 	require.NoError(t, err)
 	return &fixture{
 		t:      t,
 		docker: d,
 		c:      controller,
-		runner: runner,
 	}
 }
 
