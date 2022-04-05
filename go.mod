@@ -6,15 +6,17 @@ require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/docker/cli v20.10.13+incompatible
 	github.com/docker/docker v20.10.12+incompatible
+	github.com/docker/go-connections v0.4.0
 	github.com/google/go-cmp v0.5.5
 	github.com/mitchellh/go-homedir v1.1.0
+	github.com/opencontainers/image-spec v1.0.1
 	github.com/phayes/freeport v0.0.0-20180830031419-95f893ade6f2
 	github.com/pkg/errors v0.9.1
 	github.com/shirou/gopsutil/v3 v3.21.9
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
-	github.com/tilt-dev/clusterid v0.1.0
+	github.com/tilt-dev/clusterid v0.1.3
 	github.com/tilt-dev/localregistry-go v0.0.0-20201021185044-ffc4c827f097
 	github.com/tilt-dev/wmclient v0.0.0-20201109174454-1839d0355fbc
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
@@ -45,7 +47,6 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/denisbrodbeck/machineid v1.0.0 // indirect
 	github.com/docker/distribution v2.7.1+incompatible // indirect
-	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/form3tech-oss/jwt-go v3.2.3+incompatible // indirect
@@ -78,7 +79,6 @@ require (
 	github.com/onsi/ginkgo v1.14.2 // indirect
 	github.com/onsi/gomega v1.10.4 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/russross/blackfriday/v2 v2.0.1 // indirect
