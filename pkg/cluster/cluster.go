@@ -16,6 +16,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/tilt-dev/clusterid"
+	"github.com/tilt-dev/ctlptl/internal/exec"
 	"github.com/tilt-dev/ctlptl/internal/socat"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/docker"
@@ -82,6 +83,7 @@ type socatController interface {
 
 type Controller struct {
 	iostreams                   genericclioptions.IOStreams
+	runner                      exec.CmdRunner
 	config                      clientcmdapi.Config
 	clients                     map[string]kubernetes.Interface
 	admins                      map[clusterid.Product]Admin
@@ -127,6 +129,7 @@ func DefaultController(iostreams genericclioptions.IOStreams) (*Controller, erro
 
 	return &Controller{
 		iostreams:                   iostreams,
+		runner:                      exec.RealCmdRunner{},
 		config:                      config,
 		configWriter:                configWriter,
 		clients:                     make(map[string]kubernetes.Interface),
@@ -183,7 +186,7 @@ func (c *Controller) machine(ctx context.Context, name string, product clusterid
 	switch product {
 	case clusterid.ProductDockerDesktop, clusterid.ProductKIND, clusterid.ProductK3D:
 		if c.dmachine == nil {
-			machine, err := NewDockerMachine(ctx, dockerClient, c.iostreams.ErrOut)
+			machine, err := NewDockerMachine(ctx, dockerClient, c.iostreams)
 			if err != nil {
 				return nil, err
 			}
@@ -193,13 +196,13 @@ func (c *Controller) machine(ctx context.Context, name string, product clusterid
 
 	case clusterid.ProductMinikube:
 		if c.dmachine == nil {
-			machine, err := NewDockerMachine(ctx, dockerClient, c.iostreams.ErrOut)
+			machine, err := NewDockerMachine(ctx, dockerClient, c.iostreams)
 			if err != nil {
 				return nil, err
 			}
 			c.dmachine = machine
 		}
-		return newMinikubeMachine(name, c.dmachine), nil
+		return newMinikubeMachine(c.iostreams, c.runner, name, c.dmachine), nil
 	}
 
 	return unknownMachine{product: product}, nil
@@ -690,6 +693,13 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 		return nil, err
 	}
 
+	// EnsureExists may have to refresh the connection to the apiserver,
+	// so refresh our clients.
+	err = c.reloadConfigs()
+	if err != nil {
+		return nil, err
+	}
+
 	existingCluster, err := c.Get(ctx, desired.Name)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
@@ -702,6 +712,7 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 	// If we can't reconcile the two clusters, delete it now.
 	// TODO(nick): Check for a --force flag, and only delete the cluster
 	// if there's a --force.
+
 	err = c.deleteIfIrreconcilable(ctx, desired, existingCluster)
 	if err != nil {
 		return nil, err

@@ -1,10 +1,10 @@
 package cluster
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,10 +13,12 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/tilt-dev/clusterid"
+	cexec "github.com/tilt-dev/ctlptl/internal/exec"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/docker"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	klog "k8s.io/klog/v2"
 )
 
@@ -54,14 +56,14 @@ type d4mClient interface {
 }
 
 type dockerMachine struct {
+	iostreams    genericclioptions.IOStreams
 	dockerClient dockerClient
-	errOut       io.Writer
 	sleep        sleeper
 	d4m          d4mClient
 	os           string
 }
 
-func NewDockerMachine(ctx context.Context, client dockerClient, errOut io.Writer) (*dockerMachine, error) {
+func NewDockerMachine(ctx context.Context, client dockerClient, iostreams genericclioptions.IOStreams) (*dockerMachine, error) {
 	d4m, err := NewDockerDesktopClient()
 	if err != nil {
 		return nil, err
@@ -69,14 +71,14 @@ func NewDockerMachine(ctx context.Context, client dockerClient, errOut io.Writer
 
 	return &dockerMachine{
 		dockerClient: client,
-		errOut:       errOut,
+		iostreams:    iostreams,
 		sleep:        time.Sleep,
 		d4m:          d4m,
 		os:           runtime.GOOS,
 	}, nil
 }
 
-func (m dockerMachine) CPUs(ctx context.Context) (int, error) {
+func (m *dockerMachine) CPUs(ctx context.Context) (int, error) {
 	info, err := m.dockerClient.Info(ctx)
 	if err != nil {
 		return 0, err
@@ -84,7 +86,7 @@ func (m dockerMachine) CPUs(ctx context.Context) (int, error) {
 	return info.NCPU, nil
 }
 
-func (m dockerMachine) EnsureExists(ctx context.Context) error {
+func (m *dockerMachine) EnsureExists(ctx context.Context) error {
 	_, err := m.dockerClient.ServerVersion(ctx)
 	if err == nil {
 		return nil
@@ -103,7 +105,7 @@ func (m dockerMachine) EnsureExists(ctx context.Context) error {
 		}
 
 		dur := 60 * time.Second
-		_, _ = fmt.Fprintf(m.errOut, "Waiting %s for Docker Desktop to boot...\n", duration.ShortHumanDuration(dur))
+		_, _ = fmt.Fprintf(m.iostreams.ErrOut, "Waiting %s for Docker Desktop to boot...\n", duration.ShortHumanDuration(dur))
 		err = wait.Poll(time.Second, dur, func() (bool, error) {
 			_, err := m.dockerClient.ServerVersion(ctx)
 			isSuccess := err == nil
@@ -119,7 +121,7 @@ func (m dockerMachine) EnsureExists(ctx context.Context) error {
 	return fmt.Errorf("Please install Docker for Linux: https://docs.docker.com/engine/install/")
 }
 
-func (m dockerMachine) Restart(ctx context.Context, desired, existing *api.Cluster) error {
+func (m *dockerMachine) Restart(ctx context.Context, desired, existing *api.Cluster) error {
 	canChangeCPUs := false
 	isLocalDockerDesktop := false
 	if m.dockerClient.IsLocalDockerEngine() && (m.os == "darwin" || m.os == "windows") {
@@ -160,7 +162,7 @@ func (m dockerMachine) Restart(ctx context.Context, desired, existing *api.Clust
 			}
 
 			dur := 120 * time.Second
-			_, _ = fmt.Fprintf(m.errOut,
+			_, _ = fmt.Fprintf(m.iostreams.ErrOut,
 				"Applied new Docker Desktop settings. Waiting %s for Docker Desktop to restart...\n",
 				duration.ShortHumanDuration(dur))
 
@@ -184,14 +186,18 @@ func (m dockerMachine) Restart(ctx context.Context, desired, existing *api.Clust
 // Currently, out Minikube admin only supports Minikube on Docker,
 // so we delegate to the dockerMachine driver.
 type minikubeMachine struct {
-	dm   *dockerMachine
-	name string
+	iostreams genericclioptions.IOStreams
+	runner    cexec.CmdRunner
+	dm        *dockerMachine
+	name      string
 }
 
-func newMinikubeMachine(name string, dm *dockerMachine) *minikubeMachine {
+func newMinikubeMachine(iostreams genericclioptions.IOStreams, runner cexec.CmdRunner, name string, dm *dockerMachine) *minikubeMachine {
 	return &minikubeMachine{
-		name: name,
-		dm:   dm,
+		iostreams: iostreams,
+		runner:    runner,
+		name:      name,
+		dm:        dm,
 	}
 }
 
@@ -221,9 +227,53 @@ func (m *minikubeMachine) CPUs(ctx context.Context) (int, error) {
 }
 
 func (m *minikubeMachine) EnsureExists(ctx context.Context) error {
-	return m.dm.EnsureExists(ctx)
+	err := m.dm.EnsureExists(ctx)
+	if err != nil {
+		return err
+	}
+
+	m.startIfStopped(ctx)
+	return nil
 }
 
 func (m *minikubeMachine) Restart(ctx context.Context, desired, existing *api.Cluster) error {
 	return m.dm.Restart(ctx, desired, existing)
+}
+
+// Minikube is special because the "machine" can be stopped temporarily.
+// Check to see if there's a stopped machine, and start it.
+// Never return an error - if we can't proceed, we'll just restart from scratch.
+func (m *minikubeMachine) startIfStopped(ctx context.Context) {
+	out := bytes.NewBuffer(nil)
+
+	// Ignore errors. `minikube status` returns a non-zero exit code when
+	// the container has been stopped.
+	_ = m.runner.RunIO(ctx, genericclioptions.IOStreams{Out: out, ErrOut: m.iostreams.ErrOut},
+		"minikube", "status", "-p", m.name, "-o", "json")
+
+	status := minikubeStatus{}
+	decoder := json.NewDecoder(out)
+	err := decoder.Decode(&status)
+	if err != nil {
+		return
+	}
+
+	// Handle 'minikube stop'
+	if status.Host == "Stopped" {
+		_, _ = fmt.Fprintf(m.iostreams.ErrOut, "Cluster %q exists but is stopped. Starting...\n", m.name)
+		_ = m.runner.RunIO(ctx, m.iostreams, "minikube", "start", "-p", m.name)
+		return
+	}
+
+	// Handle 'minikube pause'
+	if status.APIServer == "Stopped" {
+		_, _ = fmt.Fprintf(m.iostreams.ErrOut, "Cluster %q exists but is paused. Starting...\n", m.name)
+		_ = m.runner.RunIO(ctx, m.iostreams, "minikube", "unpause", "-p", m.name)
+		return
+	}
+}
+
+type minikubeStatus struct {
+	Host      string
+	APIServer string
 }
