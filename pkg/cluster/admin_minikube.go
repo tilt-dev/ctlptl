@@ -83,6 +83,9 @@ func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, regist
 	if desired.KubernetesVersion != "" {
 		args = append(args, "--kubernetes-version", desired.KubernetesVersion)
 	}
+	if registry != nil {
+		args = append(args, "--insecure-registry", fmt.Sprintf("%s:%d", registry.Name, registry.Status.ContainerPort))
+	}
 
 	in := strings.NewReader("")
 
@@ -151,6 +154,9 @@ func (a *minikubeAdmin) ensureRegistryDisconnected(ctx context.Context, registry
 	return nil
 }
 
+// We still patch containerd so that the user can push/pull from localhost.
+// But note that this will NOT survive across minikube stop and start.
+// See https://github.com/tilt-dev/ctlptl/issues/180
 func (a *minikubeAdmin) applyContainerdPatch(ctx context.Context, desired *api.Cluster, registry *api.Registry, networkMode container.NetworkMode) error {
 	configPath := "/etc/containerd/config.toml"
 
@@ -191,12 +197,8 @@ func (a *minikubeAdmin) applyContainerdPatch(ctx context.Context, desired *api.C
 			fmt.Sprintf(
 				`s,\\\[plugins.\\\(\\\"\\\?.*cri\\\"\\\?\\\).registry.mirrors\\\],[plugins.\\\1.registry.mirrors]\\\n`+
 					`\ \ \ \ \ \ \ \ [plugins.\\\1.registry.mirrors.\\\"localhost:%d\\\"]\\\n`+
-					`\ \ \ \ \ \ \ \ \ \ endpoint\ =\ [\\\"http://%s:%d\\\"]\\\n`+
-					`\ \ \ \ \ \ \ \ [plugins.\\\1.registry.mirrors.\\\"%s:%d\\\"]\\\n`+
 					`\ \ \ \ \ \ \ \ \ \ endpoint\ =\ [\\\"http://%s:%d\\\"],`,
-				registry.Status.HostPort, networkHost, registry.Status.ContainerPort,
-				networkHost, registry.Status.ContainerPort,
-				networkHost, registry.Status.ContainerPort),
+				registry.Status.HostPort, networkHost, registry.Status.ContainerPort),
 			configPath)
 		cmd.Stderr = a.iostreams.ErrOut
 		cmd.Stdout = a.iostreams.Out
@@ -238,9 +240,10 @@ func (a *minikubeAdmin) LocalRegistryHosting(ctx context.Context, desired *api.C
 	}
 
 	return &localregistry.LocalRegistryHostingV1{
-		Host:                   fmt.Sprintf("localhost:%d", registry.Status.HostPort),
-		HostFromClusterNetwork: fmt.Sprintf("%s:%d", networkHost, registry.Status.ContainerPort),
-		Help:                   "https://github.com/tilt-dev/ctlptl",
+		Host:                     fmt.Sprintf("localhost:%d", registry.Status.HostPort),
+		HostFromClusterNetwork:   fmt.Sprintf("%s:%d", networkHost, registry.Status.ContainerPort),
+		HostFromContainerRuntime: fmt.Sprintf("%s:%d", networkHost, registry.Status.ContainerPort),
+		Help:                     "https://github.com/tilt-dev/ctlptl",
 	}, nil
 }
 
