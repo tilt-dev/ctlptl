@@ -242,6 +242,10 @@ func (e objectNotFoundError) Error() string {
 	return fmt.Sprintf("Error: No such %s: %s", e.object, e.id)
 }
 
+func (d *fakeDocker) DaemonHost() string {
+	return ""
+}
+
 func (d *fakeDocker) ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error) {
 	for _, c := range d.containers {
 		if c.ID == containerID {
@@ -293,9 +297,8 @@ func newFixture(t *testing.T) *fixture {
 	_ = os.Setenv("DOCKER_HOST", "")
 
 	d := &fakeDocker{}
-	controller, err := NewController(
+	controller := NewController(
 		genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}, d)
-	require.NoError(t, err)
 	return &fixture{
 		t:      t,
 		docker: d,

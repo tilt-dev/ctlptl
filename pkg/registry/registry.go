@@ -11,7 +11,6 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/phayes/freeport"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -63,27 +62,25 @@ type Controller struct {
 	socat        socatController
 }
 
-func NewController(iostreams genericclioptions.IOStreams, dockerClient dctr.Client) (*Controller, error) {
+func NewController(iostreams genericclioptions.IOStreams, dockerClient dctr.Client) *Controller {
+	return &Controller{
+		iostreams:    iostreams,
+		dockerClient: dockerClient,
+		socat:        socat.NewController(dockerClient),
+	}
+}
+
+func DefaultController(iostreams genericclioptions.IOStreams) (*Controller, error) {
+	dockerClient, err := dctr.NewAPIClient(iostreams)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Controller{
 		iostreams:    iostreams,
 		dockerClient: dockerClient,
 		socat:        socat.NewController(dockerClient),
 	}, nil
-}
-
-func DefaultController(ctx context.Context, iostreams genericclioptions.IOStreams) (*Controller, error) {
-	opts, err := docker.ClientOpts()
-	if err != nil {
-		return nil, err
-	}
-	dockerClient, err := client.NewClientWithOpts(opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	dockerClient.NegotiateAPIVersion(ctx)
-
-	return NewController(iostreams, dockerClient)
 }
 
 func (c *Controller) Get(ctx context.Context, name string) (*api.Registry, error) {
@@ -322,7 +319,7 @@ func (c *Controller) labelConfigs(existing *api.Registry, desired *api.Registry)
 }
 
 func (c *Controller) maybeCreateForwarder(ctx context.Context, port int) error {
-	if docker.IsLocalHost(docker.GetHostEnv()) {
+	if docker.IsLocalHost(c.dockerClient.DaemonHost()) {
 		return nil
 	}
 

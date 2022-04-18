@@ -6,15 +6,20 @@ import (
 	"io"
 	"io/ioutil"
 
+	"github.com/docker/cli/cli/command"
+	"github.com/docker/cli/cli/flags"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/spf13/pflag"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 // Docker Container client.
 type Client interface {
+	DaemonHost() string
 	ImagePull(ctx context.Context, image string, options types.ImagePullOptions) (io.ReadCloser, error)
 
 	ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error)
@@ -22,6 +27,26 @@ type Client interface {
 	ContainerRemove(ctx context.Context, id string, options types.ContainerRemoveOptions) error
 	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.ContainerCreateCreatedBody, error)
 	ContainerStart(ctx context.Context, containerID string, options types.ContainerStartOptions) error
+}
+
+func NewAPIClient(streams genericclioptions.IOStreams) (client.APIClient, error) {
+	dockerCli, err := command.NewDockerCli(
+		command.WithOutputStream(streams.Out),
+		command.WithErrorStream(streams.ErrOut))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new docker API: %v", err)
+	}
+
+	newClientOpts := flags.NewClientOptions()
+	flagset := pflag.NewFlagSet("docker", pflag.ContinueOnError)
+	newClientOpts.Common.InstallFlags(flagset)
+	newClientOpts.Common.SetDefaultOptions(flagset)
+
+	err = dockerCli.Initialize(newClientOpts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize docker API: %w", err)
+	}
+	return dockerCli.Client(), nil
 }
 
 // A simplified remove-container-if-necessary helper.

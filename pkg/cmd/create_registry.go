@@ -52,7 +52,7 @@ func (o *CreateRegistryOptions) Command() *cobra.Command {
 }
 
 func (o *CreateRegistryOptions) Run(cmd *cobra.Command, args []string) {
-	controller, err := registry.DefaultController(context.Background(), o.IOStreams)
+	controller, err := registry.DefaultController(o.IOStreams)
 	if err != nil {
 		_, _ = fmt.Fprintf(o.ErrOut, "%v\n", err)
 		os.Exit(1)

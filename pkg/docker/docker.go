@@ -1,17 +1,8 @@
 package docker
 
 import (
-	"net/http"
-	"os"
 	"strings"
-
-	"github.com/docker/cli/cli/connhelper"
-	"github.com/docker/docker/client"
 )
-
-func GetHostEnv() string {
-	return os.Getenv("DOCKER_HOST")
-}
 
 // Checks whether the Docker daemon is running on a local machine.
 // Remote docker daemons will likely need a port forwarder to work properly.
@@ -44,50 +35,4 @@ func IsLocalDockerEngineHost(dockerHost string) bool {
 
 	// Docker daemons on other local protocols are treated as docker desktop.
 	return IsLocalHost(dockerHost)
-}
-
-// ClientOpts returns an appropiate slice of client.Opt values for connecting to a Docker client.
-// It can support using SSH connections via the Docker CLI's connection helpers if the DOCKER_HOST
-// environment variable is an SSH url, otherwise it will return client.FromEnv for a standard
-// connection. This function returns an error if DOCKER_HOST is an invalid URL.
-func ClientOpts() ([]client.Opt, error) {
-	opts := []client.Opt{client.FromEnv}
-	connHelperOpts, err := connectionHelperOpts()
-	if err != nil {
-		return nil, err
-	}
-	if connHelperOpts != nil {
-		opts = append(opts, connHelperOpts...)
-	}
-	return opts, nil
-}
-
-// connectionHelperOpts uses the Docker CLI's connection helpers to check if the DOCKER_HOST
-// setting needs some special connection functionality, namely SSH. If it does, it will return
-// a list of appropriate client options. If not, it will return nil.
-func connectionHelperOpts() ([]client.Opt, error) {
-	dockerHost := GetHostEnv()
-	if dockerHost != "" {
-		helper, err := connhelper.GetConnectionHelper(dockerHost)
-		if err != nil {
-			return nil, err
-		}
-
-		if helper != nil {
-			// Create an HTTP client with a transport that reads from the connection helper's
-			// custom stream without TLS.
-			httpClient := &http.Client{
-				Transport: &http.Transport{
-					DialContext: helper.Dialer,
-				},
-			}
-			return []client.Opt{
-				client.WithHTTPClient(httpClient),
-				client.WithHost(helper.Host),
-				client.WithDialContext(helper.Dialer),
-			}, nil
-		}
-
-	}
-	return nil, nil
 }

@@ -92,9 +92,10 @@ func (m *dockerMachine) EnsureExists(ctx context.Context) error {
 		return nil
 	}
 
-	if !m.dockerClient.IsLocalDockerEngine() {
+	host := m.dockerClient.DaemonHost()
+	if !docker.IsLocalDockerEngineHost(host) {
 		return fmt.Errorf("Detected remote DOCKER_HOST, but no Docker running. Host: %q. Error: %v",
-			docker.GetHostEnv(), err)
+			host, err)
 	}
 
 	klog.V(2).Infoln("No Docker daemon running. Attempting to start Docker.")
@@ -124,7 +125,7 @@ func (m *dockerMachine) EnsureExists(ctx context.Context) error {
 func (m *dockerMachine) Restart(ctx context.Context, desired, existing *api.Cluster) error {
 	canChangeCPUs := false
 	isLocalDockerDesktop := false
-	if m.dockerClient.IsLocalDockerEngine() && (m.os == "darwin" || m.os == "windows") {
+	if docker.IsLocalDockerEngineHost(m.dockerClient.DaemonHost()) && (m.os == "darwin" || m.os == "windows") {
 		canChangeCPUs = true // DockerForMac and DockerForWindows can change the CPU on the VM
 		isLocalDockerDesktop = true
 	} else if clusterid.Product(desired.Product) == clusterid.ProductMinikube {
