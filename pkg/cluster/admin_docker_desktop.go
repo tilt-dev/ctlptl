@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"runtime"
 
+	"github.com/tilt-dev/localregistry-go"
+
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/docker"
-	"github.com/tilt-dev/localregistry-go"
 )
 
 // The DockerDesktop manages the Kubernetes cluster for DockerDesktop.

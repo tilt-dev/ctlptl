@@ -13,13 +13,14 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/tilt-dev/clusterid"
-	cexec "github.com/tilt-dev/ctlptl/internal/exec"
-	"github.com/tilt-dev/ctlptl/pkg/api"
-	"github.com/tilt-dev/ctlptl/pkg/docker"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	klog "k8s.io/klog/v2"
+
+	cexec "github.com/tilt-dev/ctlptl/internal/exec"
+	"github.com/tilt-dev/ctlptl/pkg/api"
+	"github.com/tilt-dev/ctlptl/pkg/docker"
 )
 
 type Machine interface {

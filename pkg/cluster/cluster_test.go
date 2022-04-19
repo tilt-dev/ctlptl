@@ -16,9 +16,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tilt-dev/clusterid"
-	"github.com/tilt-dev/ctlptl/internal/exec"
-	"github.com/tilt-dev/ctlptl/pkg/api"
-	"github.com/tilt-dev/ctlptl/pkg/registry"
 	"github.com/tilt-dev/localregistry-go"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -32,6 +29,10 @@ import (
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/kind/pkg/apis/config/v1alpha4"
+
+	"github.com/tilt-dev/ctlptl/internal/exec"
+	"github.com/tilt-dev/ctlptl/pkg/api"
+	"github.com/tilt-dev/ctlptl/pkg/registry"
 )
 
 func TestClusterGet(t *testing.T) {

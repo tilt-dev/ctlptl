@@ -21,11 +21,12 @@ import (
 	"io"
 	"strings"
 
-	"github.com/tilt-dev/ctlptl/pkg/api"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"github.com/tilt-dev/ctlptl/pkg/api"
 )
 
 // NOTE(nick): A fork of the NamePrinter that supports ctlptl types, which don't have a full object metadata

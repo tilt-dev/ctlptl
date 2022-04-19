@@ -7,9 +7,10 @@ import (
 	"strconv"
 
 	"github.com/spf13/cobra"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+
 	"github.com/tilt-dev/ctlptl/internal/dctr"
 	"github.com/tilt-dev/ctlptl/internal/socat"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 func NewSocatCommand() *cobra.Command {

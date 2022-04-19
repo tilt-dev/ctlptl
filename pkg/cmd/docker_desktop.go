@@ -8,8 +8,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/tilt-dev/ctlptl/pkg/cluster"
 	"gopkg.in/yaml.v3"
+
+	"github.com/tilt-dev/ctlptl/pkg/cluster"
 )
 
 func NewDockerDesktopCommand() *cobra.Command {

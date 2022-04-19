@@ -9,10 +9,11 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/pkg/errors"
-	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/localregistry-go"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/klog/v2"
+
+	"github.com/tilt-dev/ctlptl/pkg/api"
 )
 
 // minikubeAdmin uses the minikube CLI to manipulate a minikube cluster,

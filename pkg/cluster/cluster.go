@@ -16,12 +16,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/tilt-dev/clusterid"
-	"github.com/tilt-dev/ctlptl/internal/dctr"
-	"github.com/tilt-dev/ctlptl/internal/exec"
-	"github.com/tilt-dev/ctlptl/internal/socat"
-	"github.com/tilt-dev/ctlptl/pkg/api"
-	"github.com/tilt-dev/ctlptl/pkg/docker"
-	"github.com/tilt-dev/ctlptl/pkg/registry"
 	"github.com/tilt-dev/localregistry-go"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
@@ -39,6 +33,13 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
+
+	"github.com/tilt-dev/ctlptl/internal/dctr"
+	"github.com/tilt-dev/ctlptl/internal/exec"
+	"github.com/tilt-dev/ctlptl/internal/socat"
+	"github.com/tilt-dev/ctlptl/pkg/api"
+	"github.com/tilt-dev/ctlptl/pkg/docker"
+	"github.com/tilt-dev/ctlptl/pkg/registry"
 
 	// Client auth plugins! They will auto-init if we import them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"

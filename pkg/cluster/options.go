@@ -1,8 +1,9 @@
 package cluster
 
 import (
-	"github.com/tilt-dev/ctlptl/pkg/api"
 	"k8s.io/apimachinery/pkg/fields"
+
+	"github.com/tilt-dev/ctlptl/pkg/api"
 )
 
 type ListOptions struct {

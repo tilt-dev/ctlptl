@@ -3,8 +3,9 @@ package cluster
 import (
 	"context"
 
-	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/localregistry-go"
+
+	"github.com/tilt-dev/ctlptl/pkg/api"
 )
 
 // A cluster admin provides the basic start/stop functionality of a cluster,
