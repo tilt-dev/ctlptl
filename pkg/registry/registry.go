@@ -31,7 +31,7 @@ var (
 	groupResource = schema.GroupResource{Group: "ctlptl.dev", Resource: "registries"}
 )
 
-const registryImageRef = "docker.io/library/registry:2" // The registry everyone uses.
+const DefaultRegistryImageRef = "docker.io/library/registry:2" // The registry everyone uses.
 
 // https://github.com/moby/moby/blob/v20.10.3/api/types/types.go#L313
 const containerStateRunning = "running"
@@ -50,6 +50,15 @@ func FillDefaults(registry *api.Registry) {
 	if registry.Name == "" {
 		registry.Name = "ctlptl-registry"
 	}
+
+	if registry.Image == "" {
+		registry.Image = DefaultRegistryImageRef
+	}
+
+	if registry.Labels == nil {
+		registry.Labels = make(map[string]string)
+	}
+	registry.Labels[docker.ContainerLabelRole] = "registry"
 }
 
 type socatController interface {
@@ -103,15 +112,19 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 		return nil, err
 	}
 
-	filterArgs := filters.NewArgs()
-	filterArgs.Add("ancestor", registryImageRef)
-
-	containers, err := c.dockerClient.ContainerList(ctx, types.ContainerListOptions{
-		Filters: filterArgs,
-		All:     true,
-	})
+	containers, err := c.listContainers(ctx, filters.NewArgs(
+		filters.Arg("label", fmt.Sprintf("%s=registry", docker.ContainerLabelRole))))
 	if err != nil {
 		return nil, err
+	}
+	if len(containers) == 0 {
+		// ctlptl did not always label its registries, so fallback to using the
+		// default registry image ref as a filter
+		containers, err = c.listContainers(ctx, filters.NewArgs(
+			filters.Arg("ancestor", DefaultRegistryImageRef)))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	result := []api.Registry{}
@@ -152,6 +165,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 				Networks:          networks,
 				State:             container.State,
 				Labels:            container.Labels,
+				Image:             container.Image,
 			},
 		}
 
@@ -191,6 +205,9 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 	needsDelete := false
 	if existing.Port != 0 && desired.Port != 0 && existing.Port != desired.Port {
 		// If the port has changed, let's delete the registry and recreate it.
+		needsDelete = true
+	}
+	if existing.Status.Image != desired.Image {
 		needsDelete = true
 	}
 	if existing.Status.State != containerStateRunning {
@@ -236,7 +253,7 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 		desired.Name,
 		&container.Config{
 			Hostname:     desired.Name,
-			Image:        registryImageRef,
+			Image:        desired.Image,
 			ExposedPorts: exposedPorts,
 			Labels:       c.labelConfigs(existing, desired),
 		},
@@ -323,8 +340,20 @@ func (c *Controller) maybeCreateForwarder(ctx context.Context, port int) error {
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(c.iostreams.ErrOut, " 🎮 Env DOCKER_HOST set. Assuming remote Docker and forwarding registry to localhost:%d\n", port)
+	_, _ = fmt.Fprintf(c.iostreams.ErrOut,
+		" 🎮 Env DOCKER_HOST set. Assuming remote Docker and forwarding registry to localhost:%d\n", port)
 	return c.socat.ConnectRemoteDockerPort(ctx, port)
+}
+
+func (c *Controller) listContainers(ctx context.Context, filterArgs filters.Args) ([]types.Container, error) {
+	containers, err := c.dockerClient.ContainerList(ctx, types.ContainerListOptions{
+		Filters: filterArgs,
+		All:     true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return containers, nil
 }
 
 // Delete the given registry.

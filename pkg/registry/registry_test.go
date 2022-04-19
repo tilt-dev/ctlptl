@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
@@ -28,6 +29,7 @@ func kindRegistry() types.Container {
 		ImageID: "sha256:2d4f4b5309b1e41b4f83ae59b44df6d673ef44433c734b14c1c103ebca82c116",
 		Command: "/entrypoint.sh /etc/docker/registry/config.yml",
 		Created: 1603483645,
+		Labels:  map[string]string{"dev.tilt.ctlptl.role": "registry"},
 		Ports: []types.Port{
 			types.Port{IP: "127.0.0.1", PrivatePort: 5000, PublicPort: 5001, Type: "tcp"},
 		},
@@ -56,6 +58,7 @@ func kindRegistryLoopback() types.Container {
 		ImageID: "sha256:2d4f4b5309b1e41b4f83ae59b44df6d673ef44433c734b14c1c103ebca82c116",
 		Command: "/entrypoint.sh /etc/docker/registry/config.yml",
 		Created: 1603483645,
+		Labels:  map[string]string{"dev.tilt.ctlptl.role": "registry"},
 		Ports: []types.Port{
 			types.Port{IP: "127.0.0.1", PrivatePort: 5000, PublicPort: 5001, Type: "tcp"},
 		},
@@ -76,17 +79,22 @@ func kindRegistryLoopback() types.Container {
 	}
 }
 
-func TestListRegistries(t *testing.T) {
+func TestListRegistriesRoleLabel(t *testing.T) {
 	f := newFixture(t)
 	defer f.TearDown()
 
-	f.docker.containers = []types.Container{kindRegistry(), kindRegistryLoopback()}
+	// only the first container should be seen because it's the one with
+	// the `dev.tilt.ctlptl.role=registry` label, and we only fallback to
+	// matching by image if there are NO registries with the label
+	otherReg := kindRegistryLoopback()
+	otherReg.Labels = nil
+	f.docker.containers = []types.Container{kindRegistry(), otherReg}
 
 	list, err := f.c.List(context.Background(), ListOptions{})
 	require.NoError(t, err)
 
-	require.Equal(t, 2, len(list.Items))
-	assert.Equal(t, list.Items[0], api.Registry{
+	require.Len(t, list.Items, 1)
+	assert.Equal(t, api.Registry{
 		TypeMeta: typeMeta,
 		Name:     "kind-registry",
 		Port:     5001,
@@ -99,9 +107,45 @@ func TestListRegistries(t *testing.T) {
 			Networks:          []string{"bridge", "kind"},
 			ContainerID:       "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
 			State:             "running",
+			Labels:            map[string]string{"dev.tilt.ctlptl.role": "registry"},
+			Image:             "registry:2",
 		},
-	})
-	assert.Equal(t, list.Items[1], api.Registry{
+	}, list.Items[0])
+}
+
+func TestListRegistriesImageRefFallback(t *testing.T) {
+	f := newFixture(t)
+	defer f.TearDown()
+
+	f.docker.containers = []types.Container{kindRegistry(), kindRegistryLoopback()}
+	for i := range f.docker.containers {
+		delete(f.docker.containers[i].Labels, "dev.tilt.ctlptl.role")
+		if len(f.docker.containers[i].Labels) == 0 {
+			f.docker.containers[i].Labels = nil
+		}
+	}
+
+	list, err := f.c.List(context.Background(), ListOptions{})
+	require.NoError(t, err)
+
+	require.Len(t, list.Items, 2)
+	assert.Equal(t, api.Registry{
+		TypeMeta: typeMeta,
+		Name:     "kind-registry",
+		Port:     5001,
+		Status: api.RegistryStatus{
+			CreationTimestamp: metav1.Time{Time: time.Unix(1603483645, 0)},
+			HostPort:          5001,
+			ContainerPort:     5000,
+			IPAddress:         "172.0.1.2",
+			ListenAddress:     "127.0.0.1",
+			Networks:          []string{"bridge", "kind"},
+			ContainerID:       "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
+			State:             "running",
+			Image:             "registry:2",
+		},
+	}, list.Items[0])
+	assert.Equal(t, api.Registry{
 		TypeMeta: typeMeta,
 		Name:     "kind-registry-loopback",
 		Port:     5001,
@@ -114,8 +158,9 @@ func TestListRegistries(t *testing.T) {
 			Networks:          []string{"bridge", "kind"},
 			ContainerID:       "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
 			State:             "running",
+			Image:             "registry:2",
 		},
-	})
+	}, list.Items[1])
 }
 
 func TestGetRegistry(t *testing.T) {
@@ -126,7 +171,7 @@ func TestGetRegistry(t *testing.T) {
 
 	registry, err := f.c.Get(context.Background(), "kind-registry")
 	require.NoError(t, err)
-	assert.Equal(t, *registry, api.Registry{
+	assert.Equal(t, &api.Registry{
 		TypeMeta: typeMeta,
 		Name:     "kind-registry",
 		Port:     5001,
@@ -139,8 +184,10 @@ func TestGetRegistry(t *testing.T) {
 			Networks:          []string{"bridge", "kind"},
 			ContainerID:       "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
 			State:             "running",
+			Labels:            map[string]string{"dev.tilt.ctlptl.role": "registry"},
+			Image:             "registry:2",
 		},
-	})
+	}, registry)
 }
 
 func TestApplyDeadRegistry(t *testing.T) {
@@ -188,7 +235,10 @@ func TestApplyLabels(t *testing.T) {
 	}
 	config := f.docker.lastCreateConfig
 	if assert.NotNil(t, config) {
-		assert.Equal(t, map[string]string{"managed-by": "ctlptl"}, config.Labels)
+		assert.Equal(t, map[string]string{
+			"managed-by":           "ctlptl",
+			"dev.tilt.ctlptl.role": "registry",
+		}, config.Labels)
 		assert.Equal(t, "kind-registry", config.Hostname)
 		assert.Equal(t, "docker.io/library/registry:2", config.Image)
 	}
@@ -218,9 +268,48 @@ func TestPreservePort(t *testing.T) {
 
 	config := f.docker.lastCreateConfig
 	if assert.NotNil(t, config) {
-		assert.Equal(t, map[string]string{}, config.Labels)
+		assert.Equal(t, map[string]string{"dev.tilt.ctlptl.role": "registry"}, config.Labels)
 		assert.Equal(t, "kind-registry", config.Hostname)
 		assert.Equal(t, "docker.io/library/registry:2", config.Image)
+	}
+}
+
+func TestCustomImage(t *testing.T) {
+	f := newFixture(t)
+	defer f.TearDown()
+
+	// Make sure the previous registry is wiped out
+	// because it doesn't have the image we want.
+	f.docker.containers = []types.Container{kindRegistry()}
+
+	f.docker.onCreate = func() {
+		f.docker.containers = []types.Container{kindRegistry()}
+	}
+
+	// ensure stable w/o image change
+	registry, err := f.c.Apply(context.Background(), &api.Registry{
+		TypeMeta: typeMeta,
+		Name:     "kind-registry",
+		Image:    "registry:2",
+	})
+	if assert.NoError(t, err) {
+		assert.Nil(t, f.docker.lastCreateConfig, "Registry should not have been re-created")
+	}
+
+	// change image, should be (re)created
+	registry, err = f.c.Apply(context.Background(), &api.Registry{
+		TypeMeta: typeMeta,
+		Name:     "kind-registry",
+		Image:    "fake.tilt.dev/different-registry-image:latest",
+	})
+	if assert.NoError(t, err) {
+		assert.Equal(t, "running", registry.Status.State)
+	}
+	config := f.docker.lastCreateConfig
+	if assert.NotNil(t, config) {
+		assert.Equal(t, map[string]string{"dev.tilt.ctlptl.role": "registry"}, config.Labels)
+		assert.Equal(t, "kind-registry", config.Hostname)
+		assert.Equal(t, "fake.tilt.dev/different-registry-image:latest", config.Image)
 	}
 }
 
@@ -264,7 +353,20 @@ func (d *fakeDocker) ContainerInspect(ctx context.Context, containerID string) (
 }
 
 func (d *fakeDocker) ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error) {
-	return d.containers, nil
+	var result []types.Container
+	for _, c := range d.containers {
+		if options.Filters.Contains("ancestor") {
+			img, err := reference.ParseNormalizedNamed(c.Image)
+			if err != nil || !options.Filters.Match("ancestor", img.String()) {
+				continue
+			}
+		}
+		if options.Filters.Contains("label") && !options.Filters.MatchKVList("label", c.Labels) {
+			continue
+		}
+		result = append(result, c)
+	}
+	return result, nil
 }
 
 func (d *fakeDocker) ContainerRemove(ctx context.Context, id string, options types.ContainerRemoveOptions) error {
@@ -272,11 +374,14 @@ func (d *fakeDocker) ContainerRemove(ctx context.Context, id string, options typ
 	return nil
 }
 
-func (d *fakeDocker) ImagePull(ctx context.Context, image string, options types.ImagePullOptions) (io.ReadCloser, error) {
+func (d *fakeDocker) ImagePull(ctx context.Context, image string,
+	options types.ImagePullOptions) (io.ReadCloser, error) {
 	return nil, nil
 }
 
-func (d *fakeDocker) ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.ContainerCreateCreatedBody, error) {
+func (d *fakeDocker) ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig,
+	networkingConfig *network.NetworkingConfig, platform *specs.Platform,
+	containerName string) (container.ContainerCreateCreatedBody, error) {
 	d.lastCreateConfig = config
 	d.lastCreateHostConfig = hostConfig
 	if d.onCreate != nil {
@@ -284,7 +389,8 @@ func (d *fakeDocker) ContainerCreate(ctx context.Context, config *container.Conf
 	}
 	return container.ContainerCreateCreatedBody{}, nil
 }
-func (d *fakeDocker) ContainerStart(ctx context.Context, containerID string, options types.ContainerStartOptions) error {
+func (d *fakeDocker) ContainerStart(ctx context.Context, containerID string,
+	options types.ContainerStartOptions) error {
 	return nil
 }
 

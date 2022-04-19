@@ -46,8 +46,12 @@ func (o *CreateRegistryOptions) Command() *cobra.Command {
 	cmd.SetOut(o.Out)
 	cmd.SetErr(o.ErrOut)
 	o.PrintFlags.AddFlags(cmd)
-	cmd.Flags().IntVar(&o.Registry.Port, "port", o.Registry.Port, "The port to expose the registry on host. If not specified, chooses a random port")
-	cmd.Flags().StringVar(&o.Registry.ListenAddress, "listen-address", o.Registry.ListenAddress, "The host's IP address to bind the container to. If not set defaults to 127.0.0.1")
+	cmd.Flags().IntVar(&o.Registry.Port, "port", o.Registry.Port,
+		"The port to expose the registry on host. If not specified, chooses a random port")
+	cmd.Flags().StringVar(&o.Registry.ListenAddress, "listen-address", o.Registry.ListenAddress,
+		"The host's IP address to bind the container to. If not set defaults to 127.0.0.1")
+	cmd.Flags().StringVar(&o.Registry.Image, "image", registry.DefaultRegistryImageRef,
+		"Registry image to use")
 
 	return cmd
 }
