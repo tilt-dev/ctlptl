@@ -149,7 +149,7 @@ func (o *DeleteOptions) run(args []string) error {
 			}
 		case *api.Registry:
 			if o.registryDeleter == nil {
-				o.registryDeleter, err = registry.DefaultController(ctx, o.IOStreams)
+				o.registryDeleter, err = registry.DefaultController(o.IOStreams)
 				if err != nil {
 					return err
 				}

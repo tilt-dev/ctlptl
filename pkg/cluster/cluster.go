@@ -16,6 +16,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/tilt-dev/clusterid"
+	"github.com/tilt-dev/ctlptl/internal/dctr"
 	"github.com/tilt-dev/ctlptl/internal/exec"
 	"github.com/tilt-dev/ctlptl/internal/socat"
 	"github.com/tilt-dev/ctlptl/pkg/api"
@@ -165,7 +166,7 @@ func (c *Controller) getDockerClient(ctx context.Context) (dockerClient, error) 
 		return c.dockerClient, nil
 	}
 
-	client, err := newDockerWrapperFromEnv(ctx)
+	client, err := dctr.NewAPIClient(c.iostreams)
 	if err != nil {
 		return nil, err
 	}
@@ -209,16 +210,17 @@ func (c *Controller) machine(ctx context.Context, name string, product clusterid
 }
 
 func (c *Controller) registryController(ctx context.Context) (registryController, error) {
+	dockerClient, err := c.getDockerClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	result := c.registryCtl
 	if result == nil {
-		var err error
-		result, err = registry.DefaultController(ctx, c.iostreams)
-		if err != nil {
-			return nil, err
-		}
+		result = registry.NewController(c.iostreams, dockerClient)
 		c.registryCtl = result
 	}
 	return result, nil
@@ -242,12 +244,12 @@ func (c *Controller) admin(ctx context.Context, product clusterid.Product) (Admi
 
 	switch product {
 	case clusterid.ProductDockerDesktop:
-		if !dockerClient.IsLocalDockerEngine() {
+		if !docker.IsLocalDockerEngineHost(dockerClient.DaemonHost()) {
 			return nil, fmt.Errorf("Detected remote DOCKER_HOST. Remote Docker engines do not support Docker Desktop clusters: %s",
-				docker.GetHostEnv())
+				dockerClient.DaemonHost())
 		}
 
-		admin = newDockerDesktopAdmin()
+		admin = newDockerDesktopAdmin(dockerClient.DaemonHost())
 	case clusterid.ProductKIND:
 		admin = newKindAdmin(c.iostreams, dockerClient)
 	case clusterid.ProductK3D:
@@ -988,7 +990,12 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Cluste
 // If the current cluster is on a remote docker instance,
 // we need a port-forwarder to connect it.
 func (c *Controller) maybeCreateForwarderForCurrentCluster(ctx context.Context, errOut io.Writer) error {
-	if docker.IsLocalHost(docker.GetHostEnv()) {
+	dockerClient, err := c.getDockerClient(ctx)
+	if err != nil {
+		return err
+	}
+
+	if docker.IsLocalHost(dockerClient.DaemonHost()) {
 		return nil
 	}
 

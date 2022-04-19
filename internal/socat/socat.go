@@ -11,10 +11,8 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
 	"github.com/shirou/gopsutil/v3/process"
 	"github.com/tilt-dev/ctlptl/internal/dctr"
-	"github.com/tilt-dev/ctlptl/pkg/docker"
 )
 
 const serviceName = "ctlptl-portforward-service"
@@ -25,20 +23,6 @@ type Controller struct {
 
 func NewController(client dctr.Client) *Controller {
 	return &Controller{client: client}
-}
-
-func DefaultController(ctx context.Context) (*Controller, error) {
-	opts, err := docker.ClientOpts()
-	if err != nil {
-		return nil, err
-	}
-	client, err := client.NewClientWithOpts(opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	client.NegotiateAPIVersion(ctx)
-	return NewController(client), nil
 }
 
 // Connect a port on the local machine to a port on a remote docker machine.

@@ -18,8 +18,8 @@ type dockerDesktopAdmin struct {
 	host string
 }
 
-func newDockerDesktopAdmin() *dockerDesktopAdmin {
-	return &dockerDesktopAdmin{os: runtime.GOOS, host: docker.GetHostEnv()}
+func newDockerDesktopAdmin(host string) *dockerDesktopAdmin {
+	return &dockerDesktopAdmin{os: runtime.GOOS, host: host}
 }
 
 func (a *dockerDesktopAdmin) EnsureInstalled(ctx context.Context) error { return nil }

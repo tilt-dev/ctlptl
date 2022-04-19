@@ -7,7 +7,9 @@ import (
 	"strconv"
 
 	"github.com/spf13/cobra"
+	"github.com/tilt-dev/ctlptl/internal/dctr"
 	"github.com/tilt-dev/ctlptl/internal/socat"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 func NewSocatCommand() *cobra.Command {
@@ -35,12 +37,14 @@ func connectRemoteDocker(cmd *cobra.Command, args []string) {
 	}
 
 	ctx := context.Background()
-	c, err := socat.DefaultController(ctx)
+	streams := genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}
+	dockerAPI, err := dctr.NewAPIClient(streams)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "connect-remote-docker: %v\n", err)
 		os.Exit(1)
 	}
 
+	c := socat.NewController(dockerAPI)
 	err = c.ConnectRemoteDockerPort(ctx, port)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "connect-remote-docker: %v\n", err)

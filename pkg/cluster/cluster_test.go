@@ -470,8 +470,11 @@ type fakeDockerClient struct {
 	ncpu         int
 }
 
-func (c *fakeDockerClient) IsLocalDockerEngine() bool {
-	return !c.isRemoteHost
+func (c *fakeDockerClient) DaemonHost() string {
+	if c.isRemoteHost {
+		return "ssh://ed"
+	}
+	return ""
 }
 
 func (c *fakeDockerClient) ServerVersion(ctx context.Context) (types.Version, error) {

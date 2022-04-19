@@ -92,7 +92,7 @@ func (o *ApplyOptions) run() error {
 		switch obj := obj.(type) {
 		case *api.Registry:
 			if rc == nil {
-				rc, err = registry.DefaultController(ctx, o.IOStreams)
+				rc, err = registry.DefaultController(o.IOStreams)
 				if err != nil {
 					return err
 				}
