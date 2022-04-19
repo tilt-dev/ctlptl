@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tilt-dev/clusterid"
+	"github.com/tilt-dev/ctlptl/internal/exec"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/registry"
 	"github.com/tilt-dev/localregistry-go"
@@ -379,7 +380,7 @@ func newFixture(t *testing.T) *fixture {
 	d4m := &fakeD4MClient{docker: dockerClient}
 	dmachine := &dockerMachine{
 		dockerClient: dockerClient,
-		errOut:       os.Stderr,
+		iostreams:    genericclioptions.IOStreams{Out: os.Stdout, ErrOut: os.Stderr},
 		sleep:        func(d time.Duration) {},
 		d4m:          d4m,
 		os:           "darwin", // default to macos
@@ -428,6 +429,7 @@ func newFixture(t *testing.T) *fixture {
 	registryCtl := &fakeRegistryController{}
 	controller := &Controller{
 		iostreams:                   iostreams,
+		runner:                      exec.NewFakeCmdRunner(func(argv []string) {}),
 		admins:                      make(map[clusterid.Product]Admin),
 		config:                      *config,
 		configWriter:                configWriter,
