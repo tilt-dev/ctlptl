@@ -6,12 +6,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tilt-dev/ctlptl/pkg/api"
-	"github.com/tilt-dev/ctlptl/pkg/cluster"
-	"github.com/tilt-dev/ctlptl/pkg/registry"
 	"github.com/tilt-dev/localregistry-go"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+
+	"github.com/tilt-dev/ctlptl/pkg/api"
+	"github.com/tilt-dev/ctlptl/pkg/cluster"
+	"github.com/tilt-dev/ctlptl/pkg/registry"
 )
 
 var createTime = time.Unix(1500000000, 0)

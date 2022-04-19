@@ -7,9 +7,10 @@ import (
 	"io"
 
 	"github.com/pkg/errors"
-	"github.com/tilt-dev/ctlptl/pkg/api"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/tilt-dev/ctlptl/pkg/api"
 )
 
 // Parses a stream of YAML.

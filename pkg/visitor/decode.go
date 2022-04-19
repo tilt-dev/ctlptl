@@ -2,8 +2,9 @@ package visitor
 
 import (
 	"github.com/pkg/errors"
-	"github.com/tilt-dev/ctlptl/pkg/encoding"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/tilt-dev/ctlptl/pkg/encoding"
 )
 
 func DecodeAll(vs []Interface) ([]runtime.Object, error) {

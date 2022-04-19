@@ -11,6 +11,9 @@ test:
 generated:
 	hack/make-rules/generated.sh
 
+fmt:
+	goimports -w -l -local github.com/tilt-dev/ctlptl cmd/ internal/ pkg/
+
 tidy:
 	go mod tidy
 

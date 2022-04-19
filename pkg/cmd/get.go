@@ -7,15 +7,16 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/tilt-dev/ctlptl/pkg/api"
-	"github.com/tilt-dev/ctlptl/pkg/cluster"
-	"github.com/tilt-dev/ctlptl/pkg/registry"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
+
+	"github.com/tilt-dev/ctlptl/pkg/api"
+	"github.com/tilt-dev/ctlptl/pkg/cluster"
+	"github.com/tilt-dev/ctlptl/pkg/registry"
 )
 
 type GetOptions struct {

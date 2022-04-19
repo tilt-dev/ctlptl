@@ -1,9 +1,10 @@
 package cmd
 
 import (
-	myprinters "github.com/tilt-dev/ctlptl/internal/printers"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
+
+	myprinters "github.com/tilt-dev/ctlptl/internal/printers"
 )
 
 func toPrinter(flags *genericclioptions.PrintFlags) (printers.ResourcePrinter, error) {
