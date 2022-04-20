@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -203,7 +204,7 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 		// If the port has changed, let's delete the registry and recreate it.
 		needsDelete = true
 	}
-	if existing.Status.Image != desired.Image {
+	if !imagesRefsEqual(existing.Status.Image, desired.Image) {
 		needsDelete = true
 	}
 	if existing.Status.State != containerStateRunning {
@@ -397,4 +398,22 @@ func (c *Controller) Delete(ctx context.Context, name string) error {
 	return c.dockerClient.ContainerRemove(ctx, registry.Status.ContainerID, types.ContainerRemoveOptions{
 		Force: true,
 	})
+}
+
+// imageRefsEqual returns true of the normalized versions of the refs are equal.
+//
+// If the normalized versions are not equal OR either ref is invalid, false
+// is returned.
+func imagesRefsEqual(a, b string) bool {
+	aRef, err := reference.ParseNormalizedNamed(a)
+	if err != nil {
+		return false
+	}
+
+	bRef, err := reference.ParseNormalizedNamed(b)
+	if err != nil {
+		return false
+	}
+
+	return aRef.String() == bRef.String()
 }
