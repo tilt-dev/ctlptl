@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -270,6 +271,11 @@ func (o *GetOptions) registriesAsTable(registries []api.Registry) runtime.Object
 			},
 		},
 	}
+
+	// sort chronologically newest -> oldest to match `docker ps` behavior
+	sort.SliceStable(registries, func(i, j int) bool {
+		return registries[i].Status.CreationTimestamp.After(registries[j].Status.CreationTimestamp.Time)
+	})
 
 	for _, registry := range registries {
 		age := "unknown"

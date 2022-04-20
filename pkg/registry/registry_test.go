@@ -52,12 +52,12 @@ func kindRegistry() types.Container {
 
 func kindRegistryLoopback() types.Container {
 	return types.Container{
-		ID:      "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
+		ID:      "d62f2587ff7b03858f144d3cf83c789578a6d6403f8b82a459ab4e317917cd42",
 		Names:   []string{"/kind-registry-loopback"},
 		Image:   "registry:2",
 		ImageID: "sha256:2d4f4b5309b1e41b4f83ae59b44df6d673ef44433c734b14c1c103ebca82c116",
 		Command: "/entrypoint.sh /etc/docker/registry/config.yml",
-		Created: 1603483645,
+		Created: 1603483646,
 		Labels:  map[string]string{"dev.tilt.ctlptl.role": "registry"},
 		Ports: []types.Port{
 			types.Port{IP: "127.0.0.1", PrivatePort: 5000, PublicPort: 5001, Type: "tcp"},
@@ -79,21 +79,50 @@ func kindRegistryLoopback() types.Container {
 	}
 }
 
-func TestListRegistriesRoleLabel(t *testing.T) {
+func kindRegistryCustomImage() types.Container {
+	return types.Container{
+		ID:      "c7f123e65474f951c3bc4232c888616c0f9b1052c7ae706a3b6d4701bea6e90d",
+		Names:   []string{"/kind-registry-custom-image"},
+		Image:   "fake.tilt.dev/my-registry-image:latest",
+		ImageID: "sha256:0ac33e5f5afa79e084075e8698a22d574816eea8d7b7d480586835657c3e1c8b",
+		Command: "/entrypoint.sh /etc/docker/registry/config.yml",
+		Created: 1603483647,
+		Labels:  map[string]string{"dev.tilt.ctlptl.role": "registry"},
+		Ports: []types.Port{
+			types.Port{IP: "127.0.0.1", PrivatePort: 5000, PublicPort: 5001, Type: "tcp"},
+		},
+		SizeRw:     0,
+		SizeRootFs: 0,
+		State:      "running",
+		Status:     "Up 2 hours",
+		NetworkSettings: &types.SummaryNetworkSettings{
+			Networks: map[string]*network.EndpointSettings{
+				"bridge": &network.EndpointSettings{
+					IPAddress: "172.0.1.2",
+				},
+				"kind": &network.EndpointSettings{
+					IPAddress: "172.0.1.3",
+				},
+			},
+		},
+	}
+}
+
+func TestListRegistries(t *testing.T) {
 	f := newFixture(t)
 	defer f.TearDown()
 
-	// only the first container should be seen because it's the one with
-	// the `dev.tilt.ctlptl.role=registry` label, and we only fallback to
-	// matching by image if there are NO registries with the label
-	otherReg := kindRegistryLoopback()
-	otherReg.Labels = nil
-	f.docker.containers = []types.Container{kindRegistry(), otherReg}
+	regWithoutLabels := kindRegistryLoopback()
+	regWithoutLabels.Labels = nil
+
+	f.docker.containers = []types.Container{kindRegistry(), regWithoutLabels, kindRegistryCustomImage()}
 
 	list, err := f.c.List(context.Background(), ListOptions{})
 	require.NoError(t, err)
 
-	require.Len(t, list.Items, 1)
+	// registry list response is sorted by container ID:
+	// 	kind-registry:a815, kind-registry-custom-image:c7f1, kind-registry-loopback:d62f
+	require.Len(t, list.Items, 3)
 	assert.Equal(t, api.Registry{
 		TypeMeta: typeMeta,
 		Name:     "kind-registry",
@@ -111,56 +140,39 @@ func TestListRegistriesRoleLabel(t *testing.T) {
 			Image:             "registry:2",
 		},
 	}, list.Items[0])
-}
-
-func TestListRegistriesImageRefFallback(t *testing.T) {
-	f := newFixture(t)
-	defer f.TearDown()
-
-	f.docker.containers = []types.Container{kindRegistry(), kindRegistryLoopback()}
-	for i := range f.docker.containers {
-		delete(f.docker.containers[i].Labels, "dev.tilt.ctlptl.role")
-		if len(f.docker.containers[i].Labels) == 0 {
-			f.docker.containers[i].Labels = nil
-		}
-	}
-
-	list, err := f.c.List(context.Background(), ListOptions{})
-	require.NoError(t, err)
-
-	require.Len(t, list.Items, 2)
 	assert.Equal(t, api.Registry{
 		TypeMeta: typeMeta,
-		Name:     "kind-registry",
+		Name:     "kind-registry-custom-image",
 		Port:     5001,
 		Status: api.RegistryStatus{
-			CreationTimestamp: metav1.Time{Time: time.Unix(1603483645, 0)},
+			CreationTimestamp: metav1.Time{Time: time.Unix(1603483647, 0)},
 			HostPort:          5001,
 			ContainerPort:     5000,
 			IPAddress:         "172.0.1.2",
 			ListenAddress:     "127.0.0.1",
 			Networks:          []string{"bridge", "kind"},
-			ContainerID:       "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
+			ContainerID:       "c7f123e65474f951c3bc4232c888616c0f9b1052c7ae706a3b6d4701bea6e90d",
 			State:             "running",
-			Image:             "registry:2",
+			Labels:            map[string]string{"dev.tilt.ctlptl.role": "registry"},
+			Image:             "fake.tilt.dev/my-registry-image:latest",
 		},
-	}, list.Items[0])
+	}, list.Items[1])
 	assert.Equal(t, api.Registry{
 		TypeMeta: typeMeta,
 		Name:     "kind-registry-loopback",
 		Port:     5001,
 		Status: api.RegistryStatus{
-			CreationTimestamp: metav1.Time{Time: time.Unix(1603483645, 0)},
+			CreationTimestamp: metav1.Time{Time: time.Unix(1603483646, 0)},
 			HostPort:          5001,
 			ContainerPort:     5000,
 			IPAddress:         "172.0.1.2",
 			ListenAddress:     "127.0.0.1",
 			Networks:          []string{"bridge", "kind"},
-			ContainerID:       "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
+			ContainerID:       "d62f2587ff7b03858f144d3cf83c789578a6d6403f8b82a459ab4e317917cd42",
 			State:             "running",
 			Image:             "registry:2",
 		},
-	}, list.Items[1])
+	}, list.Items[2])
 }
 
 func TestGetRegistry(t *testing.T) {

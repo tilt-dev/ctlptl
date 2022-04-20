@@ -36,6 +36,17 @@ const DefaultRegistryImageRef = "docker.io/library/registry:2" // The registry e
 // https://github.com/moby/moby/blob/v20.10.3/api/types/types.go#L313
 const containerStateRunning = "running"
 
+// ctlptlLabels are labels applied on create to registry containers.
+//
+// These are not considered for equality purposes, as ctlptl supports interop
+// with local cluster tools that support self-managing a registry (e.g. k3d),
+// so we don't want to unnecessarily re-create them. However, if ctlptl is used
+// to modify (i.e. delete&create) a registry, the new object _will_ include
+// these labels.
+var ctlptlLabels = map[string]string{
+	docker.ContainerLabelRole: "registry",
+}
+
 func TypeMeta() api.TypeMeta {
 	return typeMeta
 }
@@ -54,11 +65,6 @@ func FillDefaults(registry *api.Registry) {
 	if registry.Image == "" {
 		registry.Image = DefaultRegistryImageRef
 	}
-
-	if registry.Labels == nil {
-		registry.Labels = make(map[string]string)
-	}
-	registry.Labels[docker.ContainerLabelRole] = "registry"
 }
 
 type socatController interface {
@@ -112,19 +118,9 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 		return nil, err
 	}
 
-	containers, err := c.listContainers(ctx, filters.NewArgs(
-		filters.Arg("label", fmt.Sprintf("%s=registry", docker.ContainerLabelRole))))
+	containers, err := c.registryContainers(ctx)
 	if err != nil {
 		return nil, err
-	}
-	if len(containers) == 0 {
-		// ctlptl did not always label its registries, so fallback to using the
-		// default registry image ref as a filter
-		containers, err = c.listContainers(ctx, filters.NewArgs(
-			filters.Arg("ancestor", DefaultRegistryImageRef)))
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	result := []api.Registry{}
@@ -320,7 +316,7 @@ func (c *Controller) portConfigs(existing *api.Registry, desired *api.Registry) 
 
 // Compute the label configs to the container create call.
 func (c *Controller) labelConfigs(existing *api.Registry, desired *api.Registry) map[string]string {
-	newLabels := make(map[string]string, len(existing.Status.Labels)+len(desired.Labels))
+	newLabels := make(map[string]string, len(existing.Status.Labels)+len(desired.Labels)+len(ctlptlLabels))
 
 	// Preserve existing labels.
 	for k, v := range existing.Status.Labels {
@@ -329,6 +325,10 @@ func (c *Controller) labelConfigs(existing *api.Registry, desired *api.Registry)
 
 	// Overwrite with new labels.
 	for k, v := range desired.Labels {
+		newLabels[k] = v
+	}
+
+	for k, v := range ctlptlLabels {
 		newLabels[k] = v
 	}
 
@@ -345,15 +345,41 @@ func (c *Controller) maybeCreateForwarder(ctx context.Context, port int) error {
 	return c.socat.ConnectRemoteDockerPort(ctx, port)
 }
 
-func (c *Controller) listContainers(ctx context.Context, filterArgs filters.Args) ([]types.Container, error) {
-	containers, err := c.dockerClient.ContainerList(ctx, types.ContainerListOptions{
-		Filters: filterArgs,
-		All:     true,
+func (c *Controller) registryContainers(ctx context.Context) ([]types.Container, error) {
+	containers := make(map[string]types.Container)
+
+	roleContainers, err := c.dockerClient.ContainerList(ctx, types.ContainerListOptions{
+		Filters: filters.NewArgs(
+			filters.Arg("label", fmt.Sprintf("%s=registry", docker.ContainerLabelRole))),
+		All: true,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return containers, nil
+	for i := range roleContainers {
+		containers[roleContainers[i].ID] = roleContainers[i]
+	}
+
+	ancestorContainers, err := c.dockerClient.ContainerList(ctx, types.ContainerListOptions{
+		Filters: filters.NewArgs(
+			filters.Arg("ancestor", DefaultRegistryImageRef)),
+		All: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	for i := range ancestorContainers {
+		containers[ancestorContainers[i].ID] = ancestorContainers[i]
+	}
+
+	result := make([]types.Container, 0, len(containers))
+	for _, c := range containers {
+		result = append(result, c)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].ID < result[j].ID
+	})
+	return result, nil
 }
 
 // Delete the given registry.
