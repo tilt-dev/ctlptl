@@ -6,10 +6,12 @@ import (
 	"os"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
+	"github.com/tilt-dev/clusterid"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/cluster"
 )
@@ -27,6 +29,7 @@ func NewCreateClusterOptions() *CreateClusterOptions {
 		IOStreams:  genericclioptions.IOStreams{Out: os.Stdout, ErrOut: os.Stderr, In: os.Stdin},
 		Cluster: &api.Cluster{
 			TypeMeta: cluster.TypeMeta(),
+			Minikube: &api.MinikubeCluster{},
 		},
 	}
 	return o
@@ -53,6 +56,12 @@ func (o *CreateClusterOptions) Command() *cobra.Command {
 		o.Cluster.MinCPUs, "Sets the minimum CPUs for the cluster")
 	cmd.Flags().StringVar(&o.Cluster.KubernetesVersion, "kubernetes-version",
 		o.Cluster.KubernetesVersion, "Sets the kubernetes version for the cluster, if possible")
+	cmd.Flags().StringSliceVar(&o.Cluster.Minikube.StartFlags, "minikube-start-flags",
+		o.Cluster.Minikube.StartFlags, "Minikube extra start flags (only applicable to a minikube cluster)")
+	cmd.Flags().StringSliceVar(&o.Cluster.Minikube.ExtraConfigs, "minikube-extra-configs",
+		o.Cluster.Minikube.ExtraConfigs, "Minikube extra configs (only applicable to a minikube cluster)")
+	cmd.Flags().StringVar(&o.Cluster.Minikube.ContainerRuntime, "minikube-container-runtime",
+		o.Cluster.Minikube.ContainerRuntime, "Minikube container runtime (only applicable to a minikube cluster)")
 
 	return cmd
 }
@@ -86,6 +95,12 @@ func (o *CreateClusterOptions) run(controller clusterCreator, product string) er
 	defer a.Flush(time.Second)
 
 	o.Cluster.Product = product
+
+	// Zero out the minikube config if not used.
+	if product != string(clusterid.ProductMinikube) || cmp.Equal(o.Cluster.Minikube, &api.MinikubeCluster{}) {
+		o.Cluster.Minikube = nil
+	}
+
 	cluster.FillDefaults(o.Cluster)
 
 	ctx := context.Background()
