@@ -4,6 +4,8 @@ import (
 	"strings"
 )
 
+const ContainerLabelRole = "dev.tilt.ctlptl.role"
+
 // Checks whether the Docker daemon is running on a local machine.
 // Remote docker daemons will likely need a port forwarder to work properly.
 func IsLocalHost(dockerHost string) bool {

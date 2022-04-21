@@ -152,6 +152,14 @@ type Registry struct {
 	// that are tagged "app: k3d".
 	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 
+	// Image to use for registry container (optional).
+	//
+	// Can be used to provide an alternate image or use a different registry
+	// than Docker Hub.
+	//
+	// Defaults to `docker.io/library/registry:2`.
+	Image string `json:"image,omitempty" yaml:"image,omitempty"`
+
 	// Most recently observed status of the registry.
 	// Populated by the system.
 	// Read-only.
@@ -190,6 +198,9 @@ type RegistryStatus struct {
 
 	// Labels attached to the running container.
 	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+
+	// Image for the running container.
+	Image string `json:"image,omitempty" yaml:"image,omitempty"`
 }
 
 // RegistryList is a list of Registrys.

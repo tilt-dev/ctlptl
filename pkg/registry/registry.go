@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -31,10 +32,21 @@ var (
 	groupResource = schema.GroupResource{Group: "ctlptl.dev", Resource: "registries"}
 )
 
-const registryImageRef = "docker.io/library/registry:2" // The registry everyone uses.
+const DefaultRegistryImageRef = "docker.io/library/registry:2" // The registry everyone uses.
 
 // https://github.com/moby/moby/blob/v20.10.3/api/types/types.go#L313
 const containerStateRunning = "running"
+
+// ctlptlLabels are labels applied on create to registry containers.
+//
+// These are not considered for equality purposes, as ctlptl supports interop
+// with local cluster tools that support self-managing a registry (e.g. k3d),
+// so we don't want to unnecessarily re-create them. However, if ctlptl is used
+// to modify (i.e. delete&create) a registry, the new object _will_ include
+// these labels.
+var ctlptlLabels = map[string]string{
+	docker.ContainerLabelRole: "registry",
+}
 
 func TypeMeta() api.TypeMeta {
 	return typeMeta
@@ -49,6 +61,10 @@ func FillDefaults(registry *api.Registry) {
 	// The default name is determined by the underlying product.
 	if registry.Name == "" {
 		registry.Name = "ctlptl-registry"
+	}
+
+	if registry.Image == "" {
+		registry.Image = DefaultRegistryImageRef
 	}
 }
 
@@ -103,13 +119,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 		return nil, err
 	}
 
-	filterArgs := filters.NewArgs()
-	filterArgs.Add("ancestor", registryImageRef)
-
-	containers, err := c.dockerClient.ContainerList(ctx, types.ContainerListOptions{
-		Filters: filterArgs,
-		All:     true,
-	})
+	containers, err := c.registryContainers(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -152,6 +162,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 				Networks:          networks,
 				State:             container.State,
 				Labels:            container.Labels,
+				Image:             container.Image,
 			},
 		}
 
@@ -191,6 +202,9 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 	needsDelete := false
 	if existing.Port != 0 && desired.Port != 0 && existing.Port != desired.Port {
 		// If the port has changed, let's delete the registry and recreate it.
+		needsDelete = true
+	}
+	if !imagesRefsEqual(existing.Status.Image, desired.Image) {
 		needsDelete = true
 	}
 	if existing.Status.State != containerStateRunning {
@@ -236,7 +250,7 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 		desired.Name,
 		&container.Config{
 			Hostname:     desired.Name,
-			Image:        registryImageRef,
+			Image:        desired.Image,
 			ExposedPorts: exposedPorts,
 			Labels:       c.labelConfigs(existing, desired),
 		},
@@ -303,7 +317,7 @@ func (c *Controller) portConfigs(existing *api.Registry, desired *api.Registry) 
 
 // Compute the label configs to the container create call.
 func (c *Controller) labelConfigs(existing *api.Registry, desired *api.Registry) map[string]string {
-	newLabels := make(map[string]string, len(existing.Status.Labels)+len(desired.Labels))
+	newLabels := make(map[string]string, len(existing.Status.Labels)+len(desired.Labels)+len(ctlptlLabels))
 
 	// Preserve existing labels.
 	for k, v := range existing.Status.Labels {
@@ -315,6 +329,10 @@ func (c *Controller) labelConfigs(existing *api.Registry, desired *api.Registry)
 		newLabels[k] = v
 	}
 
+	for k, v := range ctlptlLabels {
+		newLabels[k] = v
+	}
+
 	return newLabels
 }
 
@@ -323,8 +341,46 @@ func (c *Controller) maybeCreateForwarder(ctx context.Context, port int) error {
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(c.iostreams.ErrOut, " 🎮 Env DOCKER_HOST set. Assuming remote Docker and forwarding registry to localhost:%d\n", port)
+	_, _ = fmt.Fprintf(c.iostreams.ErrOut,
+		" 🎮 Env DOCKER_HOST set. Assuming remote Docker and forwarding registry to localhost:%d\n", port)
 	return c.socat.ConnectRemoteDockerPort(ctx, port)
+}
+
+func (c *Controller) registryContainers(ctx context.Context) ([]types.Container, error) {
+	containers := make(map[string]types.Container)
+
+	roleContainers, err := c.dockerClient.ContainerList(ctx, types.ContainerListOptions{
+		Filters: filters.NewArgs(
+			filters.Arg("label", fmt.Sprintf("%s=registry", docker.ContainerLabelRole))),
+		All: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	for i := range roleContainers {
+		containers[roleContainers[i].ID] = roleContainers[i]
+	}
+
+	ancestorContainers, err := c.dockerClient.ContainerList(ctx, types.ContainerListOptions{
+		Filters: filters.NewArgs(
+			filters.Arg("ancestor", DefaultRegistryImageRef)),
+		All: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	for i := range ancestorContainers {
+		containers[ancestorContainers[i].ID] = ancestorContainers[i]
+	}
+
+	result := make([]types.Container, 0, len(containers))
+	for _, c := range containers {
+		result = append(result, c)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].ID < result[j].ID
+	})
+	return result, nil
 }
 
 // Delete the given registry.
@@ -342,4 +398,22 @@ func (c *Controller) Delete(ctx context.Context, name string) error {
 	return c.dockerClient.ContainerRemove(ctx, registry.Status.ContainerID, types.ContainerRemoveOptions{
 		Force: true,
 	})
+}
+
+// imageRefsEqual returns true of the normalized versions of the refs are equal.
+//
+// If the normalized versions are not equal OR either ref is invalid, false
+// is returned.
+func imagesRefsEqual(a, b string) bool {
+	aRef, err := reference.ParseNormalizedNamed(a)
+	if err != nil {
+		return false
+	}
+
+	bRef, err := reference.ParseNormalizedNamed(b)
+	if err != nil {
+		return false
+	}
+
+	return aRef.String() == bRef.String()
 }
