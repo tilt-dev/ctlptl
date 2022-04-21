@@ -28,11 +28,7 @@ func (RealCmdRunner) RunIO(ctx context.Context, iostreams genericclioptions.IOSt
 	c.Stdin = iostreams.In
 	c.Stderr = iostreams.ErrOut
 	c.Stdout = iostreams.Out
-
-	// For some reason, ExitError only gets populated with Stderr if we call Output().
-	_, err := c.Output()
-
-	return err
+	return c.Run()
 }
 
 type FakeCmdRunner struct {

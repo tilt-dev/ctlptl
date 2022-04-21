@@ -13,6 +13,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/klog/v2"
 
+	cexec "github.com/tilt-dev/ctlptl/internal/exec"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 )
 
@@ -20,13 +21,15 @@ import (
 // once the underlying machine has been setup.
 type minikubeAdmin struct {
 	iostreams    genericclioptions.IOStreams
+	runner       cexec.CmdRunner
 	dockerClient dockerClient
 }
 
-func newMinikubeAdmin(iostreams genericclioptions.IOStreams, dockerClient dockerClient) *minikubeAdmin {
+func newMinikubeAdmin(iostreams genericclioptions.IOStreams, dockerClient dockerClient, runner cexec.CmdRunner) *minikubeAdmin {
 	return &minikubeAdmin{
 		iostreams:    iostreams,
 		dockerClient: dockerClient,
+		runner:       runner,
 	}
 }
 
@@ -65,18 +68,23 @@ func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, regist
 		extraConfigs = desired.Minikube.ExtraConfigs
 	}
 
-	// TODO(nick): Let the user pass in their own Minikube configuration.
 	args := []string{
 		"start",
+	}
+
+	if desired.Minikube != nil {
+		args = append(args, desired.Minikube.StartFlags...)
+	}
+
+	args = append(args,
+		"-p", clusterName,
 		"--driver=docker",
 		fmt.Sprintf("--container-runtime=%s", containerRuntime),
-	}
+	)
 
 	for _, c := range extraConfigs {
 		args = append(args, fmt.Sprintf("--extra-config=%s", c))
 	}
-
-	args = append(args, "-p", clusterName)
 
 	if desired.MinCPUs != 0 {
 		args = append(args, fmt.Sprintf("--cpus=%d", desired.MinCPUs))
@@ -90,11 +98,9 @@ func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, regist
 
 	in := strings.NewReader("")
 
-	cmd := exec.CommandContext(ctx, "minikube", args...)
-	cmd.Stdout = a.iostreams.Out
-	cmd.Stderr = a.iostreams.ErrOut
-	cmd.Stdin = in
-	err := cmd.Run()
+	err := a.runner.RunIO(ctx,
+		genericclioptions.IOStreams{In: in, Out: a.iostreams.Out, ErrOut: a.iostreams.ErrOut},
+		"minikube", args...)
 	if err != nil {
 		return errors.Wrap(err, "creating minikube cluster")
 	}
@@ -162,10 +168,9 @@ func (a *minikubeAdmin) applyContainerdPatch(ctx context.Context, desired *api.C
 	configPath := "/etc/containerd/config.toml"
 
 	nodeOutput := bytes.NewBuffer(nil)
-	cmd := exec.CommandContext(ctx, "minikube", "-p", desired.Name, "node", "list")
-	cmd.Stdout = nodeOutput
-	cmd.Stderr = a.iostreams.ErrOut
-	err := cmd.Run()
+	err := a.runner.RunIO(ctx,
+		genericclioptions.IOStreams{Out: nodeOutput, ErrOut: a.iostreams.ErrOut},
+		"minikube", "-p", desired.Name, "node", "list")
 	if err != nil {
 		return errors.Wrap(err, "configuring minikube registry")
 	}
@@ -193,7 +198,9 @@ func (a *minikubeAdmin) applyContainerdPatch(ctx context.Context, desired *api.C
 		// this is the most annoying sed expression i've ever had to write
 		// minikube does not give us great primitives for writing files on the host machine :\
 		// so we have to hack around the shell escaping on its interactive shell
-		cmd := exec.CommandContext(ctx, "minikube", "-p", desired.Name, "--node", node,
+		err := a.runner.RunIO(ctx,
+			a.iostreams,
+			"minikube", "-p", desired.Name, "--node", node,
 			"ssh", "sudo", "sed", `\-i`,
 			fmt.Sprintf(
 				`s,\\\[plugins.\\\(\\\"\\\?.*cri\\\"\\\?\\\).registry.mirrors\\\],[plugins.\\\1.registry.mirrors]\\\n`+
@@ -201,18 +208,12 @@ func (a *minikubeAdmin) applyContainerdPatch(ctx context.Context, desired *api.C
 					`\ \ \ \ \ \ \ \ \ \ endpoint\ =\ [\\\"http://%s:%d\\\"],`,
 				registry.Status.HostPort, networkHost, registry.Status.ContainerPort),
 			configPath)
-		cmd.Stderr = a.iostreams.ErrOut
-		cmd.Stdout = a.iostreams.Out
-		err = cmd.Run()
 		if err != nil {
 			return errors.Wrap(err, "configuring minikube registry")
 		}
 
-		cmd = exec.CommandContext(ctx, "minikube", "-p", desired.Name, "--node", node,
+		err = a.runner.RunIO(ctx, a.iostreams, "minikube", "-p", desired.Name, "--node", node,
 			"ssh", "sudo", "systemctl", "restart", "containerd")
-		cmd.Stderr = a.iostreams.ErrOut
-		cmd.Stdout = a.iostreams.Out
-		err = cmd.Run()
 		if err != nil {
 			return errors.Wrap(err, "configuring minikube registry")
 		}
@@ -249,11 +250,7 @@ func (a *minikubeAdmin) LocalRegistryHosting(ctx context.Context, desired *api.C
 }
 
 func (a *minikubeAdmin) Delete(ctx context.Context, config *api.Cluster) error {
-	cmd := exec.CommandContext(ctx, "minikube", "delete", "-p", config.Name)
-	cmd.Stdout = a.iostreams.Out
-	cmd.Stderr = a.iostreams.ErrOut
-	cmd.Stdin = a.iostreams.In
-	err := cmd.Run()
+	err := a.runner.RunIO(ctx, a.iostreams, "minikube", "delete", "-p", config.Name)
 	if err != nil {
 		return errors.Wrap(err, "deleting minikube cluster")
 	}

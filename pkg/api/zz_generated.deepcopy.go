@@ -125,6 +125,11 @@ func (in *MinikubeCluster) DeepCopyInto(out *MinikubeCluster) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.StartFlags != nil {
+		in, out := &in.StartFlags, &out.StartFlags
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

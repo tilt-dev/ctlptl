@@ -112,6 +112,10 @@ type MinikubeCluster struct {
 	//
 	// kubelet.max-pods=500
 	ExtraConfigs []string `json:"extraConfigs,omitempty" yaml:"extraConfigs,omitempty"`
+
+	// Unstructured flags to pass to minikube on `minikube start`.
+	// These flags will be passed before all tilt-determined flags.
+	StartFlags []string `json:"startFlags,omitempty" yaml:"startFlags,omitempty"`
 }
 
 // ClusterList is a list of Clusters.

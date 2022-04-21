@@ -256,7 +256,7 @@ func (c *Controller) admin(ctx context.Context, product clusterid.Product) (Admi
 	case clusterid.ProductK3D:
 		admin = newK3dAdmin(c.iostreams)
 	case clusterid.ProductMinikube:
-		admin = newMinikubeAdmin(c.iostreams, dockerClient)
+		admin = newMinikubeAdmin(c.iostreams, dockerClient, c.runner)
 	}
 
 	if product == "" {
