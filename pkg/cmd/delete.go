@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
+	"github.com/tilt-dev/clusterid"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/cluster"
 	"github.com/tilt-dev/ctlptl/pkg/registry"
@@ -138,6 +139,25 @@ func (o *DeleteOptions) run(args []string) error {
 
 			cluster.FillDefaults(resource)
 			err := o.clusterDeleter.Delete(ctx, resource.Name)
+			if err != nil && errors.IsNotFound(err) {
+				// We create clusters like:
+				// ctlptl create cluster kind
+				// For most clusters, the name of the cluster will match the name of the product.
+				// But for cases where they don't match, we want
+				// `ctlptl delete cluster kind` to automatically map to `ctlptl delete cluster kind-kind`
+				retryName := ""
+				if resource.Name == string(clusterid.ProductKIND) {
+					retryName = clusterid.ProductKIND.DefaultClusterName()
+				} else if resource.Name == string(clusterid.ProductK3D) {
+					retryName = clusterid.ProductK3D.DefaultClusterName()
+				}
+
+				if retryName != "" {
+					resource.Name = retryName
+					err = o.clusterDeleter.Delete(ctx, retryName)
+				}
+			}
+
 			if err != nil {
 				if o.IgnoreNotFound && errors.IsNotFound(err) {
 					continue
