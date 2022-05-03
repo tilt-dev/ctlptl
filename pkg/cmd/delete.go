@@ -11,7 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
-	"github.com/tilt-dev/clusterid"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/cluster"
 	"github.com/tilt-dev/ctlptl/pkg/registry"
@@ -120,25 +119,17 @@ func (o *DeleteOptions) run(args []string) error {
 			}
 
 			cluster.FillDefaults(resource)
-			err = controller.Delete(ctx, resource.Name)
-			if err != nil && errors.IsNotFound(err) {
-				// We create clusters like:
-				// ctlptl create cluster kind
-				// For most clusters, the name of the cluster will match the name of the product.
-				// But for cases where they don't match, we want
-				// `ctlptl delete cluster kind` to automatically map to `ctlptl delete cluster kind-kind`
-				retryName := ""
-				if resource.Name == string(clusterid.ProductKIND) {
-					retryName = clusterid.ProductKIND.DefaultClusterName()
-				} else if resource.Name == string(clusterid.ProductK3D) {
-					retryName = clusterid.ProductK3D.DefaultClusterName()
-				}
 
-				if retryName != "" {
-					resource.Name = retryName
-					err = controller.Delete(ctx, retryName)
-				}
+			name := resource.Name
+
+			// Normalize the name of the cluster so that
+			// 'ctlptl delete cluster kind' works.
+			cluster, err := normalizedGet(ctx, controller, name)
+			if err == nil {
+				name = cluster.Name
 			}
+
+			err = controller.Delete(ctx, name)
 
 			if err != nil {
 				if o.IgnoreNotFound && errors.IsNotFound(err) {
@@ -251,7 +242,7 @@ func (o *DeleteOptions) cascadeResources(ctx context.Context, resources []runtim
 				if err != nil {
 					return nil, err
 				}
-				cluster, err := controller.Get(ctx, r.Name)
+				cluster, err := normalizedGet(ctx, controller, r.Name)
 				if err != nil && !errors.IsNotFound(err) {
 					return nil, err
 				}
