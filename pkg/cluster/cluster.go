@@ -363,9 +363,15 @@ func (c *Controller) populateLocalRegistryHosting(ctx context.Context, cluster *
 
 	// Let's try to find the registry corresponding to this cluster.
 	var port int
-	_, err = fmt.Sscanf(hosting.Host, "localhost:%d", &port)
-	if err != nil || port == 0 {
-		return err
+	for _, pattern := range []string{"localhost:%d", "127.0.0.1:%d"} {
+		_, _ = fmt.Sscanf(hosting.Host, pattern, &port)
+		if port != 0 {
+			break
+		}
+	}
+
+	if port == 0 {
+		return nil
 	}
 
 	registryCtl, err := c.registryController(ctx)

@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tilt-dev/ctlptl/pkg/api"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -16,12 +17,12 @@ func TestDeleteByName(t *testing.T) {
 	o := NewDeleteOptions()
 	o.IOStreams = streams
 
-	cd := &fakeDeleter{}
-	o.clusterDeleter = cd
+	cd := &fakeClusterController{}
+	o.clusterController = cd
 	err := o.run([]string{"cluster", "kind-kind"})
 	require.NoError(t, err)
 	assert.Equal(t, "cluster.ctlptl.dev/kind-kind deleted\n", out.String())
-	assert.Equal(t, "kind-kind", cd.lastName)
+	assert.Equal(t, "kind-kind", cd.lastDeleteName)
 }
 
 func TestDeleteByFile(t *testing.T) {
@@ -34,13 +35,13 @@ kind: Cluster
 name: kind-kind
 `))
 
-	cd := &fakeDeleter{}
-	o.clusterDeleter = cd
+	cd := &fakeClusterController{}
+	o.clusterController = cd
 	o.Filenames = []string{"-"}
 	err := o.run([]string{})
 	require.NoError(t, err)
 	assert.Equal(t, "cluster.ctlptl.dev/kind-kind deleted\n", out.String())
-	assert.Equal(t, "kind-kind", cd.lastName)
+	assert.Equal(t, "kind-kind", cd.lastDeleteName)
 }
 
 func TestDeleteDefault(t *testing.T) {
@@ -53,13 +54,13 @@ kind: Cluster
 product: kind
 `))
 
-	cd := &fakeDeleter{}
-	o.clusterDeleter = cd
+	cd := &fakeClusterController{}
+	o.clusterController = cd
 	o.Filenames = []string{"-"}
 	err := o.run([]string{})
 	require.NoError(t, err)
 	assert.Equal(t, "cluster.ctlptl.dev/kind-kind deleted\n", out.String())
-	assert.Equal(t, "kind-kind", cd.lastName)
+	assert.Equal(t, "kind-kind", cd.lastDeleteName)
 }
 
 func TestDeleteNotFound(t *testing.T) {
@@ -67,9 +68,9 @@ func TestDeleteNotFound(t *testing.T) {
 	o := NewDeleteOptions()
 	o.IOStreams = streams
 
-	cd := &fakeDeleter{nextError: errors.NewNotFound(
+	cd := &fakeClusterController{nextError: errors.NewNotFound(
 		schema.GroupResource{Group: "ctlptl.dev", Resource: "clusters"}, "garbage")}
-	o.clusterDeleter = cd
+	o.clusterController = cd
 	err := o.run([]string{"cluster", "garbage"})
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), `clusters.ctlptl.dev "garbage" not found`)
@@ -81,9 +82,9 @@ func TestDeleteIgnoreNotFound(t *testing.T) {
 	o := NewDeleteOptions()
 	o.IOStreams = streams
 
-	cd := &fakeDeleter{nextError: errors.NewNotFound(
+	cd := &fakeClusterController{nextError: errors.NewNotFound(
 		schema.GroupResource{Group: "ctlptl.dev", Resource: "clusters"}, "garbage")}
-	o.clusterDeleter = cd
+	o.clusterController = cd
 	o.IgnoreNotFound = true
 	err := o.run([]string{"cluster", "garbage"})
 	require.NoError(t, err)
@@ -107,6 +108,44 @@ port: 5002
 	require.NoError(t, err)
 	assert.Equal(t, "registry.ctlptl.dev/ctlptl-registry deleted\n", out.String())
 	assert.Equal(t, "ctlptl-registry", rd.lastName)
+}
+
+func TestDeleteCascade(t *testing.T) {
+	streams, _, out, _ := genericclioptions.NewTestIOStreams()
+	o := NewDeleteOptions()
+	o.IOStreams = streams
+
+	rd := &fakeDeleter{}
+	cd := &fakeClusterController{
+		clusters: map[string]*api.Cluster{
+			"kind-kind": &api.Cluster{
+				Name:     "kind-kind",
+				Registry: "my-registry",
+			},
+		},
+	}
+	o.clusterController = cd
+	o.registryDeleter = rd
+	o.Cascade = "true"
+	err := o.run([]string{"cluster", "kind-kind"})
+	require.NoError(t, err)
+	assert.Equal(t,
+		"registry.ctlptl.dev/my-registry deleted\n"+
+			"cluster.ctlptl.dev/kind-kind deleted\n",
+		out.String())
+	assert.Equal(t, "my-registry", rd.lastName)
+}
+
+func TestDeleteCascadeInvalid(t *testing.T) {
+	streams, _, _, _ := genericclioptions.NewTestIOStreams()
+	o := NewDeleteOptions()
+	o.IOStreams = streams
+
+	o.Cascade = "xxx"
+	err := o.run([]string{"cluster", "kind-kind"})
+	if assert.Error(t, err) {
+		require.Contains(t, err.Error(), "Invalid cascade: xxx. Valid values: true, false.")
+	}
 }
 
 type fakeDeleter struct {
