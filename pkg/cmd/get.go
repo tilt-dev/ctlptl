@@ -112,7 +112,7 @@ func (o *GetOptions) Run(cmd *cobra.Command, args []string) {
 		}
 
 		if len(args) >= 2 {
-			resource, err = c.Get(ctx, args[1])
+			resource, err = normalizedGet(ctx, c, args[1])
 			if err != nil {
 				if errors.IsNotFound(err) && o.IgnoreNotFound {
 					os.Exit(0)
