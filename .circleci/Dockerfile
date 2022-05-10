@@ -16,7 +16,7 @@ RUN apt update && apt install -y curl ca-certificates liblz4-tool rsync socat
 # Install docker
 # Adapted from https://github.com/circleci/circleci-images/blob/staging/shared/images/Dockerfile-basic.template
 # Check https://download.docker.com/linux/static/stable/x86_64/ for latest versions
-ENV DOCKER_VERSION=20.10.12
+ENV DOCKER_VERSION=20.10.15
 RUN set -exu \
   && DOCKER_URL="https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz" \
   && echo Docker URL: $DOCKER_URL \
@@ -36,7 +36,7 @@ RUN apt install -y apt-transport-https gnupg \
   && apt update && apt install -y kubectl
 
 # install Kind
-ENV KIND_VERSION=v0.12.0
+ENV KIND_VERSION=v0.13.0
 RUN set -exu \
   && curl -fLo ./kind-linux-amd64 "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64" \
   && chmod +x ./kind-linux-amd64 \

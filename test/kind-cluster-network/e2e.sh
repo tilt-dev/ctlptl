@@ -32,8 +32,8 @@ k8sVersion=$(ctlptl get cluster "$CLUSTER_NAME" -o go-template --template='{{.st
 
 ctlptl delete -f cluster.yaml
 
-if [[ "$k8sVersion" != "v1.22.7" ]]; then
-    echo "Expected kubernetes version v1.22.7 but got $k8sVersion"
+if [[ "$k8sVersion" != "v1.22.9" ]]; then
+    echo "Expected kubernetes version v1.22.9 but got $k8sVersion"
     exit 1
 fi
 
