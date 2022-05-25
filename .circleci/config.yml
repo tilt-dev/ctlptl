@@ -21,7 +21,7 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker:
-          version: 20.10.11
+          version: 20.10.14
       - run: make install
       - run: test/kind-cluster-network/e2e.sh
           
@@ -75,10 +75,10 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker:
-          version: 20.10.6
+          version: 20.10.14
       - run: git fetch --tags
       - run: go install github.com/goreleaser/goreleaser@latest
-      - run: goreleaser --rm-dist --skip-publish --snapshot
+      - run: goreleaser --debug --rm-dist --skip-publish --snapshot
       - slack/notify-on-failure:
           only_for_branches: main
           
@@ -88,7 +88,7 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker:
-          version: 20.10.6
+          version: 20.10.14
       - run: git fetch --tags
       - run: go install github.com/goreleaser/goreleaser@latest
       - run: ./hack/release.sh
