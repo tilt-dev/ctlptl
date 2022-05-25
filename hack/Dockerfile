@@ -39,7 +39,7 @@ RUN apt install -y apt-transport-https gnupg \
 # install Kind
 ENV KIND_VERSION=v0.14.0
 RUN set -exu \
-  && case $(uname -m) in aarch64) arch=arm64 ;; x64_64) arch=amd64 ;; *) arch=$(uname -m) ;; esac \
+  && case $(uname -m) in aarch64) arch=arm64 ;; x86_64) arch=amd64 ;; *) arch=$(uname -m) ;; esac \
   && curl -fLo ./kind-linux-$arch "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-$arch" \
   && chmod +x ./kind-linux-$arch \
   && mv ./kind-linux-$arch /usr/local/bin/kind
