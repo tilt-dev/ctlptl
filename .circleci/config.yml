@@ -72,6 +72,8 @@ jobs:
   release-dry-run:
     docker:
       - image: cimg/go:1.18
+    environment:
+      DOCKER_CLI_EXPERIMENTAL: enabled
     steps:
       - checkout
       - setup_remote_docker:
@@ -85,6 +87,8 @@ jobs:
   release:
     docker:
       - image: cimg/go:1.18
+    environment:
+      DOCKER_CLI_EXPERIMENTAL: enabled
     steps:
       - checkout
       - setup_remote_docker:
