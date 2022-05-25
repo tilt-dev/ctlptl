@@ -19,7 +19,7 @@ RUN apt update && apt install -y curl ca-certificates liblz4-tool rsync socat
 # Check https://download.docker.com/linux/static/stable/x86_64/ for latest versions
 ENV DOCKER_VERSION=20.10.15
 RUN set -exu \
-  && DOCKER_URL="https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz" \
+  && DOCKER_URL="https://download.docker.com/linux/static/stable/$(uname -m)/docker-${DOCKER_VERSION}.tgz" \
   && echo Docker URL: $DOCKER_URL \
   && curl --silent --show-error --location --fail --retry 3 --output /tmp/docker.tgz "${DOCKER_URL}" \
   && ls -lha /tmp/docker.tgz \
@@ -39,8 +39,9 @@ RUN apt install -y apt-transport-https gnupg \
 # install Kind
 ENV KIND_VERSION=v0.14.0
 RUN set -exu \
-  && curl -fLo ./kind-linux-amd64 "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64" \
-  && chmod +x ./kind-linux-amd64 \
-  && mv ./kind-linux-amd64 /usr/local/bin/kind
+  && case $(uname -m) in aarch64) arch=arm64 ;; x64_64) arch=amd64 ;; *) arch=$(uname -m) ;; esac \
+  && curl -fLo ./kind-linux-$arch "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-$arch" \
+  && chmod +x ./kind-linux-$arch \
+  && mv ./kind-linux-$arch /usr/local/bin/kind
 
 COPY ctlptl /usr/local/bin/ctlptl
