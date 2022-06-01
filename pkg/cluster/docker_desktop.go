@@ -60,20 +60,28 @@ func NewDockerDesktopClient() (DockerDesktopClient, error) {
 }
 
 func (c DockerDesktopClient) Open(ctx context.Context) error {
-	if runtime.GOOS == "windows" {
+	var err error
+	switch runtime.GOOS {
+
+	case "windows":
 		return fmt.Errorf("Cannot auto-start Docker Desktop on Windows")
-	}
 
-	_, err := os.Stat("/Applications/Docker.app")
-	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("Please install Docker for Desktop: https://www.docker.com/products/docker-desktop")
+	case "darwin":
+		_, err = os.Stat("/Applications/Docker.app")
+		if err != nil {
+			if os.IsNotExist(err) {
+				return fmt.Errorf("Please install Docker for Desktop: https://www.docker.com/products/docker-desktop")
+			}
+			return err
 		}
-		return err
+		cmd := exec.Command("open", "/Applications/Docker.app")
+		err = cmd.Run()
+
+	case "linux":
+		cmd := exec.Command("systemctl", "--user", "start", "docker-desktop")
+		err = cmd.Run()
 	}
 
-	cmd := exec.Command("open", "/Applications/Docker.app")
-	err = cmd.Run()
 	if err != nil {
 		return errors.Wrap(err, "starting Docker")
 	}
@@ -81,12 +89,20 @@ func (c DockerDesktopClient) Open(ctx context.Context) error {
 }
 
 func (c DockerDesktopClient) Quit(ctx context.Context) error {
-	if runtime.GOOS == "windows" {
+	var err error
+	switch runtime.GOOS {
+	case "windows":
 		return fmt.Errorf("Cannot quit Docker Desktop on Windows")
+
+	case "darwin":
+		cmd := exec.Command("osascript", "-e", `quit app "Docker"`)
+		err = cmd.Run()
+
+	case "linux":
+		cmd := exec.Command("systemctl", "--user", "stop", "docker-desktop")
+		err = cmd.Run()
 	}
 
-	cmd := exec.Command("osascript", "-e", `quit app "Docker"`)
-	err := cmd.Run()
 	if err != nil {
 		return errors.Wrap(err, "quitting Docker")
 	}

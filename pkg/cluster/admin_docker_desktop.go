@@ -50,9 +50,6 @@ func (a *dockerDesktopAdmin) Delete(ctx context.Context, config *api.Cluster) er
 	if !isLocalDockerEngine {
 		return fmt.Errorf("docker-desktop cannot be deleted from a remote DOCKER_HOST: %s", a.host)
 	}
-	if a.os != "darwin" && a.os != "windows" {
-		return fmt.Errorf("docker-desktop delete not implemented on: %s", runtime.GOOS)
-	}
 
 	client, err := NewDockerDesktopClient()
 	if err != nil {

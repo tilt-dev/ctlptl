@@ -18,17 +18,26 @@ func dockerDesktopSocketPaths() ([]string, error) {
 		return nil, err
 	}
 
-	return []string{
-		// Older versions of docker desktop use this socket.
-		filepath.Join(homedir, "Library/Containers/com.docker.docker/Data/gui-api.sock"),
+	switch runtime.GOOS {
+	case "darwin":
+		return []string{
+			// Older versions of docker desktop use this socket.
+			filepath.Join(homedir, "Library/Containers/com.docker.docker/Data/gui-api.sock"),
 
-		// Newer versions of docker desktop use this socket.
-		filepath.Join(homedir, "Library/Containers/com.docker.docker/Data/backend.native.sock"),
-	}, nil
+			// Newer versions of docker desktop use this socket.
+			filepath.Join(homedir, "Library/Containers/com.docker.docker/Data/backend.native.sock"),
+		}, nil
+	case "linux":
+		return []string{
+			// Docker Desktop for Linux
+			filepath.Join(homedir, ".docker/desktop/backend.native.sock"),
+		}, nil
+	}
+	return nil, fmt.Errorf("Cannot find docker-desktop socket paths on %s", runtime.GOOS)
 }
 
 func dialDockerDesktop(socketPath string) (net.Conn, error) {
-	if runtime.GOOS != "darwin" {
+	if runtime.GOOS == "windows" {
 		return nil, fmt.Errorf("Cannot dial docker-desktop on %s", runtime.GOOS)
 	}
 
