@@ -4,8 +4,9 @@ import (
 	"context"
 
 	"github.com/tilt-dev/clusterid"
-	"github.com/tilt-dev/ctlptl/pkg/api"
 	"k8s.io/apimachinery/pkg/api/errors"
+
+	"github.com/tilt-dev/ctlptl/pkg/api"
 )
 
 type clusterGetter interface {
