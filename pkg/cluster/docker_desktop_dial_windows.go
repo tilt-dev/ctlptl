@@ -14,7 +14,7 @@ import (
 func dockerDesktopSocketPaths() ([]string, error) {
 	return []string{
 		`\\.\pipe\dockerWebApiServer`,
-		`\\.\pipe\dockerBackendNativeApiServer`,
+		`\\.\pipe\dockerBackendApiServer`,
 	}, nil
 }
 

@@ -25,12 +25,12 @@ func dockerDesktopSocketPaths() ([]string, error) {
 			filepath.Join(homedir, "Library/Containers/com.docker.docker/Data/gui-api.sock"),
 
 			// Newer versions of docker desktop use this socket.
-			filepath.Join(homedir, "Library/Containers/com.docker.docker/Data/backend.native.sock"),
+			filepath.Join(homedir, "Library/Containers/com.docker.docker/Data/backend.sock"),
 		}, nil
 	case "linux":
 		return []string{
 			// Docker Desktop for Linux
-			filepath.Join(homedir, ".docker/desktop/backend.native.sock"),
+			filepath.Join(homedir, ".docker/desktop/backend.sock"),
 		}, nil
 	}
 	return nil, fmt.Errorf("Cannot find docker-desktop socket paths on %s", runtime.GOOS)
