@@ -21,11 +21,11 @@ func dockerDesktopSocketPaths() ([]string, error) {
 	switch runtime.GOOS {
 	case "darwin":
 		return []string{
-			// Older versions of docker desktop use this socket.
-			filepath.Join(homedir, "Library/Containers/com.docker.docker/Data/gui-api.sock"),
-
 			// Newer versions of docker desktop use this socket.
 			filepath.Join(homedir, "Library/Containers/com.docker.docker/Data/backend.sock"),
+
+			// Older versions of docker desktop use this socket.
+			filepath.Join(homedir, "Library/Containers/com.docker.docker/Data/gui-api.sock"),
 		}, nil
 	case "linux":
 		return []string{
