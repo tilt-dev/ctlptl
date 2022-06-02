@@ -111,20 +111,42 @@ func (c DockerDesktopClient) Quit(ctx context.Context) error {
 
 func (c DockerDesktopClient) ResetCluster(ctx context.Context) error {
 	klog.V(7).Infof("POST /kubernetes/reset\n")
+
+	checkErrors := func(err error, statusCode int) error {
+		if err != nil {
+			return errors.Wrap(err, "reset docker-desktop kubernetes")
+		}
+		if statusCode != 0 && statusCode != http.StatusOK && statusCode != http.StatusCreated {
+			return fmt.Errorf("reset docker-desktop kubernetes: status code %d", statusCode)
+		}
+		return nil
+	}
+
 	req, err := http.NewRequest("POST", "http://localhost/kubernetes/reset", nil)
-	if err != nil {
-		return errors.Wrap(err, "reset docker-desktop kubernetes")
+	if err = checkErrors(err, 0); err != nil {
+		return err
 	}
 
 	req.Header.Add("Content-Type", "application/json")
 	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return errors.Wrap(err, "reset docker-desktop kubernetes")
-	}
 	defer resp.Body.Close()
+	if err = checkErrors(err, 0); err != nil {
+		return err
+	}
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("reset docker-desktop kubernetes: status code %d", resp.StatusCode)
+		resp.Body.Close()
+		backendClient := http.Client{
+			Transport: &http.Transport{
+				DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+					return dialDockerBackend()
+				},
+			},
+		}
+		resp, err = backendClient.Do(req)
+		if err = checkErrors(err, resp.StatusCode); err != nil {
+			return err
+		}
 	}
 	return nil
 }
