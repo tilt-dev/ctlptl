@@ -32,7 +32,9 @@ func IsLocalDockerEngineHost(dockerHost string) bool {
 		// see:
 		// https://github.com/tilt-dev/ctlptl/issues/196
 		// https://docs.docker.com/desktop/faqs/#how-do-i-connect-to-the-remote-docker-engine-api
-		return strings.Contains(dockerHost, "/var/run/docker.sock")
+		return strings.Contains(dockerHost, "/var/run/docker.sock") ||
+			// Docker Desktop for Linux - socket is in ~/.docker/desktop/docker.sock
+			strings.HasSuffix(dockerHost, "/.docker/desktop/docker.sock")
 	}
 
 	// Docker daemons on other local protocols are treated as docker desktop.

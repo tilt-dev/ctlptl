@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"runtime"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -74,11 +73,6 @@ func withDockerDesktopClient(name string, run func(client cluster.DockerDesktopC
 		}
 		a.Incr(fmt.Sprintf("cmd.%s", name), nil)
 		defer a.Flush(time.Second)
-
-		if runtime.GOOS != "darwin" && runtime.GOOS != "windows" {
-			_, _ = fmt.Fprintln(os.Stderr, "ctlptl docker-desktop: currently only works on Mac and Windows")
-			os.Exit(1)
-		}
 
 		c, err := cluster.NewDockerDesktopClient()
 		if err != nil {
