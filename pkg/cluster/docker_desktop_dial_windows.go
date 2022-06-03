@@ -13,8 +13,8 @@ import (
 
 func dockerDesktopSocketPaths() ([]string, error) {
 	return []string{
-		`\\.\pipe\dockerWebApiServer`,
 		`\\.\pipe\dockerBackendNativeApiServer`,
+		`\\.\pipe\dockerWebApiServer`,
 	}, nil
 }
 
@@ -30,4 +30,8 @@ func dialDockerDesktop(socketPath string) (net.Conn, error) {
 		return nil, err
 	}
 	return npipe.DialTimeout(socketPath, 2*time.Second)
+}
+
+func dialDockerBackend() (net.Conn, error) {
+	return dialDockerDesktop(`\\.\pipe\dockerBackendApiServer`)
 }

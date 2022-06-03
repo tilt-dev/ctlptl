@@ -240,7 +240,7 @@ type d4mFixture struct {
 func newD4MFixture(t *testing.T) *d4mFixture {
 	f := &d4mFixture{t: t}
 	f.settings = getSettingsJSON
-	f.d4m = &DockerDesktopClient{httpClient: f}
+	f.d4m = &DockerDesktopClient{guiClient: f}
 	return f
 }
 

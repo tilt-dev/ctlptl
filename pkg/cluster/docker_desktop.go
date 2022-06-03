@@ -21,12 +21,13 @@ type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-// Uses the DockerDesktop GUI protocol to control DockerDesktop.
+// Uses the DockerDesktop GUI+Backend protocols to control DockerDesktop.
 //
 // There isn't an off-the-shelf library or documented protocol we can use
 // for this, so we do the best we can.
 type DockerDesktopClient struct {
-	httpClient HTTPClient
+	guiClient     HTTPClient
+	backendClient HTTPClient
 }
 
 func NewDockerDesktopClient() (DockerDesktopClient, error) {
@@ -35,7 +36,7 @@ func NewDockerDesktopClient() (DockerDesktopClient, error) {
 		return DockerDesktopClient{}, err
 	}
 
-	httpClient := &http.Client{
+	guiClient := &http.Client{
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 				var lastErr error
@@ -54,8 +55,16 @@ func NewDockerDesktopClient() (DockerDesktopClient, error) {
 			},
 		},
 	}
+	backendClient := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				return dialDockerBackend()
+			},
+		},
+	}
 	return DockerDesktopClient{
-		httpClient: httpClient,
+		guiClient:     guiClient,
+		backendClient: backendClient,
 	}, nil
 }
 
@@ -111,20 +120,28 @@ func (c DockerDesktopClient) Quit(ctx context.Context) error {
 
 func (c DockerDesktopClient) ResetCluster(ctx context.Context) error {
 	klog.V(7).Infof("POST /kubernetes/reset\n")
+
 	req, err := http.NewRequest("POST", "http://localhost/kubernetes/reset", nil)
 	if err != nil {
 		return errors.Wrap(err, "reset docker-desktop kubernetes")
 	}
 
 	req.Header.Add("Content-Type", "application/json")
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.guiClient.Do(req)
 	if err != nil {
 		return errors.Wrap(err, "reset docker-desktop kubernetes")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("reset docker-desktop kubernetes: status code %d", resp.StatusCode)
+		resp2, err := c.backendClient.Do(req)
+		if err != nil {
+			return errors.Wrap(err, "reset docker-desktop kubernetes")
+		}
+		defer resp2.Body.Close()
+		if resp2.StatusCode != http.StatusOK && resp2.StatusCode != http.StatusCreated {
+			return fmt.Errorf("reset docker-desktop kubernetes: status code %d", resp2.StatusCode)
+		}
 	}
 	return nil
 }
@@ -262,7 +279,7 @@ func (c DockerDesktopClient) writeSettings(ctx context.Context, settings map[str
 	}
 
 	req.Header.Add("Content-Type", "application/json")
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.guiClient.Do(req)
 	if err != nil {
 		return errors.Wrap(err, "writing docker-desktop settings")
 	}
@@ -281,7 +298,7 @@ func (c DockerDesktopClient) settings(ctx context.Context) (map[string]interface
 		return nil, errors.Wrap(err, "reading docker-desktop settings")
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.guiClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to Docker Desktop. "+
 			"Please ensure Docker is installed and up to date.\n  (caused by: %v)", err)
