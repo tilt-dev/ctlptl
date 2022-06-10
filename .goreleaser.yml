@@ -82,6 +82,7 @@ dockers:
   goarch: amd64
   image_templates:
     - "tiltdev/ctlptl:{{ .Tag }}-amd64"
+    - "docker/tilt-ctlptl:{{ .Tag }}-amd64"
   dockerfile: hack/Dockerfile
   use: buildx
   build_flag_templates:
@@ -99,6 +100,7 @@ dockers:
   goarm: ''
   image_templates:
     - "tiltdev/ctlptl:{{ .Tag }}-arm64"
+    - "docker/tilt-ctlptl:{{ .Tag }}-arm64"
   dockerfile: hack/Dockerfile
   use: buildx
   build_flag_templates:
@@ -120,6 +122,14 @@ docker_manifests:
   image_templates:
   - tiltdev/{{ .ProjectName }}:{{ .Tag }}-amd64
   - tiltdev/{{ .ProjectName }}:{{ .Tag }}-arm64
+- name_template: docker/tilt-{{ .ProjectName }}:{{ .Tag }}
+  image_templates:
+  - docker/tilt-{{ .ProjectName }}:{{ .Tag }}-amd64
+  - docker/tilt-{{ .ProjectName }}:{{ .Tag }}-arm64
+- name_template: docker/tilt-{{ .ProjectName }}:latest
+  image_templates:
+  - docker/tilt-{{ .ProjectName }}:{{ .Tag }}-amd64
+  - docker/tilt-{{ .ProjectName }}:{{ .Tag }}-arm64
 
   
 # Uncomment these lines if you want to experiment with other
