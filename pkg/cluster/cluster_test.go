@@ -100,7 +100,7 @@ func TestClusterGetMissing(t *testing.T) {
 
 func TestClusterApplyKIND(t *testing.T) {
 	f := newFixture(t)
-	f.dmachine.os = "darwin"
+	f.setOS("darwin")
 
 	assert.Equal(t, false, f.d4m.started)
 	kindAdmin := f.newFakeAdmin(clusterid.ProductKIND)
@@ -108,7 +108,7 @@ func TestClusterApplyKIND(t *testing.T) {
 	result, err := f.controller.Apply(context.Background(), &api.Cluster{
 		Product: string(clusterid.ProductKIND),
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, true, f.d4m.started)
 	assert.Equal(t, "kind-kind", kindAdmin.created.Name)
 	assert.Equal(t, "kind-kind", result.Name)
@@ -116,7 +116,7 @@ func TestClusterApplyKIND(t *testing.T) {
 
 func TestClusterApplyFailsToStart(t *testing.T) {
 	f := newFixture(t)
-	f.dmachine.os = "darwin"
+	f.setOS("darwin")
 
 	out := bytes.NewBuffer(nil)
 	f.controller.iostreams.ErrOut = out
@@ -140,7 +140,7 @@ func TestClusterApplyFailsToStart(t *testing.T) {
 
 func TestClusterApplyKINDWithCluster(t *testing.T) {
 	f := newFixture(t)
-	f.dmachine.os = "linux"
+	f.setOS("linux")
 
 	f.dockerClient.started = true
 
@@ -160,67 +160,83 @@ func TestClusterApplyKINDWithCluster(t *testing.T) {
 
 func TestClusterApplyDockerDesktop(t *testing.T) {
 	f := newFixture(t)
-	f.dmachine.os = "darwin"
+	f.setOS("darwin")
 
 	assert.Equal(t, false, f.d4m.started)
 	assert.Equal(t, 1, f.dockerClient.ncpu)
-	f, _ = controllerApply(f, clusterid.ProductDockerDesktop, 3)
+	f.apply(clusterid.ProductDockerDesktop, 3)
 	assert.Equal(t, true, f.d4m.started)
 	assert.Equal(t, 3, f.dockerClient.ncpu)
 }
 
+func TestClusterApplyDockerDesktopLinux(t *testing.T) {
+	f := newFixture(t)
+	f.setOS("linux")
+
+	assert.Equal(t, false, f.d4m.started)
+	assert.Equal(t, 1, f.dockerClient.ncpu)
+	f.apply(clusterid.ProductDockerDesktop, 3)
+	assert.Equal(t, true, f.d4m.started)
+	assert.Equal(t, 3, f.dockerClient.ncpu)
+}
+
+func TestClusterApplyDockerDesktopLinuxEngine(t *testing.T) {
+	f := newFixture(t)
+	f.setOS("linux")
+	f.dockerClient.host = "unix:///var/run/docker.sock"
+
+	cluster := &api.Cluster{
+		Product: string(clusterid.ProductDockerDesktop),
+	}
+	_, err := f.controller.Apply(context.Background(), cluster)
+	require.Error(f.t, err)
+	require.Contains(f.t, err.Error(),
+		"Not connected to Docker Engine. Host: \"unix:///var/run/docker.sock\". Error: not started")
+}
+
 func TestClusterApplyDockerDesktopCPUOnly(t *testing.T) {
 	f := newFixture(t)
-	f.dmachine.os = "darwin"
+	f.setOS("darwin")
 
 	err := f.d4m.Open(context.Background())
 	require.NoError(t, err)
 
 	assert.Equal(t, true, f.d4m.started)
 	assert.Equal(t, 1, f.dockerClient.ncpu)
-	f, _ = controllerApply(f, clusterid.ProductDockerDesktop, 3)
+	f.apply(clusterid.ProductDockerDesktop, 3)
 	assert.Equal(t, true, f.d4m.started)
 	assert.Equal(t, 3, f.dockerClient.ncpu)
 }
 
 func TestClusterApplyDockerDesktopStartClusterOnly(t *testing.T) {
 	f := newFixture(t)
-	f.dmachine.os = "darwin"
+	f.setOS("darwin")
 
 	assert.Equal(t, false, f.d4m.started)
 	assert.Equal(t, 1, f.dockerClient.ncpu)
-	f, _ = controllerApply(f, clusterid.ProductDockerDesktop, 0)
+	f.apply(clusterid.ProductDockerDesktop, 0)
 	assert.Equal(t, true, f.d4m.started)
 	assert.Equal(t, 1, f.dockerClient.ncpu)
 }
 
-func controllerApply(f *fixture, product clusterid.Product, cpus int) (*fixture, error) {
-	cluster := &api.Cluster{
-		Product: string(product),
-		MinCPUs: cpus,
-	}
-	_, err := f.controller.Apply(context.Background(), cluster)
-	return f, err
-}
-
 func TestClusterApplyDockerDesktopNoRestart(t *testing.T) {
 	f := newFixture(t)
-	f.dmachine.os = "darwin"
+	f.setOS("darwin")
 
 	assert.Equal(t, 0, f.d4m.settingsWriteCount)
 
 	// Pretend the cluster isn't running.
 	err := f.fakeK8s.Tracker().Delete(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "nodes"}, "", "node-1")
 	assert.NoError(t, err)
-	f, _ = controllerApply(f, clusterid.ProductDockerDesktop, 0)
+	f.apply(clusterid.ProductDockerDesktop, 0)
 	assert.Equal(t, 1, f.d4m.settingsWriteCount)
-	f, _ = controllerApply(f, clusterid.ProductDockerDesktop, 0)
+	f.apply(clusterid.ProductDockerDesktop, 0)
 	assert.Equal(t, 1, f.d4m.settingsWriteCount)
 }
 
 func TestClusterApplyMinikubeVersion(t *testing.T) {
 	f := newFixture(t)
-	f.dmachine.os = "darwin"
+	f.setOS("darwin")
 
 	assert.Equal(t, false, f.d4m.started)
 	minikubeAdmin := f.newFakeAdmin(clusterid.ProductMinikube)
@@ -279,7 +295,7 @@ func TestFillDefaultsKindConfig(t *testing.T) {
 
 func TestClusterApplyKindConfig(t *testing.T) {
 	f := newFixture(t)
-	f.dmachine.os = "darwin"
+	f.setOS("darwin")
 
 	assert.Equal(t, false, f.d4m.started)
 	kindAdmin := f.newFakeAdmin(clusterid.ProductKIND)
@@ -324,7 +340,7 @@ func TestClusterApplyKindConfig(t *testing.T) {
 
 func TestClusterApplyMinikubeConfig(t *testing.T) {
 	f := newFixture(t)
-	f.dmachine.os = "darwin"
+	f.setOS("darwin")
 
 	assert.Equal(t, false, f.d4m.started)
 	minikubeAdmin := f.newFakeAdmin(clusterid.ProductMinikube)
@@ -377,14 +393,15 @@ type fixture struct {
 func newFixture(t *testing.T) *fixture {
 	_ = os.Setenv("DOCKER_HOST", "")
 
-	dockerClient := &fakeDockerClient{ncpu: 1}
+	osName := "darwin" // default to macos
+	dockerClient := &fakeDockerClient{host: "unix:///home/nick/.docker/desktop/docker.sock", ncpu: 1}
 	d4m := &fakeD4MClient{docker: dockerClient}
 	dmachine := &dockerMachine{
 		dockerClient: dockerClient,
 		iostreams:    genericclioptions.IOStreams{Out: os.Stdout, ErrOut: os.Stderr},
 		sleep:        func(d time.Duration) {},
 		d4m:          d4m,
-		os:           "darwin", // default to macos
+		os:           osName,
 	}
 	config := &clientcmdapi.Config{
 		CurrentContext: "microk8s",
@@ -441,6 +458,8 @@ func newFixture(t *testing.T) *fixture {
 		registryCtl:                 registryCtl,
 		waitForKubeConfigTimeout:    time.Millisecond,
 		waitForClusterCreateTimeout: time.Millisecond,
+		os:                          osName,
+		dockerClient:                dockerClient,
 	}
 	return &fixture{
 		t:            t,
@@ -455,6 +474,20 @@ func newFixture(t *testing.T) *fixture {
 	}
 }
 
+func (f *fixture) apply(product clusterid.Product, cpus int) {
+	cluster := &api.Cluster{
+		Product: string(product),
+		MinCPUs: cpus,
+	}
+	_, err := f.controller.Apply(context.Background(), cluster)
+	require.NoError(f.t, err)
+}
+
+func (f *fixture) setOS(os string) {
+	f.controller.os = os
+	f.dmachine.os = os
+}
+
 func (f *fixture) newFakeAdmin(p clusterid.Product) *fakeAdmin {
 	admin := newFakeAdmin(f.config, f.fakeK8s)
 	f.controller.admins[p] = admin
@@ -466,16 +499,13 @@ func newFakeController(t *testing.T) *Controller {
 }
 
 type fakeDockerClient struct {
-	isRemoteHost bool
-	started      bool
-	ncpu         int
+	started bool
+	ncpu    int
+	host    string
 }
 
 func (c *fakeDockerClient) DaemonHost() string {
-	if c.isRemoteHost {
-		return "ssh://ed"
-	}
-	return ""
+	return c.host
 }
 
 func (c *fakeDockerClient) ServerVersion(ctx context.Context) (types.Version, error) {
@@ -541,6 +571,9 @@ func (c *fakeD4MClient) writeSettings(ctx context.Context, settings map[string]i
 }
 
 func (c *fakeD4MClient) settings(ctx context.Context) (map[string]interface{}, error) {
+	if c.lastSettings == nil {
+		c.lastSettings = make(map[string]interface{})
+	}
 	return c.lastSettings, nil
 }
 

@@ -94,39 +94,38 @@ func (m *dockerMachine) EnsureExists(ctx context.Context) error {
 	}
 
 	host := m.dockerClient.DaemonHost()
-	if !docker.IsLocalDockerEngineHost(host) {
-		return fmt.Errorf("Detected remote DOCKER_HOST, but no Docker running. Host: %q. Error: %v",
+
+	// If we are connecting to local desktop, we can try to start it.
+	// Otherwise, we just error.
+	if !docker.IsLocalDockerDesktop(host, m.os) {
+		return fmt.Errorf("Not connected to Docker Engine. Host: %q. Error: %v",
 			host, err)
 	}
 
-	klog.V(2).Infoln("No Docker daemon running. Attempting to start Docker.")
-	if m.os == "darwin" || m.os == "windows" {
-		err := m.d4m.Open(ctx)
-		if err != nil {
-			return err
-		}
-
-		dur := 60 * time.Second
-		_, _ = fmt.Fprintf(m.iostreams.ErrOut, "Waiting %s for Docker Desktop to boot...\n", duration.ShortHumanDuration(dur))
-		err = wait.Poll(time.Second, dur, func() (bool, error) {
-			_, err := m.dockerClient.ServerVersion(ctx)
-			isSuccess := err == nil
-			return isSuccess, nil
-		})
-		if err != nil {
-			return fmt.Errorf("timed out waiting for Docker to start")
-		}
-		klog.V(2).Infoln("Docker started successfully")
-		return nil
+	klog.V(2).Infoln("No Docker Desktop running. Attempting to start Docker.")
+	err = m.d4m.Open(ctx)
+	if err != nil {
+		return err
 	}
 
-	return fmt.Errorf("Please install Docker for Linux: https://docs.docker.com/engine/install/")
+	dur := 60 * time.Second
+	_, _ = fmt.Fprintf(m.iostreams.ErrOut, "Waiting %s for Docker Desktop to boot...\n", duration.ShortHumanDuration(dur))
+	err = wait.Poll(time.Second, dur, func() (bool, error) {
+		_, err := m.dockerClient.ServerVersion(ctx)
+		isSuccess := err == nil
+		return isSuccess, nil
+	})
+	if err != nil {
+		return fmt.Errorf("timed out waiting for Docker to start")
+	}
+	klog.V(2).Infoln("Docker started successfully")
+	return nil
 }
 
 func (m *dockerMachine) Restart(ctx context.Context, desired, existing *api.Cluster) error {
 	canChangeCPUs := false
 	isLocalDockerDesktop := false
-	if docker.IsLocalDockerEngineHost(m.dockerClient.DaemonHost()) && (m.os == "darwin" || m.os == "windows") {
+	if docker.IsLocalDockerDesktop(m.dockerClient.DaemonHost(), m.os) {
 		canChangeCPUs = true // DockerForMac and DockerForWindows can change the CPU on the VM
 		isLocalDockerDesktop = true
 	} else if clusterid.Product(desired.Product) == clusterid.ProductMinikube {
