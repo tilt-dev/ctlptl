@@ -35,10 +35,7 @@ func (a *dockerDesktopAdmin) Create(ctx context.Context, desired *api.Cluster, r
 			a.host)
 	}
 
-	if a.os == "darwin" || a.os == "windows" {
-		return nil
-	}
-	return fmt.Errorf("docker-desktop Kubernetes clusters are only available on macos and windows")
+	return nil
 }
 
 func (a *dockerDesktopAdmin) LocalRegistryHosting(ctx context.Context, desired *api.Cluster, registry *api.Registry) (*localregistry.LocalRegistryHostingV1, error) {
