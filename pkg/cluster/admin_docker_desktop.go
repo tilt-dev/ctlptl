@@ -34,6 +34,16 @@ func (a *dockerDesktopAdmin) Create(ctx context.Context, desired *api.Cluster, r
 			a.host)
 	}
 
+	client, err := NewDockerDesktopClient()
+	if err != nil {
+		return err
+	}
+
+	err = client.ResetCluster(ctx)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -48,11 +58,6 @@ func (a *dockerDesktopAdmin) Delete(ctx context.Context, config *api.Cluster) er
 	}
 
 	client, err := NewDockerDesktopClient()
-	if err != nil {
-		return err
-	}
-
-	err = client.ResetCluster(ctx)
 	if err != nil {
 		return err
 	}
