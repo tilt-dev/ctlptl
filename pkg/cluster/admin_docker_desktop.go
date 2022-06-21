@@ -14,12 +14,13 @@ import (
 // This is a bit different than the other admins, due to the overlap
 //
 type dockerDesktopAdmin struct {
-	os   string
-	host string
+	os     string
+	host   string
+	client d4mClient
 }
 
-func newDockerDesktopAdmin(host string, os string) *dockerDesktopAdmin {
-	return &dockerDesktopAdmin{os: os, host: host}
+func newDockerDesktopAdmin(host string, os string, d4m d4mClient) *dockerDesktopAdmin {
+	return &dockerDesktopAdmin{os: os, host: host, client: d4m}
 }
 
 func (a *dockerDesktopAdmin) EnsureInstalled(ctx context.Context) error { return nil }
@@ -34,12 +35,7 @@ func (a *dockerDesktopAdmin) Create(ctx context.Context, desired *api.Cluster, r
 			a.host)
 	}
 
-	client, err := NewDockerDesktopClient()
-	if err != nil {
-		return err
-	}
-
-	err = client.ResetCluster(ctx)
+	err := a.client.ResetCluster(ctx)
 	if err != nil {
 		return err
 	}
@@ -57,17 +53,12 @@ func (a *dockerDesktopAdmin) Delete(ctx context.Context, config *api.Cluster) er
 		return fmt.Errorf("docker-desktop cannot be deleted from DOCKER_HOST: %s", a.host)
 	}
 
-	client, err := NewDockerDesktopClient()
+	settings, err := a.client.settings(ctx)
 	if err != nil {
 		return err
 	}
 
-	settings, err := client.settings(ctx)
-	if err != nil {
-		return err
-	}
-
-	changed, err := client.setK8sEnabled(settings, false)
+	changed, err := a.client.setK8sEnabled(settings, false)
 	if err != nil {
 		return err
 	}
@@ -75,5 +66,5 @@ func (a *dockerDesktopAdmin) Delete(ctx context.Context, config *api.Cluster) er
 		return nil
 	}
 
-	return client.writeSettings(ctx, settings)
+	return a.client.writeSettings(ctx, settings)
 }
