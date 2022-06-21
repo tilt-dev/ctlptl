@@ -24,7 +24,6 @@ func IsLocalHost(dockerHost string) bool {
 }
 
 // Checks whether the DOCKER_HOST looks like a local Docker Engine.
-// A local Docker Engine has some additional APIs for VM management (i.e., Docker Desktop).
 func IsLocalDockerEngineHost(dockerHost string) bool {
 	if strings.HasPrefix(dockerHost, "unix:") {
 		// Many tools (like colima) try to masquerade as Docker Desktop but run
@@ -39,4 +38,14 @@ func IsLocalDockerEngineHost(dockerHost string) bool {
 
 	// Docker daemons on other local protocols are treated as docker desktop.
 	return IsLocalHost(dockerHost)
+}
+
+// Checks whether the DOCKER_HOST looks like a local Docker Desktop.
+// A local Docker Engine has some additional APIs for VM management (i.e., Docker Desktop).
+func IsLocalDockerDesktop(dockerHost string, os string) bool {
+	if os == "darwin" || os == "windows" {
+		return IsLocalDockerEngineHost(dockerHost)
+	}
+	return strings.HasPrefix(dockerHost, "unix:") &&
+		strings.HasSuffix(dockerHost, "/.docker/desktop/docker.sock")
 }

@@ -3,7 +3,6 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"runtime"
 
 	"github.com/tilt-dev/localregistry-go"
 
@@ -19,8 +18,8 @@ type dockerDesktopAdmin struct {
 	host string
 }
 
-func newDockerDesktopAdmin(host string) *dockerDesktopAdmin {
-	return &dockerDesktopAdmin{os: runtime.GOOS, host: host}
+func newDockerDesktopAdmin(host string, os string) *dockerDesktopAdmin {
+	return &dockerDesktopAdmin{os: os, host: host}
 }
 
 func (a *dockerDesktopAdmin) EnsureInstalled(ctx context.Context) error { return nil }
@@ -29,9 +28,9 @@ func (a *dockerDesktopAdmin) Create(ctx context.Context, desired *api.Cluster, r
 		return fmt.Errorf("ctlptl currently does not support connecting a registry to docker-desktop")
 	}
 
-	isLocalDockerEngine := docker.IsLocalDockerEngineHost(a.host)
-	if !isLocalDockerEngine {
-		return fmt.Errorf("docker-desktop clusters are only available on a local Docker engine. Current DOCKER_HOST: %s",
+	isLocalDockerDesktop := docker.IsLocalDockerDesktop(a.host, a.os)
+	if !isLocalDockerDesktop {
+		return fmt.Errorf("docker-desktop clusters are only available on a local Docker Desktop. Current DOCKER_HOST: %s",
 			a.host)
 	}
 
@@ -43,9 +42,9 @@ func (a *dockerDesktopAdmin) LocalRegistryHosting(ctx context.Context, desired *
 }
 
 func (a *dockerDesktopAdmin) Delete(ctx context.Context, config *api.Cluster) error {
-	isLocalDockerEngine := docker.IsLocalDockerEngineHost(a.host)
-	if !isLocalDockerEngine {
-		return fmt.Errorf("docker-desktop cannot be deleted from a remote DOCKER_HOST: %s", a.host)
+	isLocalDockerHost := docker.IsLocalDockerDesktop(a.host, a.os)
+	if !isLocalDockerHost {
+		return fmt.Errorf("docker-desktop cannot be deleted from DOCKER_HOST: %s", a.host)
 	}
 
 	client, err := NewDockerDesktopClient()

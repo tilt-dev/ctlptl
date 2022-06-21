@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -98,6 +99,7 @@ type Controller struct {
 	socat                       socatController
 	waitForKubeConfigTimeout    time.Duration
 	waitForClusterCreateTimeout time.Duration
+	os                          string
 
 	// TODO(nick): I deeply regret making this struct use goroutines. It makes
 	// everything so much more complex.
@@ -140,6 +142,7 @@ func DefaultController(iostreams genericclioptions.IOStreams) (*Controller, erro
 		clientLoader:                clientLoader,
 		waitForKubeConfigTimeout:    waitForKubeConfigTimeout,
 		waitForClusterCreateTimeout: waitForClusterCreateTimeout,
+		os:                          runtime.GOOS,
 	}, nil
 }
 
@@ -245,12 +248,12 @@ func (c *Controller) admin(ctx context.Context, product clusterid.Product) (Admi
 
 	switch product {
 	case clusterid.ProductDockerDesktop:
-		if !docker.IsLocalDockerEngineHost(dockerClient.DaemonHost()) {
+		if !docker.IsLocalDockerDesktop(dockerClient.DaemonHost(), c.os) {
 			return nil, fmt.Errorf("Detected remote DOCKER_HOST. Remote Docker engines do not support Docker Desktop clusters: %s",
 				dockerClient.DaemonHost())
 		}
 
-		admin = newDockerDesktopAdmin(dockerClient.DaemonHost())
+		admin = newDockerDesktopAdmin(dockerClient.DaemonHost(), c.os)
 	case clusterid.ProductKIND:
 		admin = newKindAdmin(c.iostreams, dockerClient)
 	case clusterid.ProductK3D:
