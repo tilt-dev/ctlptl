@@ -230,6 +230,7 @@ func TestClusterApplyDockerDesktopNoRestart(t *testing.T) {
 	assert.NoError(t, err)
 	f.apply(clusterid.ProductDockerDesktop, 0)
 	assert.Equal(t, 1, f.d4m.settingsWriteCount)
+	assert.Equal(t, 1, f.d4m.resetCount)
 	f.apply(clusterid.ProductDockerDesktop, 0)
 	assert.Equal(t, 1, f.d4m.settingsWriteCount)
 }
