@@ -250,7 +250,7 @@ We expect everyone -- users, contributors, followers, and employees alike -- to 
 
 ## License
 
-Copyright 2020 Windmill Engineering
+Copyright 2022 Docker, Inc.
 
 Licensed under [the Apache License, Version 2.0](LICENSE)
 
