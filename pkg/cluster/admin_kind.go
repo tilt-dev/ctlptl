@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -110,9 +111,14 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 		return errors.Wrap(err, "creating kind cluster")
 	}
 
-	if registry != nil && !a.inKindNetwork(registry) {
+	networkName := kindNetworkName
+	if n := os.Getenv("KIND_EXPERIMENTAL_DOCKER_NETWORK"); n != "" {
+		networkName = n
+	}
+
+	if registry != nil && !a.inKindNetwork(registry, networkName) {
 		_, _ = fmt.Fprintf(a.iostreams.ErrOut, "   Connecting kind to registry %s\n", registry.Name)
-		err := a.dockerClient.NetworkConnect(ctx, kindNetworkName, registry.Name, nil)
+		err := a.dockerClient.NetworkConnect(ctx, networkName, registry.Name, nil)
 		if err != nil {
 			return errors.Wrap(err, "connecting registry")
 		}
@@ -121,9 +127,9 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 	return nil
 }
 
-func (a *kindAdmin) inKindNetwork(registry *api.Registry) bool {
+func (a *kindAdmin) inKindNetwork(registry *api.Registry, networkName string) bool {
 	for _, n := range registry.Status.Networks {
-		if n == kindNetworkName {
+		if n == networkName {
 			return true
 		}
 	}
