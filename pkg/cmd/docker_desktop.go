@@ -56,6 +56,7 @@ func NewDockerDesktopCommand() *cobra.Command {
 			"The second argument is the desired value.\n\n" +
 			"Most settings are scalars. vm.fileSharing is a list of paths separated by commas.",
 		Example: "  ctlptl docker-desktop set vm.resources.cpus 2\n" +
+			"   ctlptl docker-desktop set kubernetes.enabled false\n" +
 			"  ctlptl docker-desktop set vm.fileSharing /Users,/Volumes,/private,/tmp",
 		Run:  withDockerDesktopClient("docker-desktop-set", dockerDesktopSet),
 		Args: cobra.ExactArgs(2),
