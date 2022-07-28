@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -129,6 +130,44 @@ func TestDeleteCascade(t *testing.T) {
 	o.registryDeleter = rd
 	o.Cascade = "true"
 	err := o.run([]string{"cluster", "kind-kind"})
+	require.NoError(t, err)
+	assert.Equal(t,
+		"registry.ctlptl.dev/my-registry deleted\n"+
+			"cluster.ctlptl.dev/kind-kind deleted\n",
+		out.String())
+	assert.Equal(t, "my-registry", rd.lastName)
+}
+
+func TestDeleteCascadeStdin(t *testing.T) {
+	streams, in, out, _ := genericclioptions.NewTestIOStreams()
+	o := NewDeleteOptions()
+	o.IOStreams = streams
+
+	rd := &fakeDeleter{}
+	cd := &fakeClusterController{
+		clusters: map[string]*api.Cluster{
+			"kind-kind": &api.Cluster{
+				Name:     "kind-kind",
+				Registry: "my-registry",
+			},
+		},
+	}
+	o.clusterController = cd
+	o.registryDeleter = rd
+	o.Cascade = "true"
+	o.Filenames = []string{"-"}
+	_, _ = io.WriteString(in, `
+apiVersion: ctlptl.dev/v1alpha1
+kind: Registry
+name: my-registry
+port: 10000
+---
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+product: kind
+registry: my-registry
+`)
+	err := o.run(nil)
 	require.NoError(t, err)
 	assert.Equal(t,
 		"registry.ctlptl.dev/my-registry deleted\n"+
