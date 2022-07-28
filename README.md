@@ -175,6 +175,13 @@ kubernetesVersion: v1.18.8
 EOF
 ```
 
+#### Docker for Mac: Limit to 1 CPU and Disable Kubernetes
+
+```
+ctlptl docker-desktop set vm.resources.cpus 1
+ctlptl docker-desktop set kubernetes.enabled false
+```
+
 #### More
 
 For more details, see:
