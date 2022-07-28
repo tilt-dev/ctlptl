@@ -252,20 +252,21 @@ func (o *DeleteOptions) cascadeResources(ctx context.Context, resources []runtim
 			}
 
 			if registryName != "" && !registryNames[registryName] {
+				registryNames[registryName] = true
 				result = append(result, &api.Registry{
 					TypeMeta: registry.TypeMeta(),
 					Name:     registryName,
 				})
-				registryNames[registryName] = true
 			}
+			result = append(result, r)
 
 		case *api.Registry:
-			if !registryNames[r.Name] {
-				registryNames[r.Name] = true
+			if registryNames[r.Name] {
 				continue
 			}
+			registryNames[r.Name] = true
+			result = append(result, r)
 		}
-		result = append(result, r)
 	}
 
 	return result, nil
