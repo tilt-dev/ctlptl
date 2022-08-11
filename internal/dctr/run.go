@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/flags"
@@ -116,6 +115,6 @@ func pull(ctx context.Context, c Client, image string) error {
 	}
 	defer resp.Close()
 
-	_, _ = io.Copy(ioutil.Discard, resp)
+	_, _ = io.Copy(io.Discard, resp)
 	return nil
 }

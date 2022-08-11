@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"runtime"
 	"sort"
 	"strconv"
@@ -472,7 +471,7 @@ func (c *Controller) populateCluster(ctx context.Context, cluster *api.Cluster) 
 	name := cluster.Name
 	product := clusterid.Product(cluster.Product)
 	if product == clusterid.ProductKIND || product == clusterid.ProductK3D || product == clusterid.ProductMinikube {
-		err := c.maybeCreateForwarderForCurrentCluster(ctx, ioutil.Discard)
+		err := c.maybeCreateForwarderForCurrentCluster(ctx, io.Discard)
 		if err != nil {
 			// If creating the forwarder fails, that's OK. We may still be able to populate things.
 			klog.V(4).Infof("WARNING: connecting socat tunnel to cluster %s: %v\n", name, err)
