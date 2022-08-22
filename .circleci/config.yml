@@ -5,7 +5,7 @@ orbs:
 jobs:
   build:
     docker:
-      - image: cimg/go:1.18
+      - image: cimg/go:1.19
     steps:
       - checkout
       - run: go get -v -t -d ./...
@@ -17,7 +17,7 @@ jobs:
 
   e2e-remote-docker:
     docker:
-      - image: docker/tilt-ctlptl-ci
+      - image: docker/tilt-ctlptl-ci@sha256:74e2dcb1a8abec971e2a6b616aae1bff8bb6d1abdc9d9c03b1a95f090952447f
     steps:
       - checkout
       - setup_remote_docker:
@@ -33,9 +33,9 @@ jobs:
       - kubernetes/install-kubectl
       - run: |
           set -ex
-          wget https://golang.org/dl/go1.18.linux-amd64.tar.gz
+          wget https://golang.org/dl/go1.19.linux-amd64.tar.gz
           sudo rm -fR /usr/local/go
-          sudo tar -C /usr/local -xzf go1.18.linux-amd64.tar.gz
+          sudo tar -C /usr/local -xzf go1.19.linux-amd64.tar.gz
       # We need a newer Docker version to work around a k3d/containerd bug.
       # https://github.com/rancher/k3d/issues/807
       - run: |
@@ -71,7 +71,7 @@ jobs:
           
   release-dry-run:
     docker:
-      - image: cimg/go:1.18
+      - image: cimg/go:1.19
     environment:
       DOCKER_CLI_EXPERIMENTAL: enabled
     steps:
@@ -88,7 +88,7 @@ jobs:
           
   release:
     docker:
-      - image: cimg/go:1.18
+      - image: cimg/go:1.19
     environment:
       DOCKER_CLI_EXPERIMENTAL: enabled
     steps:
