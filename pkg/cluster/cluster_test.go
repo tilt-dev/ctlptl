@@ -448,7 +448,7 @@ func newFixture(t *testing.T) *fixture {
 	registryCtl := &fakeRegistryController{}
 	controller := &Controller{
 		iostreams:                   iostreams,
-		runner:                      exec.NewFakeCmdRunner(func(argv []string) {}),
+		runner:                      exec.NewFakeCmdRunner(func(argv []string) string { return "" }),
 		admins:                      make(map[clusterid.Product]Admin),
 		config:                      *config,
 		configWriter:                configWriter,

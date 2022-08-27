@@ -36,7 +36,12 @@ type minikubeFixture struct {
 func newMinikubeFixture() *minikubeFixture {
 	dockerClient := &fakeDockerClient{ncpu: 1}
 	iostreams := genericclioptions.IOStreams{Out: os.Stdout, ErrOut: os.Stderr}
-	runner := exec.NewFakeCmdRunner(func(argv []string) {})
+	runner := exec.NewFakeCmdRunner(func(argv []string) string {
+		if argv[1] == "version" {
+			return `{"commit":"62e108c3dfdec8029a890ad6d8ef96b6461426dc","minikubeVersion":"v1.25.2"}`
+		}
+		return ""
+	})
 	return &minikubeFixture{
 		runner: runner,
 		a:      newMinikubeAdmin(iostreams, dockerClient, runner),
