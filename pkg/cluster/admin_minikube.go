@@ -3,10 +3,12 @@ package cluster
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
 
+	"github.com/blang/semver/v4"
 	"github.com/docker/docker/api/types/container"
 	"github.com/pkg/errors"
 	"github.com/tilt-dev/localregistry-go"
@@ -16,6 +18,9 @@ import (
 	cexec "github.com/tilt-dev/ctlptl/internal/exec"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 )
+
+// minikube v1.26 completely changes the api for changing the registry
+var v1_26 = semver.MustParse("1.26.0")
 
 // minikubeAdmin uses the minikube CLI to manipulate a minikube cluster,
 // once the underlying machine has been setup.
@@ -41,11 +46,47 @@ func (a *minikubeAdmin) EnsureInstalled(ctx context.Context) error {
 	return nil
 }
 
+type minikubeVersionResponse struct {
+	MinikubeVersion string `json:"minikubeVersion"`
+}
+
+func (a *minikubeAdmin) version(ctx context.Context) (semver.Version, error) {
+	out := bytes.NewBuffer(nil)
+	err := a.runner.RunIO(ctx,
+		genericclioptions.IOStreams{Out: out, ErrOut: a.iostreams.ErrOut},
+		"minikube", "version", "-o", "json")
+	if err != nil {
+		return semver.Version{}, fmt.Errorf("minikube version: %v", err)
+	}
+
+	decoder := json.NewDecoder(out)
+	response := minikubeVersionResponse{}
+	err = decoder.Decode(&response)
+	if err != nil {
+		return semver.Version{}, fmt.Errorf("minikube version: %v", err)
+	}
+	v := response.MinikubeVersion
+	if v == "" {
+		return semver.Version{}, fmt.Errorf("minikube version not found")
+	}
+	result, err := semver.ParseTolerant(v)
+	if err != nil {
+		return semver.Version{}, fmt.Errorf("minikube version: %v", err)
+	}
+	return result, nil
+}
+
 func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, registry *api.Registry) error {
 	klog.V(3).Infof("Creating cluster with config:\n%+v\n---\n", desired)
 	if registry != nil {
 		klog.V(3).Infof("Initializing cluster with registry config:\n%+v\n---\n", registry)
 	}
+
+	v, err := a.version(ctx)
+	if err != nil {
+		return err
+	}
+	isRegistryApi2 := v.GTE(v1_26)
 
 	clusterName := desired.Name
 	if registry != nil {
@@ -92,13 +133,21 @@ func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, regist
 	if desired.KubernetesVersion != "" {
 		args = append(args, "--kubernetes-version", desired.KubernetesVersion)
 	}
+
+	// https://github.com/tilt-dev/ctlptl/issues/239
 	if registry != nil {
+		if isRegistryApi2 {
+			return fmt.Errorf(
+				"Error: Local registries are broken in minikube v1.26.\n" +
+					"See: https://github.com/kubernetes/minikube/issues/14480 .\n" +
+					"Please downgrade to minikube v1.25 until it's fixed.")
+		}
 		args = append(args, "--insecure-registry", fmt.Sprintf("%s:%d", registry.Name, registry.Status.ContainerPort))
 	}
 
 	in := strings.NewReader("")
 
-	err := a.runner.RunIO(ctx,
+	err = a.runner.RunIO(ctx,
 		genericclioptions.IOStreams{In: in, Out: a.iostreams.Out, ErrOut: a.iostreams.ErrOut},
 		"minikube", args...)
 	if err != nil {
