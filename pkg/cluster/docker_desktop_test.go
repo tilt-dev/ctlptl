@@ -240,7 +240,7 @@ type d4mFixture struct {
 func newD4MFixture(t *testing.T) *d4mFixture {
 	f := &d4mFixture{t: t}
 	f.settings = getSettingsJSON
-	f.d4m = &DockerDesktopClient{guiClient: f}
+	f.d4m = &DockerDesktopClient{guiClient: f, backendClient: f}
 	return f
 }
 
@@ -252,7 +252,7 @@ func (f *d4mFixture) readerToMap(r io.Reader) map[string]interface{} {
 }
 
 func (f *d4mFixture) Do(r *http.Request) (*http.Response, error) {
-	require.Equal(f.t, r.URL.Path, "/settings")
+	require.Equal(f.t, r.URL.Path, "/app/settings")
 	if r.Method == "POST" {
 		f.postSettings = f.readerToMap(r.Body)
 
