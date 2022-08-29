@@ -259,29 +259,26 @@ func (c DockerDesktopClient) applySet(settings map[string]interface{}, key, newV
 }
 
 func (c DockerDesktopClient) writeSettings(ctx context.Context, settings map[string]interface{}) error {
-	sfw := c.settingsForWrite(settings)
-	encodeBody := func() (*bytes.Buffer, error) {
-		buf := bytes.NewBuffer(nil)
-		err := json.NewEncoder(buf).Encode(sfw)
-		if err != nil {
-			return nil, errors.Wrap(err, "writing docker-desktop settings")
-		}
-		return buf, nil
+	buf := bytes.NewBuffer(nil)
+	err := json.NewEncoder(buf).Encode(c.settingsForWrite(settings))
+	if err != nil {
+		return errors.Wrap(err, "writing docker-desktop settings")
 	}
+	body := buf.Bytes()
 	resp, err := c.tryRequests("writing docker-desktop settings", []clientRequest{
 		{
 			client:  c.backendClient,
 			method:  "POST",
 			url:     "http://localhost/app/settings",
 			headers: map[string]string{"Content-Type": "application/json"},
-			body:    encodeBody,
+			body:    body,
 		},
 		{
 			client:  c.guiClient,
 			method:  "POST",
 			url:     "http://localhost/settings",
 			headers: map[string]string{"Content-Type": "application/json"},
-			body:    encodeBody,
+			body:    body,
 		},
 	})
 	if err != nil {
@@ -409,45 +406,33 @@ type clientRequest struct {
 	method  string
 	url     string
 	headers map[string]string
-	body    func() (*bytes.Buffer, error)
+	body    []byte
 }
 
 func status2xx(resp *http.Response) bool {
 	return resp.StatusCode >= 200 && resp.StatusCode <= 204
 }
 
-func (c DockerDesktopClient) tryRequests(label string, requests []clientRequest) (resp *http.Response, err error) {
-	for _, creq := range requests {
-		if resp != nil {
-			resp.Body.Close()
-		}
+// tryRequest either returns a 2xx response or an error, but not both.
+// If a response is returned, the caller must close its body.
+func (c DockerDesktopClient) tryRequest(label string, creq clientRequest) (*http.Response, error) {
+	klog.V(7).Infof("%s %s\n", creq.method, creq.url)
 
-		klog.V(7).Infof("%s %s\n", creq.method, creq.url)
-
-		body := &bytes.Buffer{}
-		if creq.body != nil {
-			body, err = creq.body()
-			if err != nil {
-				return nil, errors.Wrap(err, label)
-			}
-			klog.V(8).Infof("Request body: %s\n", body.String())
-		}
-		var req *http.Request
-		req, err = http.NewRequest(creq.method, creq.url, body)
-		if err != nil {
-			return nil, errors.Wrap(err, label)
-		}
-
-		for k, v := range creq.headers {
-			req.Header.Add(k, v)
-		}
-
-		resp, err = creq.client.Do(req)
-
-		if err == nil && status2xx(resp) {
-			return resp, nil
-		}
+	body := []byte{}
+	if creq.body != nil {
+		body = creq.body
+		klog.V(8).Infof("Request body: %s\n", string(body))
 	}
+	req, err := http.NewRequest(creq.method, creq.url, bytes.NewReader(body))
+	if err != nil {
+		return nil, errors.Wrap(err, label)
+	}
+
+	for k, v := range creq.headers {
+		req.Header.Add(k, v)
+	}
+
+	resp, err := creq.client.Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, label)
 	}
@@ -455,5 +440,21 @@ func (c DockerDesktopClient) tryRequests(label string, requests []clientRequest)
 		resp.Body.Close()
 		return nil, errors.Wrap(err, fmt.Sprintf("%s: status code %d", label, resp.StatusCode))
 	}
+
 	return resp, nil
+}
+
+// tryRequests returns the first 2xx response for the given requests, in order,
+// or the error from the last response. If a response is returned, the caller
+// must close its body.
+func (c DockerDesktopClient) tryRequests(label string, requests []clientRequest) (*http.Response, error) {
+	var err error
+	for _, creq := range requests {
+		var resp *http.Response
+		resp, err = c.tryRequest(label, creq)
+		if err == nil {
+			return resp, nil
+		}
+	}
+	return nil, err
 }
