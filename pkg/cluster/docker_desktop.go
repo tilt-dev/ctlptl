@@ -119,30 +119,24 @@ func (c DockerDesktopClient) Quit(ctx context.Context) error {
 }
 
 func (c DockerDesktopClient) ResetCluster(ctx context.Context) error {
-	klog.V(7).Infof("POST /kubernetes/reset\n")
-
-	req, err := http.NewRequest("POST", "http://localhost/kubernetes/reset", nil)
+	resp, err := c.tryRequests("reset docker-desktop kubernetes", []clientRequest{
+		{
+			client:  c.backendClient,
+			method:  "POST",
+			url:     "http://localhost/kubernetes/reset",
+			headers: map[string]string{"Content-Type": "application/json"},
+		},
+		{
+			client:  c.guiClient,
+			method:  "POST",
+			url:     "http://localhost/kubernetes/reset",
+			headers: map[string]string{"Content-Type": "application/json"},
+		},
+	})
 	if err != nil {
-		return errors.Wrap(err, "reset docker-desktop kubernetes")
+		return err
 	}
-
-	req.Header.Add("Content-Type", "application/json")
-	resp, err := c.guiClient.Do(req)
-	if err != nil {
-		return errors.Wrap(err, "reset docker-desktop kubernetes")
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		resp2, err := c.backendClient.Do(req)
-		if err != nil {
-			return errors.Wrap(err, "reset docker-desktop kubernetes")
-		}
-		defer resp2.Body.Close()
-		if resp2.StatusCode != http.StatusOK && resp2.StatusCode != http.StatusCreated {
-			return fmt.Errorf("reset docker-desktop kubernetes: status code %d", resp2.StatusCode)
-		}
-	}
+	resp.Body.Close()
 	return nil
 }
 
@@ -265,54 +259,57 @@ func (c DockerDesktopClient) applySet(settings map[string]interface{}, key, newV
 }
 
 func (c DockerDesktopClient) writeSettings(ctx context.Context, settings map[string]interface{}) error {
-	klog.V(7).Infof("POST /settings\n")
 	buf := bytes.NewBuffer(nil)
 	err := json.NewEncoder(buf).Encode(c.settingsForWrite(settings))
 	if err != nil {
 		return errors.Wrap(err, "writing docker-desktop settings")
 	}
-
-	klog.V(8).Infof("Request body: %s\n", buf.String())
-	req, err := http.NewRequest("POST", "http://localhost/settings", buf)
+	body := buf.Bytes()
+	resp, err := c.tryRequests("writing docker-desktop settings", []clientRequest{
+		{
+			client:  c.backendClient,
+			method:  "POST",
+			url:     "http://localhost/app/settings",
+			headers: map[string]string{"Content-Type": "application/json"},
+			body:    body,
+		},
+		{
+			client:  c.guiClient,
+			method:  "POST",
+			url:     "http://localhost/settings",
+			headers: map[string]string{"Content-Type": "application/json"},
+			body:    body,
+		},
+	})
 	if err != nil {
-		return errors.Wrap(err, "writing docker-desktop settings")
+		return err
 	}
-
-	req.Header.Add("Content-Type", "application/json")
-	resp, err := c.guiClient.Do(req)
-	if err != nil {
-		return errors.Wrap(err, "writing docker-desktop settings")
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("writing docker-desktop settings: status code %d", resp.StatusCode)
-	}
+	resp.Body.Close()
 	return nil
 }
 
 func (c DockerDesktopClient) settings(ctx context.Context) (map[string]interface{}, error) {
-	klog.V(7).Infof("GET /settings\n")
-	req, err := http.NewRequest("GET", "http://localhost/settings", nil)
+	resp, err := c.tryRequests("reading docker-desktop settings", []clientRequest{
+		{
+			client: c.backendClient,
+			method: "GET",
+			url:    "http://localhost/app/settings",
+		},
+		{
+			client: c.guiClient,
+			method: "GET",
+			url:    "http://localhost/settings",
+		},
+	})
 	if err != nil {
-		return nil, errors.Wrap(err, "reading docker-desktop settings")
-	}
-
-	resp, err := c.guiClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("could not connect to Docker Desktop. "+
-			"Please ensure Docker is installed and up to date.\n  (caused by: %v)", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("reading docker-desktop settings: status code %d", resp.StatusCode)
-	}
 
 	settings := make(map[string]interface{})
 	err = json.NewDecoder(resp.Body).Decode(&settings)
 	if err != nil {
-		return nil, errors.Wrap(err, "reading docker settings")
+		return nil, errors.Wrap(err, "reading docker-desktop settings")
 	}
 	klog.V(8).Infof("Response body: %+v\n", settings)
 	return settings, nil
@@ -402,4 +399,94 @@ func (c DockerDesktopClient) settingsForWrite(settings interface{}) interface{} 
 	}
 
 	return settings
+}
+
+type clientRequest struct {
+	client  HTTPClient
+	method  string
+	url     string
+	headers map[string]string
+	body    []byte
+}
+
+func status2xx(resp *http.Response) bool {
+	return resp.StatusCode >= 200 && resp.StatusCode <= 204
+}
+
+type withStatusCode struct {
+	error
+	statusCode int
+}
+
+func (w withStatusCode) Cause() error { return w.error }
+
+// tryRequest either returns a 2xx response or an error, but not both.
+// If a response is returned, the caller must close its body.
+func (c DockerDesktopClient) tryRequest(label string, creq clientRequest) (*http.Response, error) {
+	klog.V(7).Infof("%s %s\n", creq.method, creq.url)
+
+	body := []byte{}
+	if creq.body != nil {
+		body = creq.body
+		klog.V(8).Infof("Request body: %s\n", string(body))
+	}
+	req, err := http.NewRequest(creq.method, creq.url, bytes.NewReader(body))
+	if err != nil {
+		return nil, errors.Wrap(err, label)
+	}
+
+	for k, v := range creq.headers {
+		req.Header.Add(k, v)
+	}
+
+	resp, err := creq.client.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, label)
+	}
+	if !status2xx(resp) {
+		resp.Body.Close()
+		return nil, withStatusCode{errors.Errorf("%s: status code %d", label, resp.StatusCode), resp.StatusCode}
+	}
+
+	return resp, nil
+}
+
+func errorPriority(err error) int {
+	switch e := err.(type) {
+	case withStatusCode:
+		return e.statusCode / 100
+	default: // give actual errors higher priority than non-2xx status codes
+		return 10
+	}
+}
+
+func chooseWorstError(errs []error) error {
+	err := errs[0]
+	prio := errorPriority(err)
+	for _, e := range errs[1:] {
+		if p := errorPriority(e); p > prio {
+			err = e
+			prio = p
+		}
+	}
+	return err
+}
+
+// tryRequests returns the first 2xx response for the given requests, in order,
+// or the "highest priority" error (based on errorPriority) from response
+// errors. If a response is returned, the caller must close its body.
+func (c DockerDesktopClient) tryRequests(label string, requests []clientRequest) (*http.Response, error) {
+	if len(requests) == 0 {
+		panic(fmt.Sprintf("%s: no requests provided", label))
+	}
+
+	errs := []error{}
+	for _, creq := range requests {
+		resp, err := c.tryRequest(label, creq)
+		if err == nil {
+			return resp, nil
+		}
+		errs = append(errs, err)
+	}
+	return nil, chooseWorstError(errs)
 }

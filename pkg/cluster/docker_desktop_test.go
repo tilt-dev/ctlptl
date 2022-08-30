@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -224,6 +226,42 @@ func TestSetSettingValueFileSharing(t *testing.T) {
 
 }
 
+func TestChooseWorstError(t *testing.T) {
+	tt := []struct {
+		expected string
+		errors   []error
+	}{
+		{
+			"connection error",
+			[]error{
+				errors.Wrap(errors.New("connection error"), ""),
+				withStatusCode{errors.New("404 error"), 404},
+			},
+		},
+		{
+			"500 error",
+			[]error{
+				withStatusCode{errors.New("500 error"), 500},
+				withStatusCode{errors.New("404 error"), 404},
+			},
+		},
+		{
+			"first error",
+			[]error{
+				errors.Wrap(errors.New("first error"), ""),
+				errors.Wrap(errors.New("second error"), ""),
+			},
+		},
+	}
+
+	for i, tc := range tt {
+		t.Run(strconv.Itoa(i)+" "+tc.expected, func(t *testing.T) {
+			err := chooseWorstError(tc.errors)
+			assert.EqualError(t, errors.Cause(err), tc.expected)
+		})
+	}
+}
+
 var getSettingsOldJSON = `{"vm":{"proxy":{"exclude":{"value":"","locked":false},"http":{"value":"","locked":false},"https":{"value":"","locked":false},"mode":{"value":"system","locked":false}},"daemon":{"locks":[],"json":"{\"debug\":true,\"experimental\":false}"},"resources":{"cpus":{"value":2,"min":1,"locked":false,"max":8},"memoryMiB":{"value":8192,"min":1024,"locked":false,"max":16384},"diskSizeMiB":{"value":61035,"used":18486,"locked":false},"dataFolder":{"value":"\/Users\/nick\/Library\/Containers\/com.docker.docker\/Data\/vms\/0\/data","locked":false},"swapMiB":{"value":1024,"min":512,"locked":false,"max":4096}},"fileSharing":{"value":[{"path":"\/Users","cached":false},{"path":"\/Volumes","cached":false},{"path":"\/private","cached":false},{"path":"\/tmp","cached":false}],"locked":false},"kubernetes":{"enabled":{"value":false,"locked":false},"stackOrchestrator":{"value":false,"locked":false},"showSystemContainers":{"value":false,"locked":false}},"network":{"dns":{"locked":false},"vpnkitCIDR":{"value":"192.168.65.0\/24","locked":false},"automaticDNS":{"value":true,"locked":false}}},"desktop":{"exportInsecureDaemon":{"value":false,"locked":false},"useGrpcfuse":{"value":true,"locked":false},"backupData":{"value":false,"locked":false},"checkForUpdates":{"value":true,"locked":false},"useCredentialHelper":{"value":true,"locked":false},"autoStart":{"value":false,"locked":false},"analyticsEnabled":{"value":true,"locked":false}},"wslIntegration":{"distros":{"value":[],"locked":false},"enableIntegrationWithDefaultWslDistro":{"value":false,"locked":false}},"cli":{"useCloudCli":{"value":true,"locked":false},"experimental":{"value":true,"locked":false}}}`
 
 var getSettingsJSON = `{"vm":{"proxy":{"exclude":"","http":"","https":"","mode":"system"},"daemon":{"locks":[],"json":"{\"debug\":true,\"experimental\":false}"},"resources":{"cpus":{"value":2,"min":1,"locked":false,"max":8},"memoryMiB":{"value":8192,"min":1024,"locked":false,"max":16384},"diskSizeMiB":{"value":61035,"used":18486,"locked":false},"dataFolder":"\/Users\/nick\/Library\/Containers\/com.docker.docker\/Data\/vms\/0\/data","swapMiB":{"value":1024,"min":512,"locked":false,"max":4096}},"fileSharing":{"value":[{"path":"\/Users","cached":false},{"path":"\/Volumes","cached":false},{"path":"\/private","cached":false},{"path":"\/tmp","cached":false}],"locked":false},"kubernetes":{"enabled":false,"stackOrchestrator":false,"showSystemContainers":false},"network":{"dns":{"locked":false},"vpnkitCIDR":"192.168.65.0\/24","automaticDNS":true}},"desktop":{"exportInsecureDaemon":false,"useGrpcfuse":true,"backupData":false,"checkForUpdates":true,"useCredentialHelper":true,"autoStart":false,"analyticsEnabled":true},"wslIntegration":{"distros":[],"enableIntegrationWithDefaultWslDistro":false},"cli":{"useCloudCli":true,"experimental":true}}`
@@ -240,7 +278,7 @@ type d4mFixture struct {
 func newD4MFixture(t *testing.T) *d4mFixture {
 	f := &d4mFixture{t: t}
 	f.settings = getSettingsJSON
-	f.d4m = &DockerDesktopClient{guiClient: f}
+	f.d4m = &DockerDesktopClient{guiClient: f, backendClient: f}
 	return f
 }
 
@@ -252,7 +290,7 @@ func (f *d4mFixture) readerToMap(r io.Reader) map[string]interface{} {
 }
 
 func (f *d4mFixture) Do(r *http.Request) (*http.Response, error) {
-	require.Equal(f.t, r.URL.Path, "/settings")
+	require.Equal(f.t, r.URL.Path, "/app/settings")
 	if r.Method == "POST" {
 		f.postSettings = f.readerToMap(r.Body)
 
