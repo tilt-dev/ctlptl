@@ -413,6 +413,13 @@ func status2xx(resp *http.Response) bool {
 	return resp.StatusCode >= 200 && resp.StatusCode <= 204
 }
 
+type withStatusCode struct {
+	error
+	statusCode int
+}
+
+func (w withStatusCode) Cause() error { return w.error }
+
 // tryRequest either returns a 2xx response or an error, but not both.
 // If a response is returned, the caller must close its body.
 func (c DockerDesktopClient) tryRequest(label string, creq clientRequest) (*http.Response, error) {
@@ -438,23 +445,48 @@ func (c DockerDesktopClient) tryRequest(label string, creq clientRequest) (*http
 	}
 	if !status2xx(resp) {
 		resp.Body.Close()
-		return nil, errors.Wrap(err, fmt.Sprintf("%s: status code %d", label, resp.StatusCode))
+		return nil, withStatusCode{errors.Errorf("%s: status code %d", label, resp.StatusCode), resp.StatusCode}
 	}
 
 	return resp, nil
 }
 
+func errorPriority(err error) int {
+	switch e := err.(type) {
+	case withStatusCode:
+		return e.statusCode / 100
+	default: // give actual errors higher priority than non-2xx status codes
+		return 10
+	}
+}
+
+func chooseWorstError(errs []error) error {
+	err := errs[0]
+	prio := errorPriority(err)
+	for _, e := range errs[1:] {
+		if p := errorPriority(e); p > prio {
+			err = e
+			prio = p
+		}
+	}
+	return err
+}
+
 // tryRequests returns the first 2xx response for the given requests, in order,
-// or the error from the last response. If a response is returned, the caller
-// must close its body.
+// or the "highest priority" error (based on errorPriority) from response
+// errors. If a response is returned, the caller must close its body.
 func (c DockerDesktopClient) tryRequests(label string, requests []clientRequest) (*http.Response, error) {
-	var err error
+	if len(requests) == 0 {
+		panic(fmt.Sprintf("%s: no requests provided", label))
+	}
+
+	errs := []error{}
 	for _, creq := range requests {
-		var resp *http.Response
-		resp, err = c.tryRequest(label, creq)
+		resp, err := c.tryRequest(label, creq)
 		if err == nil {
 			return resp, nil
 		}
+		errs = append(errs, err)
 	}
-	return nil, err
+	return nil, chooseWorstError(errs)
 }
