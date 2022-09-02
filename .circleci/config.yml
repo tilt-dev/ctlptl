@@ -17,7 +17,7 @@ jobs:
 
   e2e-remote-docker:
     docker:
-      - image: docker/tilt-ctlptl-ci@sha256:399ac0f677aa573322112315278d34afdc4238b9bb03b8fceee906d0cb3cc4ec
+      - image: docker/tilt-ctlptl-ci@sha256:aed12655a66198ed10f136c7de02868a846fb4ae4b5ace2ca11f1e92d0c4e766
     steps:
       - checkout
       - setup_remote_docker:
