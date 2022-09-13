@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/blang/semver/v4"
+	"github.com/docker/docker/errdefs"
 	"github.com/pkg/errors"
 	"github.com/tilt-dev/localregistry-go"
 	"gopkg.in/yaml.v3"
@@ -19,7 +20,13 @@ import (
 	"github.com/tilt-dev/ctlptl/pkg/api"
 )
 
-const kindNetworkName = "kind"
+func kindNetworkName() string {
+	networkName := "kind"
+	if n := os.Getenv("KIND_EXPERIMENTAL_DOCKER_NETWORK"); n != "" {
+		networkName = n
+	}
+	return networkName
+}
 
 // kindAdmin uses the kind CLI to manipulate a kind cluster,
 // once the underlying machine has been setup.
@@ -111,10 +118,7 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 		return errors.Wrap(err, "creating kind cluster")
 	}
 
-	networkName := kindNetworkName
-	if n := os.Getenv("KIND_EXPERIMENTAL_DOCKER_NETWORK"); n != "" {
-		networkName = n
-	}
+	networkName := kindNetworkName()
 
 	if registry != nil && !a.inKindNetwork(registry, networkName) {
 		_, _ = fmt.Fprintf(a.iostreams.ErrOut, "   Connecting kind to registry %s\n", registry.Name)
@@ -160,6 +164,21 @@ func (a *kindAdmin) Delete(ctx context.Context, config *api.Cluster) error {
 		return errors.Wrap(err, "deleting kind cluster")
 	}
 	return nil
+}
+
+func (a *kindAdmin) ModifyConfigInContainer(ctx context.Context, cluster *api.Cluster, containerID string, dockerClient dockerClient, configWriter configWriter) error {
+	err := dockerClient.NetworkConnect(ctx, kindNetworkName(), containerID, nil)
+	if err != nil {
+		if !errdefs.IsForbidden(err) || !strings.Contains(err.Error(), "already exists") {
+			return fmt.Errorf("error connecting to cluster network: %w", err)
+		}
+	}
+
+	kindName := strings.TrimPrefix(cluster.Name, "kind-")
+	return configWriter.SetConfig(
+		fmt.Sprintf("clusters.%s.server", cluster.Name),
+		fmt.Sprintf("https://%s-control-plane:6443", kindName),
+	)
 }
 
 func (a *kindAdmin) getNodeImage(ctx context.Context, kindVersion, k8sVersion string) (string, error) {

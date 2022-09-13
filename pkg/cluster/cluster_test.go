@@ -379,6 +379,37 @@ func TestClusterApplyMinikubeConfig(t *testing.T) {
 	assert.Contains(t, f.errOut.String(), "desired Minikube config does not match current")
 }
 
+func TestClusterFixKubeConfigInContainer(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+
+	t.Run("when not in a container", func(t *testing.T) {
+		cluster := &api.Cluster{Product: string(clusterid.ProductKIND)}
+		assert.NoError(t, f.controller.maybeFixKubeConfigInsideContainer(ctx, cluster))
+		assert.Empty(t, f.dockerClient.networks)
+		assert.Empty(t, f.configWriter.opts)
+	})
+
+	t.Run("with a cluster that doesn't support AdminInContainer", func(t *testing.T) {
+		f.dockerClient.containerID = "012345abcdef"
+		cluster := &api.Cluster{Product: string(clusterid.ProductK3D)}
+		assert.NoError(t, f.controller.maybeFixKubeConfigInsideContainer(ctx, cluster))
+		assert.Empty(t, f.dockerClient.networks)
+		assert.Empty(t, f.configWriter.opts)
+	})
+
+	t.Run("when in a container and using a KIND cluster", func(t *testing.T) {
+		f.dockerClient.containerID = "012345abcdef"
+		cluster := &api.Cluster{
+			Name:    "kind-test",
+			Product: string(clusterid.ProductKIND),
+		}
+		assert.NoError(t, f.controller.maybeFixKubeConfigInsideContainer(ctx, cluster))
+		assert.Contains(t, f.dockerClient.networks, kindNetworkName())
+		assert.Equal(t, "https://test-control-plane:6443", f.configWriter.opts["clusters.kind-test.server"])
+	})
+}
+
 type fixture struct {
 	t            *testing.T
 	errOut       *bytes.Buffer
@@ -387,6 +418,7 @@ type fixture struct {
 	dmachine     *dockerMachine
 	d4m          *fakeD4MClient
 	config       *clientcmdapi.Config
+	configWriter fakeConfigWriter
 	registryCtl  *fakeRegistryController
 	fakeK8s      *fake.Clientset
 }
@@ -422,7 +454,7 @@ func newFixture(t *testing.T) *fixture {
 	configLoader := configLoader(func() (clientcmdapi.Config, error) {
 		return *config, nil
 	})
-	configWriter := fakeConfigWriter{config: config}
+	configWriter := fakeConfigWriter{config: config, opts: make(map[string]string)}
 	iostreams := genericclioptions.IOStreams{
 		In:     os.Stdin,
 		Out:    bytes.NewBuffer(nil),
@@ -470,6 +502,7 @@ func newFixture(t *testing.T) *fixture {
 		d4m:          d4m,
 		dockerClient: dockerClient,
 		config:       config,
+		configWriter: configWriter,
 		registryCtl:  registryCtl,
 		fakeK8s:      fakeK8s,
 	}
@@ -500,9 +533,11 @@ func newFakeController(t *testing.T) *Controller {
 }
 
 type fakeDockerClient struct {
-	started bool
-	ncpu    int
-	host    string
+	started     bool
+	ncpu        int
+	host        string
+	networks    []string
+	containerID string
 }
 
 func (c *fakeDockerClient) DaemonHost() string {
@@ -549,11 +584,26 @@ func (d *fakeDockerClient) ContainerStart(ctx context.Context, containerID strin
 }
 
 func (d *fakeDockerClient) NetworkConnect(ctx context.Context, networkID, containerID string, config *network.EndpointSettings) error {
+	d.networks = append(d.networks, networkID)
 	return nil
 }
 
 func (d *fakeDockerClient) NetworkDisconnect(ctx context.Context, networkID, containerID string, force bool) error {
+	if len(d.networks) == 0 {
+		return nil
+	}
+	networks := []string{}
+	for _, n := range d.networks {
+		if n != networkID {
+			networks = append(networks, n)
+		}
+	}
+	d.networks = networks
 	return nil
+}
+
+func (d *fakeDockerClient) insideContainer(ctx context.Context) string {
+	return d.containerID
 }
 
 type fakeD4MClient struct {
@@ -683,6 +733,7 @@ func (c *fakeRegistryController) Apply(ctx context.Context, r *api.Registry) (*a
 
 type fakeConfigWriter struct {
 	config *clientcmdapi.Config
+	opts   map[string]string
 }
 
 func (w fakeConfigWriter) SetContext(name string) error {
@@ -695,5 +746,10 @@ func (w fakeConfigWriter) DeleteContext(name string) error {
 		w.config.CurrentContext = ""
 	}
 	delete(w.config.Contexts, name)
+	return nil
+}
+
+func (w fakeConfigWriter) SetConfig(name, value string) error {
+	w.opts[name] = value
 	return nil
 }
