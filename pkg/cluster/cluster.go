@@ -786,6 +786,11 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 			return nil, err
 		}
 
+		err = c.maybeFixKubeConfigInsideContainer(ctx, desired)
+		if err != nil {
+			return nil, err
+		}
+
 		err = c.waitForHealthCheckAfterCreate(ctx, desired)
 		if err != nil {
 			return nil, err
@@ -1107,4 +1112,32 @@ func (c *Controller) waitForHealthCheckAfterCreate(ctx context.Context, cluster 
 		return fmt.Errorf("timed out waiting for cluster to start: %v", lastErr)
 	}
 	return nil
+}
+
+// maybeFixKubeConfigInsideContainer modifies the kubeconfig to allow access to
+// the cluster from a container attached to the same network as the cluster, if
+// currently running inside a container and the cluster admin object supports
+// the modifications.
+func (c *Controller) maybeFixKubeConfigInsideContainer(ctx context.Context, cluster *api.Cluster) error {
+	containerID := insideContainer(ctx, c.dockerClient)
+	if containerID == "" {
+		return nil
+	}
+
+	admin, err := c.admin(ctx, clusterid.Product(cluster.Product))
+	if err != nil {
+		return err
+	}
+
+	adminInC, ok := admin.(AdminInContainer)
+	if !ok {
+		return nil
+	}
+
+	err = adminInC.ModifyConfigInContainer(ctx, cluster, containerID, c.dockerClient, c.configWriter)
+	if err != nil {
+		return fmt.Errorf("error updating kube config: %w", err)
+	}
+
+	return c.reloadConfigs()
 }
