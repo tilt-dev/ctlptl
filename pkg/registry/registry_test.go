@@ -253,6 +253,7 @@ func TestApplyLabels(t *testing.T) {
 		}, config.Labels)
 		assert.Equal(t, "kind-registry", config.Hostname)
 		assert.Equal(t, "docker.io/library/registry:2", config.Image)
+		assert.Equal(t, []string{"REGISTRY_STORAGE_DELETE_ENABLED=true"}, config.Env)
 	}
 }
 
