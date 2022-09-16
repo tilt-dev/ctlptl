@@ -21,6 +21,7 @@ import (
 
 // minikube v1.26 completely changes the api for changing the registry
 var v1_26 = semver.MustParse("1.26.0")
+var v1_27 = semver.MustParse("1.27.0")
 
 // minikubeAdmin uses the minikube CLI to manipulate a minikube cluster,
 // once the underlying machine has been setup.
@@ -86,7 +87,8 @@ func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, regist
 	if err != nil {
 		return err
 	}
-	isRegistryApi2 := v.GTE(v1_26)
+	isRegistryApiBroken := v.GTE(v1_26) && v.LT(v1_27)
+	isRegistryApiV2 := v.GTE(v1_26)
 
 	clusterName := desired.Name
 	if registry != nil {
@@ -136,11 +138,11 @@ func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, regist
 
 	// https://github.com/tilt-dev/ctlptl/issues/239
 	if registry != nil {
-		if isRegistryApi2 {
+		if isRegistryApiBroken {
 			return fmt.Errorf(
 				"Error: Local registries are broken in minikube v1.26.\n" +
 					"See: https://github.com/kubernetes/minikube/issues/14480 .\n" +
-					"Please downgrade to minikube v1.25 until it's fixed.")
+					"Please upgrade to minikube v1.27.")
 		}
 		args = append(args, "--insecure-registry", fmt.Sprintf("%s:%d", registry.Name, registry.Status.ContainerPort))
 	}
@@ -165,9 +167,16 @@ func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, regist
 			return err
 		}
 
-		err = a.applyContainerdPatch(ctx, desired, registry, networkMode)
-		if err != nil {
-			return err
+		if isRegistryApiV2 {
+			err = a.applyContainerdPatchRegistryApiV2(ctx, desired, registry, networkMode)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = a.applyContainerdPatchRegistryApiV1(ctx, desired, registry, networkMode)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -210,10 +219,62 @@ func (a *minikubeAdmin) ensureRegistryDisconnected(ctx context.Context, registry
 	return nil
 }
 
+// We want to make sure that the image is pullable from either:
+// localhost:[registry-port] or
+// [registry-name]:5000
+// by cloning the registry config created by minikube's --insecure-registry.
+func (a *minikubeAdmin) applyContainerdPatchRegistryApiV2(ctx context.Context, desired *api.Cluster, registry *api.Registry, networkMode container.NetworkMode) error {
+	nodeOutput := bytes.NewBuffer(nil)
+	err := a.runner.RunIO(ctx,
+		genericclioptions.IOStreams{Out: nodeOutput, ErrOut: a.iostreams.ErrOut},
+		"minikube", "-p", desired.Name, "node", "list")
+	if err != nil {
+		return errors.Wrap(err, "configuring minikube registry")
+	}
+
+	nodes := []string{}
+	nodeOutputSplit := strings.Split(nodeOutput.String(), "\n")
+	for _, line := range nodeOutputSplit {
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		node := strings.TrimSpace(fields[0])
+		if node == "" {
+			continue
+		}
+		nodes = append(nodes, node)
+	}
+
+	for _, node := range nodes {
+		networkHost := registry.Status.IPAddress
+		if networkMode.IsUserDefined() {
+			networkHost = registry.Name
+		}
+
+		err := a.runner.RunIO(ctx,
+			a.iostreams,
+			"minikube", "-p", desired.Name, "--node", node,
+			"ssh", "sudo", "cp", `\-R`,
+			fmt.Sprintf(`/etc/containerd/certs.d/%s\:%d`, networkHost, registry.Status.ContainerPort),
+			fmt.Sprintf(`/etc/containerd/certs.d/localhost\:%d`, registry.Status.HostPort))
+		if err != nil {
+			return errors.Wrap(err, "configuring minikube registry")
+		}
+
+		err = a.runner.RunIO(ctx, a.iostreams, "minikube", "-p", desired.Name, "--node", node,
+			"ssh", "sudo", "systemctl", "restart", "containerd")
+		if err != nil {
+			return errors.Wrap(err, "configuring minikube registry")
+		}
+	}
+	return nil
+}
+
 // We still patch containerd so that the user can push/pull from localhost.
 // But note that this will NOT survive across minikube stop and start.
 // See https://github.com/tilt-dev/ctlptl/issues/180
-func (a *minikubeAdmin) applyContainerdPatch(ctx context.Context, desired *api.Cluster, registry *api.Registry, networkMode container.NetworkMode) error {
+func (a *minikubeAdmin) applyContainerdPatchRegistryApiV1(ctx context.Context, desired *api.Cluster, registry *api.Registry, networkMode container.NetworkMode) error {
 	configPath := "/etc/containerd/config.toml"
 
 	nodeOutput := bytes.NewBuffer(nil)
