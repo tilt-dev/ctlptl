@@ -253,6 +253,7 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 			Image:        desired.Image,
 			ExposedPorts: exposedPorts,
 			Labels:       c.labelConfigs(existing, desired),
+			Env:          []string{"REGISTRY_STORAGE_DELETE_ENABLED=true"},
 		},
 		&container.HostConfig{
 			RestartPolicy: container.RestartPolicy{Name: "always"},
