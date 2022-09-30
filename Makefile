@@ -31,4 +31,4 @@ BUILDER=buildx-multiarch
 
 publish-ci-image:
 	docker buildx inspect $(BUILDER) || docker buildx create --name=$(BUILDER) --driver=docker-container --driver-opt=network=host
-	docker buildx build --builder=$(BUILDER) --platform=linux/amd64,linux/arm64 --push -t docker/tilt-ctlptl-ci -f .circleci/Dockerfile .
+	docker buildx build --builder=$(BUILDER) --pull --platform=linux/amd64,linux/arm64 --push -t docker/tilt-ctlptl-ci -f .circleci/Dockerfile .
