@@ -75,6 +75,18 @@ func TestClusterList(t *testing.T) {
 	assert.Equal(t, "microk8s", clusters.Items[1].Name)
 }
 
+// Make sure that an empty config doesn't confuse ctlptl.
+func TestClusterListEmptyConfig(t *testing.T) {
+	c := newFakeController(t)
+	c.config.Contexts["kind"] = &clientcmdapi.Context{}
+
+	clusters, err := c.List(context.Background(), ListOptions{})
+	assert.NoError(t, err)
+	require.Equal(t, 2, len(clusters.Items))
+	assert.Equal(t, "docker-desktop", clusters.Items[0].Name)
+	assert.Equal(t, "microk8s", clusters.Items[1].Name)
+}
+
 func TestClusterListSelectorMatch(t *testing.T) {
 	c := newFakeController(t)
 	clusters, err := c.List(context.Background(), ListOptions{FieldSelector: "product=microk8s"})
@@ -101,6 +113,25 @@ func TestClusterGetMissing(t *testing.T) {
 func TestClusterApplyKIND(t *testing.T) {
 	f := newFixture(t)
 	f.setOS("darwin")
+
+	assert.Equal(t, false, f.d4m.started)
+	kindAdmin := f.newFakeAdmin(clusterid.ProductKIND)
+
+	result, err := f.controller.Apply(context.Background(), &api.Cluster{
+		Product: string(clusterid.ProductKIND),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, true, f.d4m.started)
+	assert.Equal(t, "kind-kind", kindAdmin.created.Name)
+	assert.Equal(t, "kind-kind", result.Name)
+}
+
+// Make sure an empty context doesn't confuse ctlptl.
+func TestClusterApplyKINDEmptyConfig(t *testing.T) {
+	f := newFixture(t)
+	f.setOS("darwin")
+
+	f.config.Contexts["kind"] = &clientcmdapi.Context{}
 
 	assert.Equal(t, false, f.d4m.started)
 	kindAdmin := f.newFakeAdmin(clusterid.ProductKIND)
