@@ -936,10 +936,16 @@ func (c *Controller) Get(ctx context.Context, name string) (*api.Cluster, error)
 	if !ok {
 		return nil, apierrors.NewNotFound(groupResource, name)
 	}
+
+	configCluster, ok := config.Clusters[ct.Cluster]
+	if !ok {
+		return nil, apierrors.NewNotFound(groupResource, name)
+	}
+
 	cluster := &api.Cluster{
 		TypeMeta: typeMeta,
 		Name:     name,
-		Product:  clusterid.ProductFromContext(ct, config.Clusters[ct.Cluster]).String(),
+		Product:  clusterid.ProductFromContext(ct, configCluster).String(),
 	}
 	c.populateCluster(ctx, cluster)
 
@@ -954,7 +960,13 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Cluste
 
 	config := c.configCopy()
 	names := make([]string, 0, len(c.config.Contexts))
-	for name := range config.Contexts {
+	for name, ct := range config.Contexts {
+		_, ok := config.Clusters[ct.Cluster]
+		if !ok {
+			// Filter out malformed contexts.
+			continue
+		}
+
 		names = append(names, name)
 	}
 	sort.Strings(names)
