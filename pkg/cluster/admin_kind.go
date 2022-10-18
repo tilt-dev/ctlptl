@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -85,6 +86,25 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 
 	kindName := strings.TrimPrefix(clusterName, "kind-")
 
+	// If a cluster has been registered with Kind, but deleted from our kubeconfig,
+	// Kind will refuse to create a new cluster. The only way to salvage it is
+	// to delete and recreate.
+	exists, err := a.clusterExists(ctx, kindName)
+	if err != nil {
+		return err
+	}
+
+	if exists {
+		klog.V(3).Infof("Deleting orphaned KIND cluster: %s", kindName)
+		cmd := exec.CommandContext(ctx, "kind", "delete", "cluster", "--name", kindName)
+		cmd.Stdout = a.iostreams.Out
+		cmd.Stderr = a.iostreams.ErrOut
+		err := cmd.Run()
+		if err != nil {
+			return errors.Wrap(err, "deleting orphaned kind cluster")
+		}
+	}
+
 	args := []string{"create", "cluster", "--name", kindName}
 	if desired.KubernetesVersion != "" {
 		kindVersion, err := a.getKindVersion(ctx)
@@ -102,7 +122,7 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 	kindConfig := a.kindClusterConfig(desired, registry)
 	buf := bytes.NewBuffer(nil)
 	encoder := yaml.NewEncoder(buf)
-	err := encoder.Encode(kindConfig)
+	err = encoder.Encode(kindConfig)
 	if err != nil {
 		return errors.Wrap(err, "creating kind cluster")
 	}
@@ -129,6 +149,26 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 	}
 
 	return nil
+}
+
+func (a *kindAdmin) clusterExists(ctx context.Context, cluster string) (bool, error) {
+	buf := bytes.NewBuffer(nil)
+	cmd := exec.CommandContext(ctx, "kind", "get", "clusters")
+	cmd.Stdout = buf
+	cmd.Stderr = a.iostreams.ErrOut
+	err := cmd.Run()
+	if err != nil {
+		return false, errors.Wrap(err, "kind get clusters")
+	}
+
+	scanner := bufio.NewScanner(buf)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == cluster {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (a *kindAdmin) inKindNetwork(registry *api.Registry, networkName string) bool {
