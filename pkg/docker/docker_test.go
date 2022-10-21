@@ -24,6 +24,7 @@ func TestIsLocalDockerHost(t *testing.T) {
 		dockerHostTestCase{"http://cluster:2375", false, false},
 		dockerHostTestCase{"unix:///Users/USER/.colima/docker.sock", true, false},
 		dockerHostTestCase{"unix:///Users/USER/.docker/desktop/docker.sock", true, true},
+		dockerHostTestCase{"unix:///Users/USER/.docker/run/docker.sock", true, true},
 	}
 	for i, c := range cases {
 		c := c
