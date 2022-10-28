@@ -37,7 +37,7 @@ RUN apt install -y apt-transport-https gnupg \
   && apt update && apt install -y kubectl
 
 # Install Kind
-ENV KIND_VERSION=v0.16.0
+ENV KIND_VERSION=v0.17.0
 ARG TARGETARCH
 RUN set -exu \
   && KIND_URL="https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-$TARGETARCH" \
