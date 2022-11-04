@@ -3,7 +3,7 @@ GOPATH = $(shell go env GOPATH)
 .PHONY: generate test vendor publish-ci-image
 
 install:
-	go install ./cmd/ctlptl
+	CGO_ENABLED=0 go install ./cmd/ctlptl
 
 test:
 	go test -timeout 30s -v ./...
