@@ -20,8 +20,7 @@ jobs:
       - image: docker/tilt-ctlptl-ci@sha256:a06365a5d76f900883950aeec65d5a3cd49a96ee750a327ac34c3f4850298ee3
     steps:
       - checkout
-      - setup_remote_docker:
-          version: 20.10.14
+      - setup_remote_docker
       - run: make install
       - run: test/kind-cluster-network/e2e.sh
           
@@ -71,34 +70,44 @@ jobs:
           
   release-dry-run:
     docker:
-      - image: cimg/go:1.19
+      - image: golang:1.19-bullseye
     environment:
       DOCKER_CLI_EXPERIMENTAL: enabled
     steps:
       - checkout
-      - setup_remote_docker:
-          version: 20.10.14
+      - setup_remote_docker
       # https://discuss.circleci.com/t/arm-version-of-remote-docker/41624
       - run: ssh remote-docker "sudo apt-get update; sudo apt-get install -y qemu-user-static binfmt-support"
       - run: git fetch --tags
       - run: go install github.com/goreleaser/goreleaser@latest
+      - run: |
+          pushd /tmp
+          curl -O https://download.docker.com/linux/debian/dists/bullseye/pool/stable/amd64/docker-ce-cli_20.10.17~3-0~debian-bullseye_amd64.deb
+          dpkg -i *.deb
+          rm -f *.deb
+          popd
       - run: goreleaser --debug --rm-dist --skip-publish --snapshot
       - slack/notify-on-failure:
           only_for_branches: main
           
   release:
     docker:
-      - image: cimg/go:1.19
+      - image: golang:1.19-bullseye
     environment:
       DOCKER_CLI_EXPERIMENTAL: enabled
     steps:
       - checkout
-      - setup_remote_docker:
-          version: 20.10.14
+      - setup_remote_docker
       # https://discuss.circleci.com/t/arm-version-of-remote-docker/41624
       - run: ssh remote-docker "sudo apt-get update; sudo apt-get install -y qemu-user-static binfmt-support"
       - run: git fetch --tags
       - run: go install github.com/goreleaser/goreleaser@latest
+      - run: |
+          pushd /tmp
+          curl -O https://download.docker.com/linux/debian/dists/bullseye/pool/stable/amd64/docker-ce-cli_20.10.17~3-0~debian-bullseye_amd64.deb
+          dpkg -i *.deb
+          rm -f *.deb
+          popd
       - run: ./hack/release.sh
       - slack/status:
           mentions: "nick"
