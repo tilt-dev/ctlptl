@@ -20,8 +20,7 @@ jobs:
       - image: docker/tilt-ctlptl-ci@sha256:a06365a5d76f900883950aeec65d5a3cd49a96ee750a327ac34c3f4850298ee3
     steps:
       - checkout
-      - setup_remote_docker:
-          version: 20.10.14
+      - setup_remote_docker
       - run: make install
       - run: test/kind-cluster-network/e2e.sh
           
@@ -76,8 +75,7 @@ jobs:
       DOCKER_CLI_EXPERIMENTAL: enabled
     steps:
       - checkout
-      - setup_remote_docker:
-          version: 20.10.14
+      - setup_remote_docker
       # https://discuss.circleci.com/t/arm-version-of-remote-docker/41624
       - run: ssh remote-docker "sudo apt-get update; sudo apt-get install -y qemu-user-static binfmt-support"
       - run: git fetch --tags
@@ -99,8 +97,7 @@ jobs:
       DOCKER_CLI_EXPERIMENTAL: enabled
     steps:
       - checkout
-      - setup_remote_docker:
-          version: 20.10.14
+      - setup_remote_docker
       # https://discuss.circleci.com/t/arm-version-of-remote-docker/41624
       - run: ssh remote-docker "sudo apt-get update; sudo apt-get install -y qemu-user-static binfmt-support"
       - run: git fetch --tags
