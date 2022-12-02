@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/tilt-dev/ctlptl/pkg/api/k3dv1alpha4"
 	"github.com/tilt-dev/localregistry-go"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/kind/pkg/apis/config/v1alpha4"
@@ -62,6 +63,9 @@ type Cluster struct {
 	// The Minikube cluster config. Only applicable for clusters with product: minikube.
 	Minikube *MinikubeCluster `json:"minikube,omitempty" yaml:"minikube,omitempty"`
 
+	// The K3D cluster config. Only applicable for clusters with product: k3d.
+	K3D *K3DCluster `json:"k3d,omitempty" yaml:"k3d,omitempty"`
+
 	// Most recently observed status of the cluster.
 	// Populated by the system.
 	// Read-only.
@@ -116,6 +120,22 @@ type MinikubeCluster struct {
 	// Unstructured flags to pass to minikube on `minikube start`.
 	// These flags will be passed before all tilt-determined flags.
 	StartFlags []string `json:"startFlags,omitempty" yaml:"startFlags,omitempty"`
+}
+
+// K3DCluster describes k3d-specific options for starting a cluster.
+//
+// Prefer setting features on the ClusterSpec rather than on the K3dCluster
+// object when possible.
+//
+// ctlptl's logic for diffing clusters and applying changes is less robust
+// for cluster-specific configs.
+type K3DCluster struct {
+	// K3D's own cluster config format.
+	//
+	// Documentation: https://k3d.io/v5.4.6/usage/configfile/
+	//
+	// Uses this schema: https://github.com/k3d-io/k3d/blob/v5.4.6/pkg/config/v1alpha4/types.go
+	V1Alpha4Simple *k3dv1alpha4.SimpleConfig `json:"v1alpha4Simple,omitempty" yaml:"v1alpha4Simple,omitempty"`
 }
 
 // ClusterList is a list of Clusters.

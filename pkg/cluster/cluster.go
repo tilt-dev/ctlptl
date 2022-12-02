@@ -256,7 +256,7 @@ func (c *Controller) admin(ctx context.Context, product clusterid.Product) (Admi
 	case clusterid.ProductKIND:
 		admin = newKindAdmin(c.iostreams, dockerClient)
 	case clusterid.ProductK3D:
-		admin = newK3dAdmin(c.iostreams)
+		admin = newK3DAdmin(c.iostreams, c.runner)
 	case clusterid.ProductMinikube:
 		admin = newMinikubeAdmin(c.iostreams, dockerClient, c.runner)
 	}
@@ -428,6 +428,7 @@ func (c *Controller) populateClusterSpec(ctx context.Context, cluster *api.Clust
 	cluster.MinCPUs = spec.MinCPUs
 	cluster.KindV1Alpha4Cluster = spec.KindV1Alpha4Cluster
 	cluster.Minikube = spec.Minikube
+	cluster.K3D = spec.K3D
 	return nil
 }
 
@@ -628,6 +629,11 @@ func (c *Controller) deleteIfIrreconcilable(ctx context.Context, desired, existi
 			"Deleting cluster %s because desired Minikube config does not match current.\nCluster config diff: %s\n",
 			desired.Name, cmp.Diff(existing.Minikube, desired.Minikube))
 		needsDelete = true
+	} else if desired.K3D != nil && !cmp.Equal(existing.K3D, desired.K3D) {
+		_, _ = fmt.Fprintf(c.iostreams.ErrOut,
+			"Deleting cluster %s because desired K3D config does not match current.\nCluster config diff: %s\n",
+			desired.Name, cmp.Diff(existing.K3D, desired.K3D))
+		needsDelete = true
 	}
 
 	if !needsDelete {
@@ -651,7 +657,7 @@ func (c *Controller) ensureRegistryExistsForCluster(ctx context.Context, desired
 
 	regLabels := map[string]string{}
 	if desired.Product == string(clusterid.ProductK3D) {
-		// A K3d cluster will only connect to a registry
+		// A K3D cluster will only connect to a registry
 		// with these labels.
 		regLabels["app"] = "k3d"
 		regLabels["k3d.role"] = "registry"
@@ -686,6 +692,9 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 	}
 	if desired.Minikube != nil && clusterid.Product(desired.Product) != clusterid.ProductMinikube {
 		return nil, fmt.Errorf("minikube config may only be set on clusters with product: minikube. Actual product: %s", desired.Product)
+	}
+	if desired.K3D != nil && clusterid.Product(desired.Product) != clusterid.ProductK3D {
+		return nil, fmt.Errorf("k3d config may only be set on clusters with product: k3d. Actual product: %s", desired.Product)
 	}
 
 	FillDefaults(desired)
