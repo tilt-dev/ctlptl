@@ -1,0 +1,8 @@
+# k3d with an embedded config
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+name: k3d-config
+product: k3d
+k3d:
+  v1alpha4Simple:
+    network: custom-network

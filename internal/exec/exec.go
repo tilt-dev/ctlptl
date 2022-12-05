@@ -34,8 +34,9 @@ func (RealCmdRunner) RunIO(ctx context.Context, iostreams genericclioptions.IOSt
 }
 
 type FakeCmdRunner struct {
-	handler  func(argv []string) string
-	LastArgs []string
+	handler   func(argv []string) string
+	LastArgs  []string
+	LastStdin string
 }
 
 func NewFakeCmdRunner(handler func(argv []string) string) *FakeCmdRunner {
@@ -50,6 +51,18 @@ func (f *FakeCmdRunner) Run(ctx context.Context, cmd string, args ...string) err
 
 func (f *FakeCmdRunner) RunIO(ctx context.Context, iostreams genericclioptions.IOStreams, cmd string, args ...string) error {
 	f.LastArgs = append([]string{cmd}, args...)
+
+	if iostreams.In != nil {
+		in, err := io.ReadAll(iostreams.In)
+		if err != nil {
+			return err
+		}
+
+		f.LastStdin = string(in)
+	} else {
+		f.LastStdin = ""
+	}
+
 	out := f.handler(append([]string{cmd}, args...))
 	_, err := io.Copy(iostreams.Out, strings.NewReader(out))
 	return err
