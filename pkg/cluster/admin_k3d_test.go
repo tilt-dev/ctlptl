@@ -57,7 +57,8 @@ func TestK3DStartFlagsV5(t *testing.T) {
 	}, f.runner.LastArgs)
 	assert.Equal(t, f.runner.LastStdin, `kind: Simple
 apiVersion: k3d.io/v1alpha4
-name: my-cluster
+metadata:
+    name: my-cluster
 network: bar
 registries:
     use:
