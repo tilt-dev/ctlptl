@@ -13,6 +13,10 @@ type TypeMeta struct {
 	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 }
 
+type ObjectMeta struct {
+	Name string `mapstructure:"name,omitempty" json:"name,omitempty" yaml:"name,omitempty"`
+}
+
 type VolumeWithNodeFilters struct {
 	Volume      string   `mapstructure:"volume" yaml:"volume,omitempty" json:"volume,omitempty"`
 	NodeFilters []string `mapstructure:"nodeFilters" yaml:"nodeFilters,omitempty" json:"nodeFilters,omitempty"`
@@ -94,7 +98,7 @@ type SimpleConfigRegistries struct {
 // SimpleConfig describes the toplevel k3d configuration file.
 type SimpleConfig struct {
 	TypeMeta     `yaml:",inline"`
-	Name         string                  `mapstructure:"name" yaml:"name,omitempty" json:"name,omitempty"`
+	ObjectMeta   `mapstructure:"metadata" yaml:"metadata,omitempty" json:"metadata,omitempty"`
 	Servers      int                     `mapstructure:"servers" yaml:"servers,omitempty" json:"servers,omitempty"` //nolint:lll    // default 1
 	Agents       int                     `mapstructure:"agents" yaml:"agents,omitempty" json:"agents,omitempty"`    //nolint:lll    // default 0
 	ExposeAPI    SimpleExposureOpts      `mapstructure:"kubeAPI" yaml:"kubeAPI,omitempty" json:"kubeAPI,omitempty"`
