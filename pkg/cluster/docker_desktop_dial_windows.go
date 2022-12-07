@@ -11,7 +11,7 @@ import (
 	"gopkg.in/natefinch/npipe.v2"
 )
 
-func dockerDesktopSocketPaths() ([]string, error) {
+func dockerDesktopBackendNativeSocketPaths() ([]string, error) {
 	return []string{
 		`\\.\pipe\dockerBackendNativeApiServer`,
 		`\\.\pipe\dockerWebApiServer`,
