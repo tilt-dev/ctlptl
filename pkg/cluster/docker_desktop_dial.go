@@ -12,7 +12,7 @@ import (
 	"github.com/mitchellh/go-homedir"
 )
 
-func dockerDesktopSocketPaths() ([]string, error) {
+func dockerDesktopBackendNativeSocketPaths() ([]string, error) {
 	socketDir, err := dockerDesktopSocketDir()
 	if err != nil {
 		return nil, err

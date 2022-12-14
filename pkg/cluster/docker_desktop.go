@@ -17,6 +17,16 @@ import (
 	klog "k8s.io/klog/v2"
 )
 
+type ddProtocol int
+
+const (
+	// Pre DD 4.12
+	ddProtocolV1 ddProtocol = iota
+
+	// Post DD 4.12
+	ddProtocolV2 = 1
+)
+
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
@@ -26,17 +36,17 @@ type HTTPClient interface {
 // There isn't an off-the-shelf library or documented protocol we can use
 // for this, so we do the best we can.
 type DockerDesktopClient struct {
-	guiClient     HTTPClient
-	backendClient HTTPClient
+	backendNativeClient HTTPClient
+	backendClient       HTTPClient
 }
 
 func NewDockerDesktopClient() (DockerDesktopClient, error) {
-	socketPaths, err := dockerDesktopSocketPaths()
+	backendNativeSocketPaths, err := dockerDesktopBackendNativeSocketPaths()
 	if err != nil {
 		return DockerDesktopClient{}, err
 	}
 
-	guiClient := &http.Client{
+	backendNativeClient := &http.Client{
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 				var lastErr error
@@ -44,7 +54,7 @@ func NewDockerDesktopClient() (DockerDesktopClient, error) {
 				// Different versions of docker use different socket paths,
 				// so return all of them and connect to the first one that
 				// accepts a TCP dial.
-				for _, socketPath := range socketPaths {
+				for _, socketPath := range backendNativeSocketPaths {
 					conn, err := dialDockerDesktop(socketPath)
 					if err == nil {
 						return conn, nil
@@ -63,8 +73,8 @@ func NewDockerDesktopClient() (DockerDesktopClient, error) {
 		},
 	}
 	return DockerDesktopClient{
-		guiClient:     guiClient,
-		backendClient: backendClient,
+		backendNativeClient: backendNativeClient,
+		backendClient:       backendClient,
 	}, nil
 }
 
@@ -127,7 +137,7 @@ func (c DockerDesktopClient) ResetCluster(ctx context.Context) error {
 			headers: map[string]string{"Content-Type": "application/json"},
 		},
 		{
-			client:  c.guiClient,
+			client:  c.backendNativeClient,
 			method:  "POST",
 			url:     "http://localhost/kubernetes/reset",
 			headers: map[string]string{"Content-Type": "application/json"},
@@ -145,7 +155,7 @@ func (c DockerDesktopClient) SettingsValues(ctx context.Context) (interface{}, e
 	if err != nil {
 		return nil, err
 	}
-	return c.settingsForWrite(s), nil
+	return c.settingsForWrite(s, ddProtocolV1), nil
 }
 
 func (c DockerDesktopClient) SetSettingValue(ctx context.Context, key, newValue string) error {
@@ -258,27 +268,38 @@ func (c DockerDesktopClient) applySet(settings map[string]interface{}, key, newV
 	return false, fmt.Errorf("Cannot set key: %q", key)
 }
 
-func (c DockerDesktopClient) writeSettings(ctx context.Context, settings map[string]interface{}) error {
+func (c DockerDesktopClient) settingsForWriteJSON(settings map[string]interface{}, v ddProtocol) ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
-	err := json.NewEncoder(buf).Encode(c.settingsForWrite(settings))
+	err := json.NewEncoder(buf).Encode(c.settingsForWrite(settings, v))
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (c DockerDesktopClient) writeSettings(ctx context.Context, settings map[string]interface{}) error {
+	v2Body, err := c.settingsForWriteJSON(settings, ddProtocolV2)
 	if err != nil {
 		return errors.Wrap(err, "writing docker-desktop settings")
 	}
-	body := buf.Bytes()
+	v1Body, err := c.settingsForWriteJSON(settings, ddProtocolV1)
+	if err != nil {
+		return errors.Wrap(err, "writing docker-desktop settings")
+	}
 	resp, err := c.tryRequests("writing docker-desktop settings", []clientRequest{
 		{
 			client:  c.backendClient,
 			method:  "POST",
 			url:     "http://localhost/app/settings",
 			headers: map[string]string{"Content-Type": "application/json"},
-			body:    body,
+			body:    v2Body,
 		},
 		{
-			client:  c.guiClient,
+			client:  c.backendNativeClient,
 			method:  "POST",
 			url:     "http://localhost/settings",
 			headers: map[string]string{"Content-Type": "application/json"},
-			body:    body,
+			body:    v1Body,
 		},
 	})
 	if err != nil {
@@ -296,7 +317,7 @@ func (c DockerDesktopClient) settings(ctx context.Context) (map[string]interface
 			url:    "http://localhost/app/settings",
 		},
 		{
-			client: c.guiClient,
+			client: c.backendNativeClient,
 			method: "GET",
 			url:    "http://localhost/settings",
 		},
@@ -367,7 +388,7 @@ func (c DockerDesktopClient) ensureMinCPU(settings map[string]interface{}, desir
 	return true, nil
 }
 
-func (c DockerDesktopClient) settingsForWrite(settings interface{}) interface{} {
+func (c DockerDesktopClient) settingsForWrite(settings interface{}, v ddProtocol) interface{} {
 	settingsMap, ok := settings.(map[string]interface{})
 	if !ok {
 		return settings
@@ -376,7 +397,13 @@ func (c DockerDesktopClient) settingsForWrite(settings interface{}) interface{} 
 	_, hasLocked := settingsMap["locked"]
 	value, hasValue := settingsMap["value"]
 	if hasLocked && hasValue {
-		return value
+		// In the old protocol, we only sent the value back. In the new protocol,
+		// we send the whole struct.
+		if v == ddProtocolV1 {
+			return value
+		} else {
+			return settingsMap
+		}
 	}
 
 	if hasLocked && len(settingsMap) == 1 {
@@ -390,7 +417,7 @@ func (c DockerDesktopClient) settingsForWrite(settings interface{}) interface{} 
 	}
 
 	for key, value := range settingsMap {
-		newVal := c.settingsForWrite(value)
+		newVal := c.settingsForWrite(value, v)
 		if newVal != nil {
 			settingsMap[key] = newVal
 		} else {
