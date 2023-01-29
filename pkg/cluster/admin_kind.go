@@ -264,6 +264,7 @@ func (a *kindAdmin) getKindVersion(ctx context.Context) (string, error) {
 // time a new Kind version is released :\
 var kindK8sNodeTable = map[string]map[string]string{
 	"v0.17.0": {
+		"1.26": "kindest/node:v1.26.0@sha256:691e24bd2417609db7e589e1a479b902d2e209892a10ce375fab60a8407c7352",
 		"1.25": "kindest/node:v1.25.3@sha256:f52781bc0d7a19fb6c405c2af83abfeb311f130707a0e219175677e366cc45d1",
 		"1.24": "kindest/node:v1.24.7@sha256:577c630ce8e509131eab1aea12c022190978dd2f745aac5eb1fe65c0807eb315",
 		"1.23": "kindest/node:v1.23.13@sha256:ef453bb7c79f0e3caba88d2067d4196f427794086a7d0df8df4f019d5e336b61",
