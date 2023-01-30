@@ -95,6 +95,11 @@ type SimpleConfigRegistries struct {
 	Config string                            `mapstructure:"config" yaml:"config,omitempty" json:"config,omitempty"` // registries.yaml (k3s config for containerd registry override)
 }
 
+type SimpleConfigHostAlias struct {
+	IP        string   `mapstructure:"ip" yaml:"ip" json:"ip"`
+	Hostnames []string `mapstructure:"hostnames" yaml:"hostnames" json:"hostnames"`
+}
+
 // SimpleConfig describes the toplevel k3d configuration file.
 type SimpleConfig struct {
 	TypeMeta     `yaml:",inline"`
@@ -111,6 +116,7 @@ type SimpleConfig struct {
 	Options      SimpleConfigOptions     `mapstructure:"options" yaml:"options,omitempty" json:"options,omitempty"`
 	Env          []EnvVarWithNodeFilters `mapstructure:"env" yaml:"env,omitempty" json:"env,omitempty"`
 	Registries   SimpleConfigRegistries  `mapstructure:"registries" yaml:"registries,omitempty" json:"registries,omitempty"`
+	HostAliases  []SimpleConfigHostAlias `mapstructure:"hostAliases" yaml:"hostAliases,omitempty" json:"hostAliases,omitempty"`
 }
 
 // SimpleExposureOpts provides a simplified syntax compared to the original k3d.ExposureOpts
