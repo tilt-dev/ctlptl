@@ -138,6 +138,7 @@ func TestListRegistries(t *testing.T) {
 			State:             "running",
 			Labels:            map[string]string{"dev.tilt.ctlptl.role": "registry"},
 			Image:             "registry:2",
+			Env:							 []string{},
 		},
 	}, list.Items[0])
 	assert.Equal(t, api.Registry{
@@ -155,6 +156,7 @@ func TestListRegistries(t *testing.T) {
 			State:             "running",
 			Labels:            map[string]string{"dev.tilt.ctlptl.role": "registry"},
 			Image:             "fake.tilt.dev/my-registry-image:latest",
+			Env:							 []string{},
 		},
 	}, list.Items[1])
 	assert.Equal(t, api.Registry{
@@ -171,6 +173,7 @@ func TestListRegistries(t *testing.T) {
 			ContainerID:       "d62f2587ff7b03858f144d3cf83c789578a6d6403f8b82a459ab4e317917cd42",
 			State:             "running",
 			Image:             "registry:2",
+			Env:							 []string{},
 		},
 	}, list.Items[2])
 }
@@ -198,6 +201,7 @@ func TestGetRegistry(t *testing.T) {
 			State:             "running",
 			Labels:            map[string]string{"dev.tilt.ctlptl.role": "registry"},
 			Image:             "registry:2",
+			Env:							 []string{},
 		},
 	}, registry)
 }
