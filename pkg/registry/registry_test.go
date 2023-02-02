@@ -138,7 +138,7 @@ func TestListRegistries(t *testing.T) {
 			State:             "running",
 			Labels:            map[string]string{"dev.tilt.ctlptl.role": "registry"},
 			Image:             "registry:2",
-			Env:							 []string{},
+			Env:							 []string{"REGISTRY_STORAGE_DELETE_ENABLED=true","PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
 		},
 	}, list.Items[0])
 	assert.Equal(t, api.Registry{
@@ -156,7 +156,7 @@ func TestListRegistries(t *testing.T) {
 			State:             "running",
 			Labels:            map[string]string{"dev.tilt.ctlptl.role": "registry"},
 			Image:             "fake.tilt.dev/my-registry-image:latest",
-			Env:							 []string{},
+			Env:							 []string{"REGISTRY_STORAGE_DELETE_ENABLED=true","PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
 		},
 	}, list.Items[1])
 	assert.Equal(t, api.Registry{
@@ -173,7 +173,7 @@ func TestListRegistries(t *testing.T) {
 			ContainerID:       "d62f2587ff7b03858f144d3cf83c789578a6d6403f8b82a459ab4e317917cd42",
 			State:             "running",
 			Image:             "registry:2",
-			Env:							 []string{},
+			Env:							 []string{"REGISTRY_STORAGE_DELETE_ENABLED=true","PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
 		},
 	}, list.Items[2])
 }
@@ -201,7 +201,7 @@ func TestGetRegistry(t *testing.T) {
 			State:             "running",
 			Labels:            map[string]string{"dev.tilt.ctlptl.role": "registry"},
 			Image:             "registry:2",
-			Env:							 []string{},
+			Env:							 []string{"REGISTRY_STORAGE_DELETE_ENABLED=true","PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
 		},
 	}, registry)
 }
@@ -361,6 +361,33 @@ func (d *fakeDocker) ContainerInspect(ctx context.Context, containerID string) (
 					State: &types.ContainerState{
 						Running: c.State == "running",
 					},
+				},
+				Config: &container.Config{
+					Hostname:"test", 
+					Domainname:"", 
+					User:"", 
+					AttachStdin:false, 
+					AttachStdout:false, 
+					AttachStderr:false, 
+					// ExposedPorts:nat.PortSet{"5000/tcp":struct {}{}}, 
+					Tty:false, 
+					OpenStdin:false, 
+					StdinOnce:false, 
+					Env:[]string{"REGISTRY_STORAGE_DELETE_ENABLED=true", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}, 
+					Cmd:[]string{"/etc/docker/registry/config.yml"}, 
+					Healthcheck:(*container.HealthConfig)(nil), 
+					ArgsEscaped:false, 
+					Image:"docker.io/library/registry:2", 
+					Volumes:map[string]struct {}{"/var/lib/registry":struct {}{}}, 
+					WorkingDir:"", 
+					Entrypoint:[]string{"/entrypoint.sh"}, 
+					NetworkDisabled:false, 
+					MacAddress:"", 
+					OnBuild:[]string(nil), 
+					Labels:map[string]string{"dev.tilt.ctlptl.role":"registry"}, 
+					StopSignal:"", 
+					StopTimeout:(*int)(nil), 
+					Shell:[]string(nil),
 				},
 			}, nil
 		}

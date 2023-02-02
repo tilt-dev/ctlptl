@@ -138,11 +138,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 		if err != nil {
 			return nil, err
 		}
-		env := []string{}
-		if inspect.Config != nil {
-			env = inspect.Config.Env
-		}
-
+		env := inspect.Config.Env
 		netSummary := container.NetworkSettings
 		ipAddress := ""
 		networks := []string{}
