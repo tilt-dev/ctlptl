@@ -330,6 +330,47 @@ func TestCustomImage(t *testing.T) {
 	}
 }
 
+func TestCustomEnv(t *testing.T) {
+	f := newFixture(t)
+	defer f.TearDown()
+
+	// Make sure the previous registry is wiped out
+	// because it doesn't have the image we want.
+	f.docker.containers = []types.Container{kindRegistry()}
+
+	f.docker.onCreate = func() {
+		f.docker.containers = []types.Container{kindRegistry()}
+	}
+
+	// ensure stable w/o image change
+	registry, err := f.c.Apply(context.Background(), &api.Registry{
+		TypeMeta: typeMeta,
+		Name:     "kind-registry",
+		Image:    "registry:2",
+	})
+	if assert.NoError(t, err) {
+		assert.Nil(t, f.docker.lastCreateConfig, "Registry should not have been re-created")
+	}
+
+	// change env, should be (re)created
+	registry, err = f.c.Apply(context.Background(), &api.Registry{
+		TypeMeta: typeMeta,
+		Name:     "kind-registry",
+		Image:    "registry:2",
+		Env:	    []string{"REGISTRY_STORAGE_DELETE_ENABLED=false"},
+	})
+	if assert.NoError(t, err) {
+		assert.Equal(t, "running", registry.Status.State)
+	}
+	config := f.docker.lastCreateConfig
+	if assert.NotNil(t, config) {
+		assert.Equal(t, map[string]string{"dev.tilt.ctlptl.role": "registry"}, config.Labels)
+		assert.Equal(t, "kind-registry", config.Hostname)
+		assert.Equal(t, "registry:2", config.Image)
+		assert.Equal(t, []string{"REGISTRY_STORAGE_DELETE_ENABLED=false"}, config.Env)
+	}
+}
+
 type fakeDocker struct {
 	containers           []types.Container
 	lastRemovedContainer string
