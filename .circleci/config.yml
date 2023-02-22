@@ -5,19 +5,19 @@ orbs:
 jobs:
   build:
     docker:
-      - image: cimg/go:1.19
+      - image: cimg/go:1.20
     steps:
       - checkout
       - run: go get -v -t -d ./...
       - run: go test -v ./...
-      - run: cd .. && go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
+      - run: cd .. && go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.2
       - run: make golangci-lint
       - slack/notify-on-failure:
           only_for_branches: main
 
   e2e-remote-docker:
     docker:
-      - image: docker/tilt-ctlptl-ci@sha256:a06365a5d76f900883950aeec65d5a3cd49a96ee750a327ac34c3f4850298ee3
+      - image: docker/tilt-ctlptl-ci@sha256:9ca3c40113dc7d9bb7dc3bf92439264b3ebd539f4fc696757d713db6c2ed92e8
     steps:
       - checkout
       - setup_remote_docker
@@ -32,9 +32,9 @@ jobs:
       - kubernetes/install-kubectl
       - run: |
           set -ex
-          wget https://golang.org/dl/go1.19.linux-amd64.tar.gz
+          wget https://golang.org/dl/go1.20.linux-amd64.tar.gz
           sudo rm -fR /usr/local/go
-          sudo tar -C /usr/local -xzf go1.19.linux-amd64.tar.gz
+          sudo tar -C /usr/local -xzf go1.20.linux-amd64.tar.gz
       # We need a newer Docker version to work around a k3d/containerd bug.
       # https://github.com/rancher/k3d/issues/807
       - run: |
@@ -70,7 +70,7 @@ jobs:
           
   release-dry-run:
     docker:
-      - image: golang:1.19-bullseye
+      - image: golang:1.20-bullseye
     environment:
       DOCKER_CLI_EXPERIMENTAL: enabled
     steps:
@@ -92,7 +92,7 @@ jobs:
           
   release:
     docker:
-      - image: golang:1.19-bullseye
+      - image: golang:1.20-bullseye
     environment:
       DOCKER_CLI_EXPERIMENTAL: enabled
     steps:

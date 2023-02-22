@@ -5,6 +5,8 @@
 
 set -exo pipefail
 
+export DOCKER_BUILDKIT="1"
+
 cd $(dirname $(realpath $0))
 CLUSTER_NAME="k3d-ctlptl-test-cluster"
 ctlptl apply -f registry.yaml
