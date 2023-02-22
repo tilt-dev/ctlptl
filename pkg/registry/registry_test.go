@@ -300,7 +300,7 @@ func TestCustomImage(t *testing.T) {
 	}
 
 	// ensure stable w/o image change
-	registry, err := f.c.Apply(context.Background(), &api.Registry{
+	_, err := f.c.Apply(context.Background(), &api.Registry{
 		TypeMeta: typeMeta,
 		Name:     "kind-registry",
 		Image:    "registry:2",
@@ -310,7 +310,7 @@ func TestCustomImage(t *testing.T) {
 	}
 
 	// change image, should be (re)created
-	registry, err = f.c.Apply(context.Background(), &api.Registry{
+	registry, err := f.c.Apply(context.Background(), &api.Registry{
 		TypeMeta: typeMeta,
 		Name:     "kind-registry",
 		Image:    "fake.tilt.dev/different-registry-image:latest",
