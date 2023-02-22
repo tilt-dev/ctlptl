@@ -37,6 +37,12 @@ scoop bucket add tilt-dev https://github.com/tilt-dev/scoop-bucket
 scoop install ctlptl
 ```
 
+### Go install
+
+```
+go install github.com/tilt-dev/ctlptl/cmd/ctlptl@latest
+```
+
 ### Alternative Options
 
 If automatic installers aren't your cup of tea, check out the [installation
