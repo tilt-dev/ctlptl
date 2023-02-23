@@ -343,7 +343,7 @@ func TestCustomEnv(t *testing.T) {
 	}
 
 	// ensure stable w/o image change
-	registry, err := f.c.Apply(context.Background(), &api.Registry{
+	_, err := f.c.Apply(context.Background(), &api.Registry{
 		TypeMeta: typeMeta,
 		Name:     "kind-registry",
 		Image:    "registry:2",
@@ -353,7 +353,7 @@ func TestCustomEnv(t *testing.T) {
 	}
 
 	// change env, should be (re)created
-	registry, err = f.c.Apply(context.Background(), &api.Registry{
+	registry, err := f.c.Apply(context.Background(), &api.Registry{
 		TypeMeta: typeMeta,
 		Name:     "kind-registry",
 		Image:    "registry:2",
