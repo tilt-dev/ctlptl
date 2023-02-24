@@ -138,6 +138,7 @@ func TestListRegistries(t *testing.T) {
 			State:             "running",
 			Labels:            map[string]string{"dev.tilt.ctlptl.role": "registry"},
 			Image:             "registry:2",
+			Env:							 []string{"REGISTRY_STORAGE_DELETE_ENABLED=true","PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
 		},
 	}, list.Items[0])
 	assert.Equal(t, api.Registry{
@@ -155,6 +156,7 @@ func TestListRegistries(t *testing.T) {
 			State:             "running",
 			Labels:            map[string]string{"dev.tilt.ctlptl.role": "registry"},
 			Image:             "fake.tilt.dev/my-registry-image:latest",
+			Env:							 []string{"REGISTRY_STORAGE_DELETE_ENABLED=true","PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
 		},
 	}, list.Items[1])
 	assert.Equal(t, api.Registry{
@@ -171,6 +173,7 @@ func TestListRegistries(t *testing.T) {
 			ContainerID:       "d62f2587ff7b03858f144d3cf83c789578a6d6403f8b82a459ab4e317917cd42",
 			State:             "running",
 			Image:             "registry:2",
+			Env:							 []string{"REGISTRY_STORAGE_DELETE_ENABLED=true","PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
 		},
 	}, list.Items[2])
 }
@@ -198,6 +201,7 @@ func TestGetRegistry(t *testing.T) {
 			State:             "running",
 			Labels:            map[string]string{"dev.tilt.ctlptl.role": "registry"},
 			Image:             "registry:2",
+			Env:							 []string{"REGISTRY_STORAGE_DELETE_ENABLED=true","PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
 		},
 	}, registry)
 }
@@ -326,6 +330,47 @@ func TestCustomImage(t *testing.T) {
 	}
 }
 
+func TestCustomEnv(t *testing.T) {
+	f := newFixture(t)
+	defer f.TearDown()
+
+	// Make sure the previous registry is wiped out
+	// because it doesn't have the image we want.
+	f.docker.containers = []types.Container{kindRegistry()}
+
+	f.docker.onCreate = func() {
+		f.docker.containers = []types.Container{kindRegistry()}
+	}
+
+	// ensure stable w/o image change
+	_, err := f.c.Apply(context.Background(), &api.Registry{
+		TypeMeta: typeMeta,
+		Name:     "kind-registry",
+		Image:    "registry:2",
+	})
+	if assert.NoError(t, err) {
+		assert.Nil(t, f.docker.lastCreateConfig, "Registry should not have been re-created")
+	}
+
+	// change env, should be (re)created
+	registry, err := f.c.Apply(context.Background(), &api.Registry{
+		TypeMeta: typeMeta,
+		Name:     "kind-registry",
+		Image:    "registry:2",
+		Env:	    []string{"REGISTRY_STORAGE_DELETE_ENABLED=false"},
+	})
+	if assert.NoError(t, err) {
+		assert.Equal(t, "running", registry.Status.State)
+	}
+	config := f.docker.lastCreateConfig
+	if assert.NotNil(t, config) {
+		assert.Equal(t, map[string]string{"dev.tilt.ctlptl.role": "registry"}, config.Labels)
+		assert.Equal(t, "kind-registry", config.Hostname)
+		assert.Equal(t, "registry:2", config.Image)
+		assert.Equal(t, []string{"REGISTRY_STORAGE_DELETE_ENABLED=false"}, config.Env)
+	}
+}
+
 type fakeDocker struct {
 	containers           []types.Container
 	lastRemovedContainer string
@@ -357,6 +402,33 @@ func (d *fakeDocker) ContainerInspect(ctx context.Context, containerID string) (
 					State: &types.ContainerState{
 						Running: c.State == "running",
 					},
+				},
+				Config: &container.Config{
+					Hostname:"test", 
+					Domainname:"", 
+					User:"", 
+					AttachStdin:false, 
+					AttachStdout:false, 
+					AttachStderr:false, 
+					// ExposedPorts:nat.PortSet{"5000/tcp":struct {}{}}, 
+					Tty:false, 
+					OpenStdin:false, 
+					StdinOnce:false, 
+					Env:[]string{"REGISTRY_STORAGE_DELETE_ENABLED=true", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}, 
+					Cmd:[]string{"/etc/docker/registry/config.yml"}, 
+					Healthcheck:(*container.HealthConfig)(nil), 
+					ArgsEscaped:false, 
+					Image:"docker.io/library/registry:2", 
+					Volumes:map[string]struct {}{"/var/lib/registry":struct {}{}}, 
+					WorkingDir:"", 
+					Entrypoint:[]string{"/entrypoint.sh"}, 
+					NetworkDisabled:false, 
+					MacAddress:"", 
+					OnBuild:[]string(nil), 
+					Labels:map[string]string{"dev.tilt.ctlptl.role":"registry"}, 
+					StopSignal:"", 
+					StopTimeout:(*int)(nil), 
+					Shell:[]string(nil),
 				},
 			}, nil
 		}
