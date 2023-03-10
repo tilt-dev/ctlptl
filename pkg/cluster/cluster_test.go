@@ -75,6 +75,15 @@ func TestClusterList(t *testing.T) {
 	assert.Equal(t, "microk8s", clusters.Items[1].Name)
 }
 
+func TestClusterStatusError(t *testing.T) {
+	c := newFakeController(t)
+	clusters, err := c.List(context.Background(), ListOptions{})
+	assert.NoError(t, err)
+	require.Equal(t, 2, len(clusters.Items))
+	assert.Equal(t, "reading status: not started", clusters.Items[0].Status.Error)
+	assert.Equal(t, "", clusters.Items[1].Status.Error)
+}
+
 // Make sure that an empty config doesn't confuse ctlptl.
 func TestClusterListEmptyConfig(t *testing.T) {
 	c := newFakeController(t)
