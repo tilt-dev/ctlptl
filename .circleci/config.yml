@@ -86,7 +86,7 @@ jobs:
           dpkg -i *.deb
           rm -f *.deb
           popd
-      - run: goreleaser --debug --rm-dist --skip-publish --snapshot
+      - run: goreleaser --debug --clean --skip-publish --snapshot
       - slack/notify-on-failure:
           only_for_branches: main
           

@@ -15,13 +15,13 @@ builds:
   - goos: windows
     goarch: arm64
 archives:
-- name_template: "{{ .ProjectName }}.{{ .Version }}.{{ .Os }}.{{ .Arch }}"
-  replacements:
-    windows: windows
-    darwin: mac
-    linux: linux
-    386: i386
-    amd64: x86_64
+- name_template: >-
+    {{ .ProjectName }}.{{ .Version }}.
+    {{- if eq .Os "darwin"}}mac
+    {{- else }}{{ .Os }}{{ end }}.
+    {{- if eq .Arch "amd64" }}x86_64
+    {{- else if eq .Arch "386" }}i386
+    {{- else }}{{ .Arch }}{{ end }}
   format_overrides:
     - goos: windows
       format: zip
@@ -67,8 +67,8 @@ brews:
     (fish_completion/"ctlptl.fish").write output
   test: |
     system "#{bin}/ctlptl version"
-scoop:
-  url_template: "https://github.com/tilt-dev/ctlptl/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+scoops:
+- url_template: "https://github.com/tilt-dev/ctlptl/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
   bucket:
     owner: tilt-dev
     name: scoop-bucket

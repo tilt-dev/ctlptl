@@ -20,7 +20,7 @@ cd "$DIR/.."
 echo "$DOCKER_TOKEN" | docker login --username "$DOCKER_USERNAME" --password-stdin
 
 git fetch --tags
-goreleaser --rm-dist
+goreleaser --clean
 
 VERSION=$(git describe --abbrev=0 --tags)
 
