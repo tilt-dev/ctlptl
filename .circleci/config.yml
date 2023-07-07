@@ -22,7 +22,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: make install
-      - run: test/kind-cluster-network/e2e.sh
+      - run: test/kind/e2e.sh
           
   e2e:
     machine:
@@ -106,7 +106,10 @@ workflows:
   version: 2
   build:
     jobs:
-      - build
+      - build:
+          filters:
+            branches:
+              only: never-release-on-a-branch
       - e2e:
           requires:
             - build

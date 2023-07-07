@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test-docker-desktop:
+    name: test-docker-desktop
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Cache Docker Desktop packages
+      id: cache-docker-desktop
+      uses: actions/cache@v3
+      with:
+        key: "docker-desktop-4.21.1-amd64"
+        path: |
+          ~/downloads/
+    - name: Download Docker Desktop
+      run: |
+        mkdir -p ~/.downloads
+        curl -sSL https://desktop.docker.com/linux/main/amd64/docker-desktop-4.21.1-amd64.deb > ~/.downloads/docker-desktop.deb
+      if: ${{ steps.cache-docker-desktop.outputs.cache-hit != 'true' }}
+    - name: Check for cpu vm
+      run: egrep '(vmx|svm)' /proc/cpuinfo
+    - name: Install and Run Docker Desktop
+      timeout-minutes: 5
+      run: |
+        sudo add-apt-repository universe
+        sudo apt update -y
+        sudo apt-get install ca-certificates curl gnupg
+        sudo install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+        echo \
+          "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+          "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+          sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        sudo apt update -y
+        sudo apt remove moby-cli moby-compose moby-buildx
+        sudo apt install qemu-kvm
+        sudo apt install ~/.downloads/docker-desktop.deb qemu-kvm
+        mkdir -p ~/.docker/desktop
+        echo '{"settingsVersion": 30, "licenseTermsVersion": 2}' > ~/.docker/desktop/settings.json
+
+        docker context create desktop-linux --docker host=unix://${HOME}/.docker/desktop/docker.sock --description "Docker Desktop"
+        docker context use desktop-linux
+        
+        systemctl --user start docker-desktop
+        
+        until docker ps; do echo "docker not ready, sleep 10 s and try again"; sleep 10; done
+        echo "Docker started and ready"
+        docker version
+        
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '>=1.20.0'
+    - name: Install Kind
+      uses: helm/kind-action@v1.5.0
+      with:
+        version: "v0.20.0"
+        install_only: true
+    - name: Install ctlptl
+      run: make install
+    - name: Test Kind Cluster
+      run: ./test/kind/e2e.sh
+    - name: Test DD Cluster
+      run: ./test/docker-desktop/e2e.sh
+    - name: Gather Diagnostics
+      if: ${{ failure() }}
+      run: /opt/docker-desktop/bin/com.docker.diagnose gather -upload

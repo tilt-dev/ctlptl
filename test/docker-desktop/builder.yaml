@@ -1,0 +1,32 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ko-builder
+spec:
+  template:
+    metadata:
+      labels:
+        app: ko-builder
+    spec:
+      containers:
+      - name: builder
+        image: ko-builder
+        imagePullPolicy: Never
+        securityContext:
+          privileged: true
+        command: ["bash", "-c",
+          "go get github.com/tilt-dev/ctlptl/test/simple-server && ko build --local -B github.com/tilt-dev/ctlptl/test/simple-server"]
+        env:
+        - name: GO111MODULE
+          value: "off"
+        volumeMounts:
+        - mountPath: /var/run/docker.sock
+          name: docker-sock
+          readOnly: false
+      volumes:
+      - name: docker-sock
+        hostPath:
+          path: "/run/guest-services/docker.sock"
+          type: Socket
+      restartPolicy: Never
+  backoffLimit: 0
