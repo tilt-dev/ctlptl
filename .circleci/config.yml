@@ -26,7 +26,7 @@ jobs:
           
   e2e:
     machine:
-      image: ubuntu-2004:202111-02
+      image: ubuntu-2204:2023.04.2
     steps:
       - checkout
       - kubernetes/install-kubectl
@@ -35,16 +35,6 @@ jobs:
           wget https://golang.org/dl/go1.20.linux-amd64.tar.gz
           sudo rm -fR /usr/local/go
           sudo tar -C /usr/local -xzf go1.20.linux-amd64.tar.gz
-      # We need a newer Docker version to work around a k3d/containerd bug.
-      # https://github.com/rancher/k3d/issues/807
-      - run: |
-          set -ex
-          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
-            $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-          sudo apt update
-          export DEBIAN_FRONTEND=noninteractive
-          sudo apt upgrade -y containerd.io
       - run: |
           set -ex
           export MINIKUBE_VERSION=v1.29.0
