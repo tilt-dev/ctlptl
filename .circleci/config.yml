@@ -17,12 +17,12 @@ jobs:
 
   e2e-remote-docker:
     docker:
-      - image: docker/tilt-ctlptl-ci@sha256:313bb6e393e0dbf777293026003b714158c930eb86e4b7cc369ed23078e7f729
+      - image: docker/tilt-ctlptl-ci@sha256:7c80a13d8885d1589f47d70c419c3cc25de46e71906ef918313db376664c1d2d
     steps:
       - checkout
       - setup_remote_docker
       - run: make install
-      - run: test/kind-cluster-network/e2e.sh
+      - run: test/kind/e2e.sh
           
   e2e:
     machine:
