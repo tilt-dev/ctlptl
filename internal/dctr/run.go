@@ -12,7 +12,6 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/spf13/pflag"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
@@ -24,7 +23,7 @@ type Client interface {
 	ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error)
 	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
 	ContainerRemove(ctx context.Context, id string, options types.ContainerRemoveOptions) error
-	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.ContainerCreateCreatedBody, error)
+	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.CreateResponse, error)
 	ContainerStart(ctx context.Context, containerID string, options types.ContainerStartOptions) error
 }
 
@@ -37,10 +36,6 @@ func NewAPIClient(streams genericclioptions.IOStreams) (client.APIClient, error)
 	}
 
 	newClientOpts := flags.NewClientOptions()
-	flagset := pflag.NewFlagSet("docker", pflag.ContinueOnError)
-	newClientOpts.Common.InstallFlags(flagset)
-	newClientOpts.Common.SetDefaultOptions(flagset)
-
 	err = dockerCli.Initialize(newClientOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize docker API: %w", err)
