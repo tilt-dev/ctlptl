@@ -616,8 +616,8 @@ func (d *fakeDockerClient) ContainerList(ctx context.Context, options types.Cont
 	return nil, nil
 }
 
-func (d *fakeDockerClient) ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.ContainerCreateCreatedBody, error) {
-	return container.ContainerCreateCreatedBody{}, nil
+func (d *fakeDockerClient) ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.CreateResponse, error) {
+	return container.CreateResponse{}, nil
 }
 func (d *fakeDockerClient) ContainerStart(ctx context.Context, containerID string, options types.ContainerStartOptions) error {
 	return nil
