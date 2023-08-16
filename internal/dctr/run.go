@@ -6,12 +6,13 @@ import (
 	"io"
 
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/cli/cli/flags"
+	cliflags "github.com/docker/cli/cli/flags"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/spf13/pflag"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
@@ -35,10 +36,20 @@ func NewAPIClient(streams genericclioptions.IOStreams) (client.APIClient, error)
 		return nil, fmt.Errorf("failed to create new docker API: %v", err)
 	}
 
-	newClientOpts := flags.NewClientOptions()
-	err = dockerCli.Initialize(newClientOpts)
+	opts := cliflags.NewClientOptions()
+	flagSet := pflag.NewFlagSet("docker", pflag.ContinueOnError)
+	opts.InstallFlags(flagSet)
+	opts.SetDefaultOptions(flagSet)
+	err = dockerCli.Initialize(opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize docker API: %w", err)
+		return nil, fmt.Errorf("initializing docker client: %v", err)
+	}
+
+	// A hack to see if initialization failed.
+	// https://github.com/docker/cli/issues/4489
+	endpoint := dockerCli.DockerEndpoint()
+	if endpoint.Host == "" {
+		return nil, fmt.Errorf("initializing docker client: no valid endpoint")
 	}
 	return dockerCli.Client(), nil
 }
