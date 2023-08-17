@@ -5,7 +5,7 @@ orbs:
 jobs:
   build:
     docker:
-      - image: cimg/go:1.20
+      - image: cimg/go:1.21
     steps:
       - checkout
       - run: go get -v -t -d ./...
@@ -17,7 +17,7 @@ jobs:
 
   e2e-remote-docker:
     docker:
-      - image: docker/tilt-ctlptl-ci@sha256:7c80a13d8885d1589f47d70c419c3cc25de46e71906ef918313db376664c1d2d
+      - image: docker/tilt-ctlptl-ci@sha256:6e9c1ac3bf0448575c4d045d668f524edf59e7ae51d0fc80ede9812d02f1ca53
     steps:
       - checkout
       - setup_remote_docker
@@ -32,9 +32,9 @@ jobs:
       - kubernetes/install-kubectl
       - run: |
           set -ex
-          wget https://golang.org/dl/go1.20.linux-amd64.tar.gz
+          wget https://golang.org/dl/go1.21.0.linux-amd64.tar.gz
           sudo rm -fR /usr/local/go
-          sudo tar -C /usr/local -xzf go1.20.linux-amd64.tar.gz
+          sudo tar -C /usr/local -xzf go1.21.0.linux-amd64.tar.gz
       - run: |
           set -ex
           export MINIKUBE_VERSION=v1.29.0
@@ -60,7 +60,7 @@ jobs:
           
   release-dry-run:
     docker:
-      - image: golang:1.20-bullseye
+      - image: golang:1.21-bookworm
     environment:
       DOCKER_CLI_EXPERIMENTAL: enabled
     steps:
@@ -71,10 +71,23 @@ jobs:
       - run: git fetch --tags
       - run: go install github.com/goreleaser/goreleaser@latest
       - run: |
+          set -e
           pushd /tmp
-          curl -O https://download.docker.com/linux/debian/dists/bullseye/pool/stable/amd64/docker-ce-cli_20.10.17~3-0~debian-bullseye_amd64.deb
-          dpkg -i *.deb
-          rm -f *.deb
+          apt-get update && apt-get install -y \
+            ca-certificates \
+            curl \
+            gnupg \
+            lsb-release
+          mkdir -p /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+            $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+          apt-get update
+          apt-get install -y docker-ce docker-ce-cli containerd.io
+          docker --version
+          rm -rf /var/lib/apt/lists/*
+          
           popd
       - run: goreleaser --debug --clean --skip-publish --snapshot
       - slack/notify-on-failure:
@@ -82,7 +95,7 @@ jobs:
           
   release:
     docker:
-      - image: golang:1.20-bullseye
+      - image: golang:1.21-bookworm
     environment:
       DOCKER_CLI_EXPERIMENTAL: enabled
     steps:
@@ -93,10 +106,23 @@ jobs:
       - run: git fetch --tags
       - run: go install github.com/goreleaser/goreleaser@latest
       - run: |
+          set -e
           pushd /tmp
-          curl -O https://download.docker.com/linux/debian/dists/bullseye/pool/stable/amd64/docker-ce-cli_20.10.17~3-0~debian-bullseye_amd64.deb
-          dpkg -i *.deb
-          rm -f *.deb
+          apt-get update && apt-get install -y \
+            ca-certificates \
+            curl \
+            gnupg \
+            lsb-release
+          mkdir -p /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+            $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+          apt-get update
+          apt-get install -y docker-ce docker-ce-cli containerd.io
+          docker --version
+          rm -rf /var/lib/apt/lists/*
+          
           popd
       - run: ./hack/release.sh
       - slack/status:

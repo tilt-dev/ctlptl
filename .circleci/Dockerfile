@@ -9,14 +9,14 @@
 # Similar to the release image (which contains everything BUT the build
 # toolchain)
 
-FROM golang:1.20-buster
+FROM golang:1.21-bookworm
 
 RUN apt update && apt install -y curl ca-certificates liblz4-tool rsync socat gpg
 
 # Install docker
 # Adapted from https://github.com/circleci/circleci-images/blob/staging/shared/images/Dockerfile-basic.template
 # Check https://download.docker.com/linux/static/stable/x86_64/ for latest versions
-ENV DOCKER_VERSION=24.0.4
+ENV DOCKER_VERSION=24.0.5
 RUN install -m 0755 -d /etc/apt/keyrings \
     && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
     && chmod a+r /etc/apt/keyrings/docker.gpg \
