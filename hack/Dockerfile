@@ -10,7 +10,7 @@
 #
 # Built with goreleaser.
 
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 RUN apt update && apt install -y curl ca-certificates liblz4-tool rsync socat
 
