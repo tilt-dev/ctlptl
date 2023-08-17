@@ -3,11 +3,11 @@ package registry
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
-	"regexp"
-	"reflect"
 
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
@@ -75,29 +75,29 @@ type socatController interface {
 }
 
 type Controller struct {
-	iostreams    genericclioptions.IOStreams
-	dockerClient dctr.Client
-	socat        socatController
+	iostreams genericclioptions.IOStreams
+	dockerCLI dctr.CLI
+	socat     socatController
 }
 
-func NewController(iostreams genericclioptions.IOStreams, dockerClient dctr.Client) *Controller {
+func NewController(iostreams genericclioptions.IOStreams, dockerCLI dctr.CLI) *Controller {
 	return &Controller{
-		iostreams:    iostreams,
-		dockerClient: dockerClient,
-		socat:        socat.NewController(dockerClient),
+		iostreams: iostreams,
+		dockerCLI: dockerCLI,
+		socat:     socat.NewController(dockerCLI),
 	}
 }
 
 func DefaultController(iostreams genericclioptions.IOStreams) (*Controller, error) {
-	dockerClient, err := dctr.NewAPIClient(iostreams)
+	dockerCLI, err := dctr.NewCLI(iostreams)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Controller{
-		iostreams:    iostreams,
-		dockerClient: dockerClient,
-		socat:        socat.NewController(dockerClient),
+		iostreams: iostreams,
+		dockerCLI: dockerCLI,
+		socat:     socat.NewController(dockerCLI),
 	}, nil
 }
 
@@ -134,7 +134,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 		name := strings.TrimPrefix(container.Names[0], "/")
 		created := time.Unix(container.Created, 0)
 
-		inspect, err := c.dockerClient.ContainerInspect(ctx, container.ID)
+		inspect, err := c.dockerCLI.Client().ContainerInspect(ctx, container.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -250,11 +250,11 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 			}
 		}
 	}
-	if _, ok := desiredEnvs["REGISTRY_STORAGE_DELETE_ENABLED"]; ! ok {
+	if _, ok := desiredEnvs["REGISTRY_STORAGE_DELETE_ENABLED"]; !ok {
 		desiredEnvs["REGISTRY_STORAGE_DELETE_ENABLED"] = "true"
 		desired.Env = append(desired.Env, "REGISTRY_STORAGE_DELETE_ENABLED=true")
 	}
-	if eq := reflect.DeepEqual(desiredEnvs, existingEnvs); ! eq {
+	if eq := reflect.DeepEqual(desiredEnvs, existingEnvs); !eq {
 		needsDelete = true
 	}
 
@@ -274,7 +274,7 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 
 	_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Creating registry %q...\n", desired.Name)
 
-	err = dctr.RemoveIfNecessary(ctx, c.dockerClient, desired.Name)
+	err = dctr.RemoveIfNecessary(ctx, c.dockerCLI.Client(), desired.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +286,7 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 
 	err = dctr.Run(
 		ctx,
-		c.dockerClient,
+		c.dockerCLI,
 		desired.Name,
 		&container.Config{
 			Hostname:     desired.Name,
@@ -378,7 +378,7 @@ func (c *Controller) labelConfigs(existing *api.Registry, desired *api.Registry)
 }
 
 func (c *Controller) maybeCreateForwarder(ctx context.Context, port int) error {
-	if docker.IsLocalHost(c.dockerClient.DaemonHost()) {
+	if docker.IsLocalHost(c.dockerCLI.Client().DaemonHost()) {
 		return nil
 	}
 
@@ -390,7 +390,7 @@ func (c *Controller) maybeCreateForwarder(ctx context.Context, port int) error {
 func (c *Controller) registryContainers(ctx context.Context) ([]types.Container, error) {
 	containers := make(map[string]types.Container)
 
-	roleContainers, err := c.dockerClient.ContainerList(ctx, types.ContainerListOptions{
+	roleContainers, err := c.dockerCLI.Client().ContainerList(ctx, types.ContainerListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("label", fmt.Sprintf("%s=registry", docker.ContainerLabelRole))),
 		All: true,
@@ -402,7 +402,7 @@ func (c *Controller) registryContainers(ctx context.Context) ([]types.Container,
 		containers[roleContainers[i].ID] = roleContainers[i]
 	}
 
-	ancestorContainers, err := c.dockerClient.ContainerList(ctx, types.ContainerListOptions{
+	ancestorContainers, err := c.dockerCLI.Client().ContainerList(ctx, types.ContainerListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("ancestor", DefaultRegistryImageRef)),
 		All: true,
@@ -436,7 +436,7 @@ func (c *Controller) Delete(ctx context.Context, name string) error {
 		return fmt.Errorf("container not running registry: %s", name)
 	}
 
-	return c.dockerClient.ContainerRemove(ctx, registry.Status.ContainerID, types.ContainerRemoveOptions{
+	return c.dockerCLI.Client().ContainerRemove(ctx, registry.Status.ContainerID, types.ContainerRemoveOptions{
 		Force: true,
 	})
 }

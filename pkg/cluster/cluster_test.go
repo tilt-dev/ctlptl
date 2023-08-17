@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	dockerregistry "github.com/docker/docker/registry"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,6 +31,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/kind/pkg/apis/config/v1alpha4"
 
+	"github.com/tilt-dev/ctlptl/internal/dctr"
 	"github.com/tilt-dev/ctlptl/internal/exec"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/registry"
@@ -532,7 +534,7 @@ func newFixture(t *testing.T) *fixture {
 		waitForKubeConfigTimeout:    time.Millisecond,
 		waitForClusterCreateTimeout: time.Millisecond,
 		os:                          osName,
-		dockerClient:                dockerClient,
+		dockerCLI:                   &fakeCLI{client: dockerClient},
 	}
 	return &fixture{
 		t:            t,
@@ -570,6 +572,18 @@ func (f *fixture) newFakeAdmin(p clusterid.Product) *fakeAdmin {
 
 func newFakeController(t *testing.T) *Controller {
 	return newFixture(t).controller
+}
+
+type fakeCLI struct {
+	client *fakeDockerClient
+}
+
+func (c *fakeCLI) Client() dctr.Client {
+	return c.client
+}
+
+func (c *fakeCLI) AuthInfo(ctx context.Context, repoInfo *dockerregistry.RepositoryInfo, cmdName string) (string, types.RequestPrivilegeFunc, error) {
+	return "", nil, nil
 }
 
 type fakeDockerClient struct {

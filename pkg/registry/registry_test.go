@@ -12,12 +12,14 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/registry"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
+	"github.com/tilt-dev/ctlptl/internal/dctr"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 )
 
@@ -371,6 +373,18 @@ func TestCustomEnv(t *testing.T) {
 	}
 }
 
+type fakeCLI struct {
+	client *fakeDocker
+}
+
+func (c *fakeCLI) Client() dctr.Client {
+	return c.client
+}
+
+func (c *fakeCLI) AuthInfo(ctx context.Context, repoInfo *registry.RepositoryInfo, cmdName string) (string, types.RequestPrivilegeFunc, error) {
+	return "", nil, nil
+}
+
 type fakeDocker struct {
 	containers           []types.Container
 	lastRemovedContainer string
@@ -478,6 +492,18 @@ func (d *fakeDocker) ContainerStart(ctx context.Context, containerID string,
 	options types.ContainerStartOptions) error {
 	return nil
 }
+func (d *fakeDocker) ServerVersion(ctx context.Context) (types.Version, error) {
+	return types.Version{}, nil
+}
+func (d *fakeDocker) Info(ctx context.Context) (types.Info, error) {
+	return types.Info{}, nil
+}
+func (d *fakeDocker) NetworkConnect(ctx context.Context, networkID, containerID string, config *network.EndpointSettings) error {
+	return nil
+}
+func (d *fakeDocker) NetworkDisconnect(ctx context.Context, networkID, containerID string, force bool) error {
+	return nil
+}
 
 type fixture struct {
 	t      *testing.T
@@ -490,7 +516,8 @@ func newFixture(t *testing.T) *fixture {
 
 	d := &fakeDocker{}
 	controller := NewController(
-		genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}, d)
+		genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr},
+		&fakeCLI{client: d})
 	return &fixture{
 		t:      t,
 		docker: d,

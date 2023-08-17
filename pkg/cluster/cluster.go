@@ -89,7 +89,7 @@ type Controller struct {
 	config                      clientcmdapi.Config
 	clients                     map[string]kubernetes.Interface
 	admins                      map[clusterid.Product]Admin
-	dockerClient                dockerClient
+	dockerCLI                   dctr.CLI
 	dmachine                    *dockerMachine
 	configLoader                configLoader
 	configWriter                configWriter
@@ -146,7 +146,7 @@ func DefaultController(iostreams genericclioptions.IOStreams) (*Controller, erro
 }
 
 func (c *Controller) getSocatController(ctx context.Context) (socatController, error) {
-	dcli, err := c.getDockerClient(ctx)
+	dcli, err := c.getDockerCLI(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -161,25 +161,25 @@ func (c *Controller) getSocatController(ctx context.Context) (socatController, e
 	return c.socat, nil
 }
 
-func (c *Controller) getDockerClient(ctx context.Context) (dockerClient, error) {
+func (c *Controller) getDockerCLI(ctx context.Context) (dctr.CLI, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if c.dockerClient != nil {
-		return c.dockerClient, nil
+	if c.dockerCLI != nil {
+		return c.dockerCLI, nil
 	}
 
-	client, err := dctr.NewAPIClient(c.iostreams)
+	cli, err := dctr.NewCLI(c.iostreams)
 	if err != nil {
 		return nil, err
 	}
 
-	c.dockerClient = client
-	return client, nil
+	c.dockerCLI = cli
+	return cli, nil
 }
 
 func (c *Controller) machine(ctx context.Context, name string, product clusterid.Product) (Machine, error) {
-	dockerClient, err := c.getDockerClient(ctx)
+	dockerCLI, err := c.getDockerCLI(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +190,7 @@ func (c *Controller) machine(ctx context.Context, name string, product clusterid
 	switch product {
 	case clusterid.ProductDockerDesktop, clusterid.ProductKIND, clusterid.ProductK3D:
 		if c.dmachine == nil {
-			machine, err := NewDockerMachine(ctx, dockerClient, c.iostreams)
+			machine, err := NewDockerMachine(ctx, dockerCLI.Client(), c.iostreams)
 			if err != nil {
 				return nil, err
 			}
@@ -200,7 +200,7 @@ func (c *Controller) machine(ctx context.Context, name string, product clusterid
 
 	case clusterid.ProductMinikube:
 		if c.dmachine == nil {
-			machine, err := NewDockerMachine(ctx, dockerClient, c.iostreams)
+			machine, err := NewDockerMachine(ctx, dockerCLI.Client(), c.iostreams)
 			if err != nil {
 				return nil, err
 			}
@@ -213,7 +213,7 @@ func (c *Controller) machine(ctx context.Context, name string, product clusterid
 }
 
 func (c *Controller) registryController(ctx context.Context) (registryController, error) {
-	dockerClient, err := c.getDockerClient(ctx)
+	dockerCLI, err := c.getDockerCLI(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +223,7 @@ func (c *Controller) registryController(ctx context.Context) (registryController
 
 	result := c.registryCtl
 	if result == nil {
-		result = registry.NewController(c.iostreams, dockerClient)
+		result = registry.NewController(c.iostreams, dockerCLI)
 		c.registryCtl = result
 	}
 	return result, nil
@@ -232,7 +232,7 @@ func (c *Controller) registryController(ctx context.Context) (registryController
 // A cluster admin provides the basic start/stop functionality of a cluster,
 // independent of the configuration of the machine it's running on.
 func (c *Controller) admin(ctx context.Context, product clusterid.Product) (Admin, error) {
-	dockerClient, err := c.getDockerClient(ctx)
+	dockerCLI, err := c.getDockerCLI(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -247,18 +247,18 @@ func (c *Controller) admin(ctx context.Context, product clusterid.Product) (Admi
 
 	switch product {
 	case clusterid.ProductDockerDesktop:
-		if !docker.IsLocalDockerDesktop(dockerClient.DaemonHost(), c.os) {
+		if !docker.IsLocalDockerDesktop(dockerCLI.Client().DaemonHost(), c.os) {
 			return nil, fmt.Errorf("Detected remote DOCKER_HOST. Remote Docker engines do not support Docker Desktop clusters: %s",
-				dockerClient.DaemonHost())
+				dockerCLI.Client().DaemonHost())
 		}
 
-		admin = newDockerDesktopAdmin(dockerClient.DaemonHost(), c.os, c.dmachine.d4m)
+		admin = newDockerDesktopAdmin(dockerCLI.Client().DaemonHost(), c.os, c.dmachine.d4m)
 	case clusterid.ProductKIND:
-		admin = newKindAdmin(c.iostreams, dockerClient)
+		admin = newKindAdmin(c.iostreams, dockerCLI.Client())
 	case clusterid.ProductK3D:
 		admin = newK3DAdmin(c.iostreams, c.runner)
 	case clusterid.ProductMinikube:
-		admin = newMinikubeAdmin(c.iostreams, dockerClient, c.runner)
+		admin = newMinikubeAdmin(c.iostreams, dockerCLI.Client(), c.runner)
 	}
 
 	if product == "" {
@@ -1018,12 +1018,12 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Cluste
 // If the current cluster is on a remote docker instance,
 // we need a port-forwarder to connect it.
 func (c *Controller) maybeCreateForwarderForCurrentCluster(ctx context.Context, errOut io.Writer) error {
-	dockerClient, err := c.getDockerClient(ctx)
+	dockerCLI, err := c.getDockerCLI(ctx)
 	if err != nil {
 		return err
 	}
 
-	if docker.IsLocalHost(dockerClient.DaemonHost()) {
+	if docker.IsLocalHost(dockerCLI.Client().DaemonHost()) {
 		return nil
 	}
 
@@ -1133,7 +1133,7 @@ func (c *Controller) waitForHealthCheckAfterCreate(ctx context.Context, cluster 
 // currently running inside a container and the cluster admin object supports
 // the modifications.
 func (c *Controller) maybeFixKubeConfigInsideContainer(ctx context.Context, cluster *api.Cluster) error {
-	containerID := insideContainer(ctx, c.dockerClient)
+	containerID := insideContainer(ctx, c.dockerCLI.Client())
 	if containerID == "" {
 		return nil
 	}
@@ -1148,7 +1148,7 @@ func (c *Controller) maybeFixKubeConfigInsideContainer(ctx context.Context, clus
 		return nil
 	}
 
-	err = adminInC.ModifyConfigInContainer(ctx, cluster, containerID, c.dockerClient, c.configWriter)
+	err = adminInC.ModifyConfigInContainer(ctx, cluster, containerID, c.dockerCLI.Client(), c.configWriter)
 	if err != nil {
 		return fmt.Errorf("error updating kube config: %w", err)
 	}

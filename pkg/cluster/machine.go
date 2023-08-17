@@ -18,6 +18,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	klog "k8s.io/klog/v2"
 
+	"github.com/tilt-dev/ctlptl/internal/dctr"
 	cexec "github.com/tilt-dev/ctlptl/internal/exec"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/docker"
@@ -58,13 +59,13 @@ type d4mClient interface {
 
 type dockerMachine struct {
 	iostreams    genericclioptions.IOStreams
-	dockerClient dockerClient
+	dockerClient dctr.Client
 	sleep        sleeper
 	d4m          d4mClient
 	os           string
 }
 
-func NewDockerMachine(ctx context.Context, client dockerClient, iostreams genericclioptions.IOStreams) (*dockerMachine, error) {
+func NewDockerMachine(ctx context.Context, client dctr.Client, iostreams genericclioptions.IOStreams) (*dockerMachine, error) {
 	d4m, err := NewDockerDesktopClient()
 	if err != nil {
 		return nil, err

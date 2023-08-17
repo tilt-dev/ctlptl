@@ -39,13 +39,13 @@ func connectRemoteDocker(cmd *cobra.Command, args []string) {
 
 	ctx := context.Background()
 	streams := genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}
-	dockerAPI, err := dctr.NewAPIClient(streams)
+	dockerCLI, err := dctr.NewCLI(streams)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "connect-remote-docker: %v\n", err)
 		os.Exit(1)
 	}
 
-	c := socat.NewController(dockerAPI)
+	c := socat.NewController(dockerCLI)
 	err = c.ConnectRemoteDockerPort(ctx, port)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "connect-remote-docker: %v\n", err)

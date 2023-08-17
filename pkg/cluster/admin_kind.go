@@ -18,6 +18,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/kind/pkg/apis/config/v1alpha4"
 
+	"github.com/tilt-dev/ctlptl/internal/dctr"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 )
 
@@ -33,10 +34,10 @@ func kindNetworkName() string {
 // once the underlying machine has been setup.
 type kindAdmin struct {
 	iostreams    genericclioptions.IOStreams
-	dockerClient dockerClient
+	dockerClient dctr.Client
 }
 
-func newKindAdmin(iostreams genericclioptions.IOStreams, dockerClient dockerClient) *kindAdmin {
+func newKindAdmin(iostreams genericclioptions.IOStreams, dockerClient dctr.Client) *kindAdmin {
 	return &kindAdmin{
 		iostreams:    iostreams,
 		dockerClient: dockerClient,
@@ -206,7 +207,7 @@ func (a *kindAdmin) Delete(ctx context.Context, config *api.Cluster) error {
 	return nil
 }
 
-func (a *kindAdmin) ModifyConfigInContainer(ctx context.Context, cluster *api.Cluster, containerID string, dockerClient dockerClient, configWriter configWriter) error {
+func (a *kindAdmin) ModifyConfigInContainer(ctx context.Context, cluster *api.Cluster, containerID string, dockerClient dctr.Client, configWriter configWriter) error {
 	err := dockerClient.NetworkConnect(ctx, kindNetworkName(), containerID, nil)
 	if err != nil {
 		if !errdefs.IsForbidden(err) || !strings.Contains(err.Error(), "already exists") {

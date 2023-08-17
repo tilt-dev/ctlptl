@@ -5,6 +5,7 @@ import (
 
 	"github.com/tilt-dev/localregistry-go"
 
+	"github.com/tilt-dev/ctlptl/internal/dctr"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 )
 
@@ -28,5 +29,5 @@ type Admin interface {
 // An extension of cluster admin that indicates the cluster configuration can be
 // modified for use from inside containers.
 type AdminInContainer interface {
-	ModifyConfigInContainer(ctx context.Context, cluster *api.Cluster, containerID string, dockerClient dockerClient, configWriter configWriter) error
+	ModifyConfigInContainer(ctx context.Context, cluster *api.Cluster, containerID string, dockerClient dctr.Client, configWriter configWriter) error
 }
