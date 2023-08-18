@@ -15,6 +15,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/klog/v2"
 
+	"github.com/tilt-dev/ctlptl/internal/dctr"
 	cexec "github.com/tilt-dev/ctlptl/internal/exec"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 )
@@ -28,10 +29,10 @@ var v1_27 = semver.MustParse("1.27.0")
 type minikubeAdmin struct {
 	iostreams    genericclioptions.IOStreams
 	runner       cexec.CmdRunner
-	dockerClient dockerClient
+	dockerClient dctr.Client
 }
 
-func newMinikubeAdmin(iostreams genericclioptions.IOStreams, dockerClient dockerClient, runner cexec.CmdRunner) *minikubeAdmin {
+func newMinikubeAdmin(iostreams genericclioptions.IOStreams, dockerClient dctr.Client, runner cexec.CmdRunner) *minikubeAdmin {
 	return &minikubeAdmin{
 		iostreams:    iostreams,
 		dockerClient: dockerClient,

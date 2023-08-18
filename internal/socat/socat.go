@@ -19,11 +19,11 @@ import (
 const serviceName = "ctlptl-portforward-service"
 
 type Controller struct {
-	client dctr.Client
+	cli dctr.CLI
 }
 
-func NewController(client dctr.Client) *Controller {
-	return &Controller{client: client}
+func NewController(cli dctr.CLI) *Controller {
+	return &Controller{cli: cli}
 }
 
 // Connect a port on the local machine to a port on a remote docker machine.
@@ -41,7 +41,7 @@ func (c *Controller) ConnectRemoteDockerPort(ctx context.Context, port int) erro
 func (c *Controller) StartRemotePortforwarder(ctx context.Context) error {
 	return dctr.Run(
 		ctx,
-		c.client,
+		c.cli,
 		serviceName,
 		&container.Config{
 			Hostname:   serviceName,

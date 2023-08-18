@@ -4,20 +4,9 @@ import (
 	"context"
 	"os"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/pkg/stringid"
-
 	"github.com/tilt-dev/ctlptl/internal/dctr"
 )
-
-type dockerClient interface {
-	dctr.Client
-	ServerVersion(ctx context.Context) (types.Version, error)
-	Info(ctx context.Context) (types.Info, error)
-	NetworkConnect(ctx context.Context, networkID, containerID string, config *network.EndpointSettings) error
-	NetworkDisconnect(ctx context.Context, networkID, containerID string, force bool) error
-}
 
 type detectInContainer interface {
 	insideContainer(ctx context.Context) string
@@ -32,7 +21,7 @@ type detectInContainer interface {
 //     container
 //
 // Returns a non-empty string representing the container ID if inside a container.
-func insideContainer(ctx context.Context, client dockerClient) string {
+func insideContainer(ctx context.Context, client dctr.Client) string {
 	// allows fake client to mock the result
 	if detect, ok := client.(detectInContainer); ok {
 		return detect.insideContainer(ctx)
