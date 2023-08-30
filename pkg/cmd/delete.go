@@ -105,7 +105,7 @@ func (o *DeleteOptions) run(args []string) error {
 		return err
 	}
 
-	printer, err := toPrinter(o.PrintFlags)
+	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
 	}

@@ -99,7 +99,7 @@ func (o *CreateRegistryOptions) run(controller registryCreator, name string) err
 		return err
 	}
 
-	printer, err := toPrinter(o.PrintFlags)
+	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
 	}

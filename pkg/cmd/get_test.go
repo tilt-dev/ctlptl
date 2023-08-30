@@ -83,7 +83,7 @@ func TestDefaultPrint(t *testing.T) {
 	o.IOStreams = streams
 	o.StartTime = startTime
 
-	err := o.Print(o.transformForOutput(clusterList))
+	err := o.Print(o.toTable(clusterList))
 	require.NoError(t, err)
 	assert.Equal(t, out.String(), `CURRENT   NAME        PRODUCT    AGE   REGISTRY
 *         microk8s    microk8s   3y    none
@@ -100,7 +100,7 @@ func TestYAML(t *testing.T) {
 	err := o.Command().Flags().Set("output", "yaml")
 	require.NoError(t, err)
 
-	err = o.Print(o.transformForOutput(clusterList))
+	err = o.Print(clusterList)
 	require.NoError(t, err)
 	assert.Equal(t, `apiVersion: ctlptl.dev/v1alpha1
 items:
@@ -129,7 +129,7 @@ func TestRegistryPrint(t *testing.T) {
 	o.IOStreams = streams
 	o.StartTime = startTime
 
-	err := o.Print(o.transformForOutput(registryList))
+	err := o.Print(o.toTable(registryList))
 	require.NoError(t, err)
 	assert.Equal(t, `NAME                       HOST ADDRESS     CONTAINER ADDRESS   AGE
 ctlptl-registry            0.0.0.0:5001     172.17.0.2:5000     3y

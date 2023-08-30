@@ -72,7 +72,7 @@ func (o *ApplyOptions) run() error {
 
 	ctx := context.TODO()
 
-	printer, err := toPrinter(o.PrintFlags)
+	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
 	}
