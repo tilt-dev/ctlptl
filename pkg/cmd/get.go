@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/duration"
@@ -144,7 +145,7 @@ func (o *GetOptions) ToPrinter() (printers.ResourcePrinter, error) {
 	if !o.OutputFlagSpecified() {
 		return printers.NewTablePrinter(printers.PrintOptions{}), nil
 	}
-	return toPrinter(o.PrintFlags)
+	return o.PrintFlags.ToPrinter()
 }
 
 func (o *GetOptions) Print(obj runtime.Object) error {
@@ -158,9 +159,31 @@ func (o *GetOptions) Print(obj runtime.Object) error {
 		return err
 	}
 
-	err = printer.PrintObj(o.transformForOutput(obj), o.Out)
-	if err != nil {
-		return err
+	if !o.OutputFlagSpecified() {
+		err = printer.PrintObj(o.toTable(obj), o.Out)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Name printer only supports UnstructuredList for mysterious reasons.
+		_, isNamePrinter := printer.(*printers.NamePrinter)
+		if isNamePrinter && meta.IsListType(obj) {
+			items, err := meta.ExtractList(obj)
+			if err != nil {
+				return err
+			}
+			for _, item := range items {
+				err = printer.PrintObj(item, o.Out)
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+			err = printer.PrintObj(obj, o.Out)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -169,11 +192,7 @@ func (o *GetOptions) OutputFlagSpecified() bool {
 	return o.PrintFlags.OutputFlagSpecified != nil && o.PrintFlags.OutputFlagSpecified()
 }
 
-func (o *GetOptions) transformForOutput(obj runtime.Object) runtime.Object {
-	if o.OutputFlagSpecified() {
-		return obj
-	}
-
+func (o *GetOptions) toTable(obj runtime.Object) runtime.Object {
 	switch r := obj.(type) {
 	case *api.Registry:
 		return o.registriesAsTable([]api.Registry{*r})

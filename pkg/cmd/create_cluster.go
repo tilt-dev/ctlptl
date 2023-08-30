@@ -117,7 +117,7 @@ func (o *CreateClusterOptions) run(controller clusterCreator, product string) er
 		return err
 	}
 
-	printer, err := toPrinter(o.PrintFlags)
+	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
 	}
