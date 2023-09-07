@@ -254,7 +254,7 @@ func (c *Controller) admin(ctx context.Context, product clusterid.Product) (Admi
 
 		admin = newDockerDesktopAdmin(dockerCLI.Client().DaemonHost(), c.os, c.dmachine.d4m)
 	case clusterid.ProductKIND:
-		admin = newKindAdmin(c.iostreams, dockerCLI.Client())
+		admin = newKindAdmin(c.iostreams, c.runner, dockerCLI.Client())
 	case clusterid.ProductK3D:
 		admin = newK3DAdmin(c.iostreams, c.runner)
 	case clusterid.ProductMinikube:

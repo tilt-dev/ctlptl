@@ -6,16 +6,20 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/tilt-dev/ctlptl/internal/exec"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 func TestNodeImage(t *testing.T) {
+	runner := exec.NewFakeCmdRunner(func(argv []string) string {
+		return ""
+	})
 	iostreams := genericclioptions.IOStreams{
 		In:     os.Stdin,
 		Out:    os.Stdout,
 		ErrOut: os.Stderr,
 	}
-	a := newKindAdmin(iostreams, &fakeDockerClient{})
+	a := newKindAdmin(iostreams, runner, &fakeDockerClient{})
 	ctx := context.Background()
 
 	img, err := a.getNodeImage(ctx, "v0.9.0", "v1.19")
