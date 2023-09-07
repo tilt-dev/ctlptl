@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/kind/pkg/apis/config/v1alpha4"
 
 	"github.com/tilt-dev/ctlptl/internal/dctr"
+	cexec "github.com/tilt-dev/ctlptl/internal/exec"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 )
 
@@ -34,12 +35,15 @@ func kindNetworkName() string {
 // once the underlying machine has been setup.
 type kindAdmin struct {
 	iostreams    genericclioptions.IOStreams
+	runner       cexec.CmdRunner
 	dockerClient dctr.Client
 }
 
-func newKindAdmin(iostreams genericclioptions.IOStreams, dockerClient dctr.Client) *kindAdmin {
+func newKindAdmin(iostreams genericclioptions.IOStreams,
+	runner cexec.CmdRunner, dockerClient dctr.Client) *kindAdmin {
 	return &kindAdmin{
 		iostreams:    iostreams,
+		runner:       runner,
 		dockerClient: dockerClient,
 	}
 }
@@ -97,10 +101,7 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 
 	if exists {
 		klog.V(3).Infof("Deleting orphaned KIND cluster: %s", kindName)
-		cmd := exec.CommandContext(ctx, "kind", "delete", "cluster", "--name", kindName)
-		cmd.Stdout = a.iostreams.Out
-		cmd.Stderr = a.iostreams.ErrOut
-		err := cmd.Run()
+		err := a.runner.RunIO(ctx, a.iostreams, "kind", "delete", "cluster", "--name", kindName)
 		if err != nil {
 			return errors.Wrap(err, "deleting orphaned kind cluster")
 		}
@@ -130,11 +131,9 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 
 	args = append(args, "--config", "-")
 
-	cmd := exec.CommandContext(ctx, "kind", args...)
-	cmd.Stdout = a.iostreams.Out
-	cmd.Stderr = a.iostreams.ErrOut
-	cmd.Stdin = buf
-	err = cmd.Run()
+	iostreams := a.iostreams
+	iostreams.In = buf
+	err = a.runner.RunIO(ctx, iostreams, "kind", args...)
 	if err != nil {
 		return errors.Wrap(err, "creating kind cluster")
 	}
@@ -154,10 +153,9 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 
 func (a *kindAdmin) clusterExists(ctx context.Context, cluster string) (bool, error) {
 	buf := bytes.NewBuffer(nil)
-	cmd := exec.CommandContext(ctx, "kind", "get", "clusters")
-	cmd.Stdout = buf
-	cmd.Stderr = a.iostreams.ErrOut
-	err := cmd.Run()
+	iostreams := a.iostreams
+	iostreams.Out = buf
+	err := a.runner.RunIO(ctx, iostreams, "kind", "get", "clusters")
 	if err != nil {
 		return false, errors.Wrap(err, "kind get clusters")
 	}
@@ -196,11 +194,7 @@ func (a *kindAdmin) Delete(ctx context.Context, config *api.Cluster) error {
 	}
 
 	kindName := strings.TrimPrefix(clusterName, "kind-")
-	cmd := exec.CommandContext(ctx, "kind", "delete", "cluster", "--name", kindName)
-	cmd.Stdout = a.iostreams.Out
-	cmd.Stderr = a.iostreams.ErrOut
-	cmd.Stdin = a.iostreams.In
-	err := cmd.Run()
+	err := a.runner.RunIO(ctx, a.iostreams, "kind", "delete", "cluster", "--name", kindName)
 	if err != nil {
 		return errors.Wrap(err, "deleting kind cluster")
 	}
@@ -247,15 +241,17 @@ func (a *kindAdmin) getNodeImage(ctx context.Context, kindVersion, k8sVersion st
 }
 
 func (a *kindAdmin) getKindVersion(ctx context.Context) (string, error) {
-	cmd := exec.CommandContext(ctx, "kind", "version")
-	out, err := cmd.Output()
+	out := bytes.NewBuffer(nil)
+	iostreams := a.iostreams
+	iostreams.Out = out
+	err := a.runner.RunIO(ctx, iostreams, "kind", "version")
 	if err != nil {
 		return "", errors.Wrap(err, "kind version")
 	}
 
-	parts := strings.Split(string(out), " ")
+	parts := strings.Split(out.String(), " ")
 	if len(parts) < 2 {
-		return "", fmt.Errorf("parsing kind version output: %s", string(out))
+		return "", fmt.Errorf("parsing kind version output: %s", out.String())
 	}
 
 	return parts[1], nil
