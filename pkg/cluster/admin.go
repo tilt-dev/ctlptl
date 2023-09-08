@@ -31,3 +31,15 @@ type Admin interface {
 type AdminInContainer interface {
 	ModifyConfigInContainer(ctx context.Context, cluster *api.Cluster, containerID string, dockerClient dctr.Client, configWriter configWriter) error
 }
+
+// Containerd made major changes to their config format for
+// configuring registries. Each cluster has its own way
+// of detecting this.
+
+type containerdRegistryAPI int
+
+const (
+	containerdRegistryV1 containerdRegistryAPI = iota
+	containerdRegistryV2
+	containerdRegistryBroken
+)
