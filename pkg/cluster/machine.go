@@ -111,7 +111,7 @@ func (m *dockerMachine) EnsureExists(ctx context.Context) error {
 
 	dur := 60 * time.Second
 	_, _ = fmt.Fprintf(m.iostreams.ErrOut, "Waiting %s for Docker Desktop to boot...\n", duration.ShortHumanDuration(dur))
-	err = wait.Poll(time.Second, dur, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, time.Second, dur, true, func(ctx context.Context) (bool, error) {
 		_, err := m.dockerClient.ServerVersion(ctx)
 		isSuccess := err == nil
 		return isSuccess, nil
@@ -171,7 +171,7 @@ func (m *dockerMachine) Restart(ctx context.Context, desired, existing *api.Clus
 			// Sleep for short time to ensure the write takes effect.
 			m.sleep(2 * time.Second)
 
-			err = wait.Poll(time.Second, dur, func() (bool, error) {
+			err = wait.PollUntilContextTimeout(ctx, time.Second, dur, true, func(ctx context.Context) (bool, error) {
 				_, err := m.dockerClient.ServerVersion(ctx)
 				isSuccess := err == nil
 				return isSuccess, nil
