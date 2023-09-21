@@ -1064,7 +1064,7 @@ func (c *Controller) waitForContextCreate(ctx context.Context, cluster *api.Clus
 	_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Waiting %s for cluster %q to create kubectl context...\n",
 		duration.ShortHumanDuration(c.waitForKubeConfigTimeout), cluster.Name)
 	var lastErr error
-	err = wait.Poll(time.Second, c.waitForKubeConfigTimeout, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, time.Second, c.waitForKubeConfigTimeout, true, func(ctx context.Context) (bool, error) {
 		err := refreshAndCheckOK()
 		lastErr = err
 		isSuccess := err == nil
@@ -1116,7 +1116,7 @@ func (c *Controller) waitForHealthCheckAfterCreate(ctx context.Context, cluster 
 	_, _ = fmt.Fprintf(c.iostreams.ErrOut, "Waiting %s for Kubernetes cluster %q to start...\n",
 		duration.ShortHumanDuration(c.waitForClusterCreateTimeout), cluster.Name)
 	var lastErr error
-	err = wait.Poll(time.Second, c.waitForClusterCreateTimeout, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, time.Second, c.waitForClusterCreateTimeout, true, func(ctx context.Context) (bool, error) {
 		err := checkOK()
 		lastErr = err
 		isSuccess := err == nil
