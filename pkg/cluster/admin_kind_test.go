@@ -6,9 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-
 	"github.com/tilt-dev/ctlptl/internal/exec"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 func TestNodeImage(t *testing.T) {

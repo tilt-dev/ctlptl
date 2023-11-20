@@ -88,12 +88,8 @@ func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, regist
 	if err != nil {
 		return err
 	}
-	registryAPI := containerdRegistryV1
-	if v.GTE(v1_26) && v.LT(v1_27) {
-		registryAPI = containerdRegistryBroken
-	} else if v.GTE(v1_27) {
-		registryAPI = containerdRegistryV2
-	}
+	isRegistryApiBroken := v.GTE(v1_26) && v.LT(v1_27)
+	isRegistryApiV2 := v.GTE(v1_26)
 
 	clusterName := desired.Name
 	if registry != nil {
@@ -143,7 +139,7 @@ func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, regist
 
 	// https://github.com/tilt-dev/ctlptl/issues/239
 	if registry != nil {
-		if registryAPI == containerdRegistryBroken {
+		if isRegistryApiBroken {
 			return fmt.Errorf(
 				"Error: Local registries are broken in minikube v1.26.\n" +
 					"See: https://github.com/kubernetes/minikube/issues/14480 .\n" +
@@ -172,7 +168,7 @@ func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, regist
 			return err
 		}
 
-		if registryAPI == containerdRegistryV2 {
+		if isRegistryApiV2 {
 			err = a.applyContainerdPatchRegistryApiV2(ctx, desired, registry, networkMode)
 			if err != nil {
 				return err
