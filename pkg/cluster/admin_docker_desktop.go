@@ -12,6 +12,7 @@ import (
 
 // The DockerDesktop manages the Kubernetes cluster for DockerDesktop.
 // This is a bit different than the other admins, due to the overlap
+//
 type dockerDesktopAdmin struct {
 	os     string
 	host   string

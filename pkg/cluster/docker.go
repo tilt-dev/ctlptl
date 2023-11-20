@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/docker/docker/pkg/stringid"
-
 	"github.com/tilt-dev/ctlptl/internal/dctr"
 )
 
