@@ -56,7 +56,7 @@ func (a *kindAdmin) EnsureInstalled(ctx context.Context) error {
 	return nil
 }
 
-func (a *kindAdmin) kindClusterConfig(desired *api.Cluster, registry *api.Registry) *v1alpha4.Cluster {
+func (a *kindAdmin) kindClusterConfig(desired *api.Cluster, registry *api.Registry, registryAPI containerdRegistryAPI) *v1alpha4.Cluster {
 	kindConfig := desired.KindV1Alpha4Cluster
 	if kindConfig == nil {
 		kindConfig = &v1alpha4.Cluster{}
@@ -67,13 +67,22 @@ func (a *kindAdmin) kindClusterConfig(desired *api.Cluster, registry *api.Regist
 	kindConfig.APIVersion = "kind.x-k8s.io/v1alpha4"
 
 	if registry != nil {
-		patch := fmt.Sprintf(`[plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:%d"]
+		if registryAPI == containerdRegistryV2 {
+			// Point to the registry config path.
+			// We'll add these files post-creation.
+			patch := `[plugins."io.containerd.grpc.v1.cri".registry]
+    config_path = "/etc/containerd/certs.d"
+`
+			kindConfig.ContainerdConfigPatches = append(kindConfig.ContainerdConfigPatches, patch)
+		} else {
+			patch := fmt.Sprintf(`[plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:%d"]
   endpoint = ["http://%s:%d"]
 [plugins."io.containerd.grpc.v1.cri".registry.mirrors."%s:%d"]
   endpoint = ["http://%s:%d"]
 `, registry.Status.HostPort, registry.Name, registry.Status.ContainerPort,
-			registry.Name, registry.Status.ContainerPort, registry.Name, registry.Status.ContainerPort)
-		kindConfig.ContainerdConfigPatches = append(kindConfig.ContainerdConfigPatches, patch)
+				registry.Name, registry.Status.ContainerPort, registry.Name, registry.Status.ContainerPort)
+			kindConfig.ContainerdConfigPatches = append(kindConfig.ContainerdConfigPatches, patch)
+		}
 	}
 	return kindConfig
 }
@@ -107,13 +116,22 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 		}
 	}
 
+	kindVersion, err := a.getKindVersion(ctx)
+	if err != nil {
+		return errors.Wrap(err, "creating cluster")
+	}
+
+	registryAPI := containerdRegistryV2
+	kindVersionSemver, err := semver.ParseTolerant(kindVersion)
+	if err != nil {
+		return errors.Wrap(err, "parsing kind version")
+	}
+	if kindVersionSemver.LT(semver.MustParse("0.20.0")) {
+		registryAPI = containerdRegistryV1
+	}
+
 	args := []string{"create", "cluster", "--name", kindName}
 	if desired.KubernetesVersion != "" {
-		kindVersion, err := a.getKindVersion(ctx)
-		if err != nil {
-			return errors.Wrap(err, "creating cluster")
-		}
-
 		node, err := a.getNodeImage(ctx, kindVersion, desired.KubernetesVersion)
 		if err != nil {
 			return errors.Wrap(err, "creating cluster")
@@ -121,7 +139,7 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 		args = append(args, "--image", node)
 	}
 
-	kindConfig := a.kindClusterConfig(desired, registry)
+	kindConfig := a.kindClusterConfig(desired, registry, registryAPI)
 	buf := bytes.NewBuffer(nil)
 	encoder := yaml.NewEncoder(buf)
 	err = encoder.Encode(kindConfig)
@@ -140,15 +158,81 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 
 	networkName := kindNetworkName()
 
-	if registry != nil && !a.inKindNetwork(registry, networkName) {
-		_, _ = fmt.Fprintf(a.iostreams.ErrOut, "   Connecting kind to registry %s\n", registry.Name)
-		err := a.dockerClient.NetworkConnect(ctx, networkName, registry.Name, nil)
-		if err != nil {
-			return errors.Wrap(err, "connecting registry")
+	if registry != nil {
+		if !a.inKindNetwork(registry, networkName) {
+			_, _ = fmt.Fprintf(a.iostreams.ErrOut, "   Connecting kind to registry %s\n", registry.Name)
+			err := a.dockerClient.NetworkConnect(ctx, networkName, registry.Name, nil)
+			if err != nil {
+				return errors.Wrap(err, "connecting registry")
+			}
+		}
+
+		if registryAPI == containerdRegistryV2 {
+			err = a.applyContainerdPatchRegistryApiV2(ctx, desired, registry)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
+}
+
+// We want to make sure that the image is pullable from either:
+// localhost:[registry-port] or
+// [registry-name]:5000
+// by configuring containerd to rewrite the url.
+func (a *kindAdmin) applyContainerdPatchRegistryApiV2(ctx context.Context, desired *api.Cluster, registry *api.Registry) error {
+	nodes, err := a.getNodes(ctx, desired.Name)
+	if err != nil {
+		return errors.Wrap(err, "configuring registry")
+	}
+
+	for _, node := range nodes {
+		contents := fmt.Sprintf(`[host."http://%s:%d"]
+`, registry.Name, registry.Status.ContainerPort)
+
+		localRegistryDir := fmt.Sprintf("/etc/containerd/certs.d/localhost:%d", registry.Status.HostPort)
+		err := a.runner.RunIO(ctx,
+			genericclioptions.IOStreams{In: strings.NewReader(contents), Out: a.iostreams.Out, ErrOut: a.iostreams.ErrOut},
+			"docker", "exec", "-i", node, "sh", "-c",
+			fmt.Sprintf("mkdir -p %s && cp /dev/stdin %s/hosts.toml", localRegistryDir, localRegistryDir))
+		if err != nil {
+			return errors.Wrap(err, "configuring registry")
+		}
+
+		networkRegistryDir := fmt.Sprintf("/etc/containerd/certs.d/%s:%d", registry.Name, registry.Status.ContainerPort)
+		err = a.runner.RunIO(ctx,
+			genericclioptions.IOStreams{In: strings.NewReader(contents), Out: a.iostreams.Out, ErrOut: a.iostreams.ErrOut},
+			"docker", "exec", "-i", node, "sh", "-c",
+			fmt.Sprintf("mkdir -p %s && cp /dev/stdin %s/hosts.toml", networkRegistryDir, networkRegistryDir))
+		if err != nil {
+			return errors.Wrap(err, "configuring registry")
+		}
+	}
+	return nil
+}
+
+func (a *kindAdmin) getNodes(ctx context.Context, cluster string) ([]string, error) {
+	kindName := strings.TrimPrefix(cluster, "kind-")
+	buf := bytes.NewBuffer(nil)
+	iostreams := a.iostreams
+	iostreams.Out = buf
+	err := a.runner.RunIO(ctx, iostreams,
+		"kind", "get", "nodes", "--name", kindName)
+	if err != nil {
+		return nil, errors.Wrap(err, "kind get nodes")
+	}
+
+	scanner := bufio.NewScanner(buf)
+	result := []string{}
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line != "" {
+			result = append(result, line)
+		}
+	}
+	return result, nil
 }
 
 func (a *kindAdmin) clusterExists(ctx context.Context, cluster string) (bool, error) {

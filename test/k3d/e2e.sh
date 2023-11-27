@@ -36,9 +36,15 @@ if [[ "$RESULT" != "0" ]]; then
     exit 1
 fi
 
+# Test registry from both localhost and the connected network.
 cat simple-server.yaml | \
     sed "s/HOST_FROM_CONTAINER_RUNTIME/$HOST_FROM_CONTAINER_RUNTIME/g" | \
-    sed "s/HOST_FROM_CLUSTER_NETWORK/$HOST_FROM_CLUSTER_NETWORK/g" | \
+    kubectl apply -f -
+kubectl wait --for=condition=ready pods -l app=simple-server --timeout=60s
+kubectl delete deployment simple-server
+
+cat simple-server.yaml | \
+    sed "s/HOST_FROM_CONTAINER_RUNTIME/$HOST_FROM_CLUSTER_NETWORK/g" | \
     kubectl apply -f -
 kubectl wait --for=condition=ready pods -l app=simple-server --timeout=60s
 
