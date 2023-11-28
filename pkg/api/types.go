@@ -1,10 +1,11 @@
 package api
 
 import (
-	"github.com/tilt-dev/ctlptl/pkg/api/k3dv1alpha4"
 	"github.com/tilt-dev/localregistry-go"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/kind/pkg/apis/config/v1alpha4"
+
+	"github.com/tilt-dev/ctlptl/pkg/api/k3dv1alpha4"
 )
 
 // TypeMeta partially copies apimachinery/pkg/apis/meta/v1.TypeMeta
