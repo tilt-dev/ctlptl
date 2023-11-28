@@ -187,30 +187,7 @@ func (a *kindAdmin) applyContainerdPatchRegistryApiV2(ctx context.Context, desir
 	if err != nil {
 		return errors.Wrap(err, "configuring registry")
 	}
-
-	for _, node := range nodes {
-		contents := fmt.Sprintf(`[host."http://%s:%d"]
-`, registry.Name, registry.Status.ContainerPort)
-
-		localRegistryDir := fmt.Sprintf("/etc/containerd/certs.d/localhost:%d", registry.Status.HostPort)
-		err := a.runner.RunIO(ctx,
-			genericclioptions.IOStreams{In: strings.NewReader(contents), Out: a.iostreams.Out, ErrOut: a.iostreams.ErrOut},
-			"docker", "exec", "-i", node, "sh", "-c",
-			fmt.Sprintf("mkdir -p %s && cp /dev/stdin %s/hosts.toml", localRegistryDir, localRegistryDir))
-		if err != nil {
-			return errors.Wrap(err, "configuring registry")
-		}
-
-		networkRegistryDir := fmt.Sprintf("/etc/containerd/certs.d/%s:%d", registry.Name, registry.Status.ContainerPort)
-		err = a.runner.RunIO(ctx,
-			genericclioptions.IOStreams{In: strings.NewReader(contents), Out: a.iostreams.Out, ErrOut: a.iostreams.ErrOut},
-			"docker", "exec", "-i", node, "sh", "-c",
-			fmt.Sprintf("mkdir -p %s && cp /dev/stdin %s/hosts.toml", networkRegistryDir, networkRegistryDir))
-		if err != nil {
-			return errors.Wrap(err, "configuring registry")
-		}
-	}
-	return nil
+	return applyContainerdPatchRegistryApiV2(ctx, a.runner, a.iostreams, nodes, desired, registry)
 }
 
 func (a *kindAdmin) getNodes(ctx context.Context, cluster string) ([]string, error) {

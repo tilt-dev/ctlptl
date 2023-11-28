@@ -224,17 +224,13 @@ func (a *minikubeAdmin) ensureRegistryDisconnected(ctx context.Context, registry
 	return nil
 }
 
-// We want to make sure that the image is pullable from either:
-// localhost:[registry-port] or
-// [registry-name]:5000
-// by cloning the registry config created by minikube's --insecure-registry.
-func (a *minikubeAdmin) applyContainerdPatchRegistryApiV2(ctx context.Context, desired *api.Cluster, registry *api.Registry, networkMode container.NetworkMode) error {
+func (a *minikubeAdmin) getNodes(ctx context.Context, name string) ([]string, error) {
 	nodeOutput := bytes.NewBuffer(nil)
 	err := a.runner.RunIO(ctx,
 		genericclioptions.IOStreams{Out: nodeOutput, ErrOut: a.iostreams.ErrOut},
-		"minikube", "-p", desired.Name, "node", "list")
+		"minikube", "-p", name, "node", "list")
 	if err != nil {
-		return errors.Wrap(err, "configuring minikube registry")
+		return nil, errors.Wrap(err, "configuring minikube registry")
 	}
 
 	nodes := []string{}
@@ -250,30 +246,20 @@ func (a *minikubeAdmin) applyContainerdPatchRegistryApiV2(ctx context.Context, d
 		}
 		nodes = append(nodes, node)
 	}
+	return nodes, nil
+}
 
-	for _, node := range nodes {
-		networkHost := registry.Status.IPAddress
-		if networkMode.IsUserDefined() {
-			networkHost = registry.Name
-		}
-
-		err := a.runner.RunIO(ctx,
-			a.iostreams,
-			"minikube", "-p", desired.Name, "--node", node,
-			"ssh", "sudo", "cp", `\-R`,
-			fmt.Sprintf(`/etc/containerd/certs.d/%s\:%d`, networkHost, registry.Status.ContainerPort),
-			fmt.Sprintf(`/etc/containerd/certs.d/localhost\:%d`, registry.Status.HostPort))
-		if err != nil {
-			return errors.Wrap(err, "configuring minikube registry")
-		}
-
-		err = a.runner.RunIO(ctx, a.iostreams, "minikube", "-p", desired.Name, "--node", node,
-			"ssh", "sudo", "systemctl", "restart", "containerd")
-		if err != nil {
-			return errors.Wrap(err, "configuring minikube registry")
-		}
+// We want to make sure that the image is pullable from either:
+// localhost:[registry-port] or
+// [registry-name]:5000
+// by cloning the registry config created by minikube's --insecure-registry.
+func (a *minikubeAdmin) applyContainerdPatchRegistryApiV2(ctx context.Context, desired *api.Cluster, registry *api.Registry, networkMode container.NetworkMode) error {
+	nodes, err := a.getNodes(ctx, desired.Name)
+	if err != nil {
+		return errors.Wrap(err, "configuring minikube registry")
 	}
-	return nil
+
+	return applyContainerdPatchRegistryApiV2(ctx, a.runner, a.iostreams, nodes, desired, registry)
 }
 
 // We still patch containerd so that the user can push/pull from localhost.
@@ -282,26 +268,9 @@ func (a *minikubeAdmin) applyContainerdPatchRegistryApiV2(ctx context.Context, d
 func (a *minikubeAdmin) applyContainerdPatchRegistryApiV1(ctx context.Context, desired *api.Cluster, registry *api.Registry, networkMode container.NetworkMode) error {
 	configPath := "/etc/containerd/config.toml"
 
-	nodeOutput := bytes.NewBuffer(nil)
-	err := a.runner.RunIO(ctx,
-		genericclioptions.IOStreams{Out: nodeOutput, ErrOut: a.iostreams.ErrOut},
-		"minikube", "-p", desired.Name, "node", "list")
+	nodes, err := a.getNodes(ctx, desired.Name)
 	if err != nil {
 		return errors.Wrap(err, "configuring minikube registry")
-	}
-
-	nodes := []string{}
-	nodeOutputSplit := strings.Split(nodeOutput.String(), "\n")
-	for _, line := range nodeOutputSplit {
-		fields := strings.Fields(line)
-		if len(fields) == 0 {
-			continue
-		}
-		node := strings.TrimSpace(fields[0])
-		if node == "" {
-			continue
-		}
-		nodes = append(nodes, node)
 	}
 
 	for _, node := range nodes {
