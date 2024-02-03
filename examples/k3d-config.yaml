@@ -4,5 +4,5 @@ kind: Cluster
 name: k3d-config
 product: k3d
 k3d:
-  v1alpha4Simple:
+  v1alpha5Simple:
     network: custom-network

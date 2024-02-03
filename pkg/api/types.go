@@ -6,6 +6,7 @@ import (
 	"sigs.k8s.io/kind/pkg/apis/config/v1alpha4"
 
 	"github.com/tilt-dev/ctlptl/pkg/api/k3dv1alpha4"
+	"github.com/tilt-dev/ctlptl/pkg/api/k3dv1alpha5"
 )
 
 // TypeMeta partially copies apimachinery/pkg/apis/meta/v1.TypeMeta
@@ -134,7 +135,14 @@ type MinikubeCluster struct {
 // ctlptl's logic for diffing clusters and applying changes is less robust
 // for cluster-specific configs.
 type K3DCluster struct {
-	// K3D's own cluster config format.
+	// K3D's own cluster config format, v1alpha5.
+	//
+	// Documentation: https://k3d.io/v5.6.0/usage/configfile/
+	//
+	// Uses this schema: https://github.com/k3d-io/k3d/blob/v5.6.0/pkg/config/v1alpha5/types.go
+	V1Alpha5Simple *k3dv1alpha5.SimpleConfig `json:"v1alpha5Simple,omitempty" yaml:"v1alpha5Simple,omitempty"`
+
+	// K3D's own cluster config format, v1alpha4.
 	//
 	// Documentation: https://k3d.io/v5.4.6/usage/configfile/
 	//
