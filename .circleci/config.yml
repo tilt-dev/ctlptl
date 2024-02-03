@@ -10,14 +10,14 @@ jobs:
       - checkout
       - run: go get -v -t -d ./...
       - run: go test -v ./...
-      - run: cd .. && go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.2
+      - run: cd .. && go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
       - run: make golangci-lint
       - slack/notify-on-failure:
           only_for_branches: main
 
   e2e-remote-docker:
     docker:
-      - image: docker/tilt-ctlptl-ci@sha256:6e9c1ac3bf0448575c4d045d668f524edf59e7ae51d0fc80ede9812d02f1ca53
+      - image: docker/tilt-ctlptl-ci@sha256:40dd38829d5fc8149a41b0393f64aa911ba65c46ed953936ee15c44ca3ce0fd4
     steps:
       - checkout
       - setup_remote_docker
@@ -43,7 +43,7 @@ jobs:
           sudo mv ./minikube-linux-amd64 /usr/local/bin/minikube
       - run: |
           set -ex
-          export KIND_VERSION=v0.20.0
+          export KIND_VERSION=v0.21.0
           curl -fLo ./kind-linux-amd64 "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
           chmod +x ./kind-linux-amd64
           sudo mv ./kind-linux-amd64 /usr/local/bin/kind
