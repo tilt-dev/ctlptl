@@ -13,6 +13,7 @@ import (
 	"github.com/tilt-dev/ctlptl/internal/exec"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/api/k3dv1alpha4"
+	"github.com/tilt-dev/ctlptl/pkg/api/k3dv1alpha5"
 )
 
 func TestK3DStartFlagsV4(t *testing.T) {
@@ -40,7 +41,7 @@ func TestK3DStartFlagsV5(t *testing.T) {
 	ctx := context.Background()
 	v, err := f.a.version(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, "5.4.6", v.String())
+	assert.Equal(t, "5.6.0", v.String())
 
 	err = f.a.Create(ctx, &api.Cluster{
 		Name: "k3d-my-cluster",
@@ -66,6 +67,61 @@ registries:
 `)
 }
 
+func TestK3DV1alpha5File(t *testing.T) {
+	f := newK3DFixture()
+
+	ctx := context.Background()
+	v, err := f.a.version(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, "5.6.0", v.String())
+
+	err = f.a.Create(ctx, &api.Cluster{
+		Name: "k3d-my-cluster",
+		K3D: &api.K3DCluster{
+			V1Alpha5Simple: &k3dv1alpha5.SimpleConfig{
+				Network: "bar",
+			},
+		},
+	}, &api.Registry{Name: "my-reg"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"k3d", "cluster", "create", "my-cluster",
+		"--config", "-",
+	}, f.runner.LastArgs)
+	assert.Equal(t, f.runner.LastStdin, `kind: Simple
+apiVersion: k3d.io/v1alpha5
+metadata:
+    name: my-cluster
+network: bar
+registries:
+    use:
+        - my-reg
+`)
+}
+
+func TestK3DV1alpha4FileOnOldVersions(t *testing.T) {
+	f := newK3DFixture()
+	f.version = "v5.4.0"
+
+	ctx := context.Background()
+	err := f.a.Create(ctx, &api.Cluster{
+		Name: "k3d-my-cluster",
+	}, &api.Registry{Name: "my-reg"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"k3d", "cluster", "create", "my-cluster",
+		"--config", "-",
+	}, f.runner.LastArgs)
+	assert.Equal(t, f.runner.LastStdin, `kind: Simple
+apiVersion: k3d.io/v1alpha4
+metadata:
+    name: my-cluster
+registries:
+    use:
+        - my-reg
+`)
+}
+
 type k3dFixture struct {
 	runner  *exec.FakeCmdRunner
 	a       *k3dAdmin
@@ -75,7 +131,7 @@ type k3dFixture struct {
 func newK3DFixture() *k3dFixture {
 	iostreams := genericclioptions.IOStreams{Out: os.Stdout, ErrOut: os.Stderr}
 	f := &k3dFixture{
-		version: "v5.4.6",
+		version: "v5.6.0",
 	}
 	f.runner = exec.NewFakeCmdRunner(func(argv []string) string {
 		if argv[1] == "version" {

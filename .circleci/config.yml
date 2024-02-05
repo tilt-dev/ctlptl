@@ -49,7 +49,7 @@ jobs:
           sudo mv ./kind-linux-amd64 /usr/local/bin/kind
       - run: |
           set -ex
-          export TAG=v5.4.9
+          export TAG=v5.6.0
           curl -s https://raw.githubusercontent.com/rancher/k3d/main/install.sh | bash
       - run: |
           set -ex

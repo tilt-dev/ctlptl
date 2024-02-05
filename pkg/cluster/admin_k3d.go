@@ -17,10 +17,14 @@ import (
 	cexec "github.com/tilt-dev/ctlptl/internal/exec"
 	"github.com/tilt-dev/ctlptl/pkg/api"
 	"github.com/tilt-dev/ctlptl/pkg/api/k3dv1alpha4"
+	"github.com/tilt-dev/ctlptl/pkg/api/k3dv1alpha5"
 )
 
-// Support for v1alpha4 format.
+// Support for v1alpha4 file format starts in 5.3.0.
 var v5_3 = semver.MustParse("5.3.0")
+
+// Support for v1alpha5 file format starts in 5.5.0.
+var v5_5 = semver.MustParse("5.5.0")
 
 // k3dAdmin uses the k3d CLI to manipulate a k3d cluster,
 // once the underlying machine has been setup.
@@ -55,13 +59,21 @@ func (a *k3dAdmin) Create(ctx context.Context, desired *api.Cluster, registry *a
 		return errors.Wrap(err, "detecting k3d version")
 	}
 
-	if desired.K3D != nil && desired.K3D.V1Alpha4Simple != nil && k3dV.LT(v5_3) {
-		return fmt.Errorf("k3d v1alpha4 config file only supported on v5.3+")
+	if desired.K3D != nil {
+		if desired.K3D.V1Alpha4Simple != nil && k3dV.LT(v5_3) {
+			return fmt.Errorf("k3d v1alpha4 config file only supported on v5.3+")
+		}
+		if desired.K3D.V1Alpha4Simple != nil && k3dV.LT(v5_5) {
+			return fmt.Errorf("k3d v1alpha5 config file only supported on v5.5+")
+		}
+		if desired.K3D.V1Alpha5Simple != nil && desired.K3D.V1Alpha4Simple != nil {
+			return fmt.Errorf("k3d config invalid: only one format allowed, both specified")
+		}
 	}
 
 	// We generate a cluster config on all versions
 	// because it does some useful validation.
-	k3dConfig, err := a.clusterConfig(desired, registry)
+	k3dConfig, err := a.clusterConfig(desired, registry, k3dV)
 	if err != nil {
 		return errors.Wrap(err, "creating k3d cluster")
 	}
@@ -72,7 +84,7 @@ func (a *k3dAdmin) Create(ctx context.Context, desired *api.Cluster, registry *a
 
 	if k3dV.LT(v5_3) {
 		// 5.2 and below
-		args := []string{"cluster", "create", k3dConfig.Name}
+		args := []string{"cluster", "create", k3dConfig.name()}
 		if registry != nil {
 			args = append(args, "--registry-use", registry.Name)
 		}
@@ -90,12 +102,12 @@ func (a *k3dAdmin) Create(ctx context.Context, desired *api.Cluster, registry *a
 	// 5.3 and above.
 	buf := bytes.NewBuffer(nil)
 	encoder := yaml.NewEncoder(buf)
-	err = encoder.Encode(k3dConfig)
+	err = encoder.Encode(k3dConfig.forEncoding())
 	if err != nil {
 		return errors.Wrap(err, "creating k3d cluster")
 	}
 
-	args := []string{"cluster", "create", k3dConfig.Name, "--config", "-"}
+	args := []string{"cluster", "create", k3dConfig.name(), "--config", "-"}
 	err = a.runner.RunIO(ctx,
 		genericclioptions.IOStreams{In: buf, Out: a.iostreams.Out, ErrOut: a.iostreams.ErrOut},
 		"k3d", args...)
@@ -144,24 +156,71 @@ func (a *k3dAdmin) version(ctx context.Context) (semver.Version, error) {
 	return result, nil
 }
 
-func (a *k3dAdmin) clusterConfig(desired *api.Cluster, registry *api.Registry) (*k3dv1alpha4.SimpleConfig, error) {
-	var k3dConfig *k3dv1alpha4.SimpleConfig
-	if desired.K3D == nil || desired.K3D.V1Alpha4Simple == nil {
-		k3dConfig = &k3dv1alpha4.SimpleConfig{}
+func (a *k3dAdmin) clusterConfig(desired *api.Cluster, registry *api.Registry, k3dv semver.Version) (*k3dClusterConfig, error) {
+	var v4 *k3dv1alpha4.SimpleConfig
+	var v5 *k3dv1alpha5.SimpleConfig
+	if desired.K3D != nil && desired.K3D.V1Alpha5Simple != nil {
+		v5 = desired.K3D.V1Alpha5Simple.DeepCopy()
+	} else if desired.K3D != nil && desired.K3D.V1Alpha4Simple != nil {
+		v4 = desired.K3D.V1Alpha4Simple.DeepCopy()
+	} else if !k3dv.LT(v5_5) {
+		v5 = &k3dv1alpha5.SimpleConfig{}
 	} else {
-		k3dConfig = desired.K3D.V1Alpha4Simple.DeepCopy()
+		v4 = &k3dv1alpha4.SimpleConfig{}
 	}
-	k3dConfig.Kind = "Simple"
-	k3dConfig.APIVersion = "k3d.io/v1alpha4"
+
+	if v5 != nil {
+		v5.Kind = "Simple"
+		v5.APIVersion = "k3d.io/v1alpha5"
+	} else {
+		v4.Kind = "Simple"
+		v4.APIVersion = "k3d.io/v1alpha4"
+	}
 
 	clusterName := desired.Name
 	if !strings.HasPrefix(clusterName, "k3d-") {
 		return nil, fmt.Errorf("all k3d clusters must have a name with the prefix k3d-*")
 	}
 
-	k3dConfig.Name = strings.TrimPrefix(clusterName, "k3d-")
-	if registry != nil {
-		k3dConfig.Registries.Use = append(k3dConfig.Registries.Use, registry.Name)
+	if v5 != nil {
+		v5.Name = strings.TrimPrefix(clusterName, "k3d-")
+		if registry != nil {
+			v5.Registries.Use = append(v5.Registries.Use, registry.Name)
+		}
+	} else {
+		v4.Name = strings.TrimPrefix(clusterName, "k3d-")
+		if registry != nil {
+			v4.Registries.Use = append(v4.Registries.Use, registry.Name)
+		}
 	}
-	return k3dConfig, nil
+	return &k3dClusterConfig{
+		v1Alpha5: v5,
+		v1Alpha4: v4,
+	}, nil
+}
+
+// Helper struct for serializing different file formats.
+type k3dClusterConfig struct {
+	v1Alpha5 *k3dv1alpha5.SimpleConfig
+	v1Alpha4 *k3dv1alpha4.SimpleConfig
+}
+
+func (c *k3dClusterConfig) forEncoding() interface{} {
+	if c.v1Alpha5 != nil {
+		return c.v1Alpha5
+	}
+	if c.v1Alpha4 != nil {
+		return c.v1Alpha4
+	}
+	return nil
+}
+
+func (c *k3dClusterConfig) name() string {
+	if c.v1Alpha5 != nil {
+		return c.v1Alpha5.Name
+	}
+	if c.v1Alpha4 != nil {
+		return c.v1Alpha4.Name
+	}
+	return ""
 }
