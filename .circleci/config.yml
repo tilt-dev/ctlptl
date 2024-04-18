@@ -23,7 +23,7 @@ jobs:
       - setup_remote_docker
       - run: make install
       - run: test/kind/e2e.sh
-          
+
   e2e:
     machine:
       image: ubuntu-2204:2023.04.2
@@ -37,7 +37,7 @@ jobs:
           sudo tar -C /usr/local -xzf go1.21.0.linux-amd64.tar.gz
       - run: |
           set -ex
-          export MINIKUBE_VERSION=v1.29.0
+          export MINIKUBE_VERSION=v1.32.0
           curl -fLo ./minikube-linux-amd64 "https://github.com/kubernetes/minikube/releases/download/${MINIKUBE_VERSION}/minikube-linux-amd64"
           chmod +x ./minikube-linux-amd64
           sudo mv ./minikube-linux-amd64 /usr/local/bin/minikube
@@ -57,7 +57,7 @@ jobs:
           test/e2e.sh
       - slack/notify-on-failure:
           only_for_branches: main
-          
+
   release-dry-run:
     docker:
       - image: golang:1.21-bookworm
@@ -85,12 +85,12 @@ jobs:
           apt-get install -y docker-ce-cli docker-buildx-plugin
           docker --version
           rm -rf /var/lib/apt/lists/*
-          
+
           popd
       - run: goreleaser --debug --clean --skip-publish --snapshot
       - slack/notify-on-failure:
           only_for_branches: main
-          
+
   release:
     docker:
       - image: golang:1.21-bookworm
@@ -118,12 +118,12 @@ jobs:
           apt-get install -y docker-ce-cli docker-buildx-plugin
           docker --version
           rm -rf /var/lib/apt/lists/*
-          
+
           popd
       - run: ./hack/release.sh
       - slack/status:
           mentions: "nick"
-        
+
 workflows:
   version: 2
   build:
