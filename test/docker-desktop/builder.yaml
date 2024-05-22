@@ -14,11 +14,14 @@ spec:
         imagePullPolicy: Never
         securityContext:
           privileged: true
-        command: ["bash", "-c",
-          "go get github.com/tilt-dev/ctlptl/test/simple-server && ko build --local -B github.com/tilt-dev/ctlptl/test/simple-server"]
-        env:
-        - name: GO111MODULE
-          value: "off"
+        command:
+          - bash
+          - "-c"
+          - |
+            set -e
+            go mod init github.com/tilt-dev/test-ctlptl
+            go get github.com/tilt-dev/ctlptl/test/simple-server@latest
+            ko publish -B --insecure-registry github.com/tilt-dev/ctlptl/test/simple-server
         volumeMounts:
         - mountPath: /var/run/docker.sock
           name: docker-sock
