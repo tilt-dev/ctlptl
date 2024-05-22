@@ -29,7 +29,7 @@ checksum:
   name_template: 'checksums.txt'
 snapshot:
   name_template: "{{ .Tag }}-next"
-  
+
 changelog:
   sort: asc
   use: github
@@ -40,9 +40,9 @@ changelog:
     - '^cleanup:'
     - '^circleci:'
     - '^ci:'
-    
+
 brews:
-- tap:
+- repository:
     owner: tilt-dev
     name: homebrew-tap
   commit_author:
@@ -53,7 +53,7 @@ brews:
   description: "Making local Kubernetes clusters easy to set up and tear down"
   install: |
     bin.install "ctlptl"
-    
+
     # Install bash completion
     output = Utils.safe_popen_read("#{bin}/ctlptl", "completion", "bash")
     (bash_completion/"ctlptl").write output
@@ -69,7 +69,7 @@ brews:
     system "#{bin}/ctlptl version"
 scoops:
 - url_template: "https://github.com/tilt-dev/ctlptl/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-  bucket:
+  repository:
     owner: tilt-dev
     name: scoop-bucket
   commit_author:
@@ -133,7 +133,7 @@ docker_manifests:
   - docker/tilt-{{ .ProjectName }}:{{ .Tag }}-amd64
   - docker/tilt-{{ .ProjectName }}:{{ .Tag }}-arm64
 
-  
+
 # Uncomment these lines if you want to experiment with other
 # parts of the release process without releasing new binaries.
 # release:
