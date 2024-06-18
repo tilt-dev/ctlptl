@@ -27,7 +27,7 @@ func kindRegistry() types.Container {
 	return types.Container{
 		ID:      "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
 		Names:   []string{"/kind-registry"},
-		Image:   "registry:2",
+		Image:   DefaultRegistryImageRef,
 		ImageID: "sha256:2d4f4b5309b1e41b4f83ae59b44df6d673ef44433c734b14c1c103ebca82c116",
 		Command: "/entrypoint.sh /etc/docker/registry/config.yml",
 		Created: 1603483645,
@@ -56,7 +56,7 @@ func kindRegistryLoopback() types.Container {
 	return types.Container{
 		ID:      "d62f2587ff7b03858f144d3cf83c789578a6d6403f8b82a459ab4e317917cd42",
 		Names:   []string{"/kind-registry-loopback"},
-		Image:   "registry:2",
+		Image:   DefaultRegistryImageRef,
 		ImageID: "sha256:2d4f4b5309b1e41b4f83ae59b44df6d673ef44433c734b14c1c103ebca82c116",
 		Command: "/entrypoint.sh /etc/docker/registry/config.yml",
 		Created: 1603483646,
@@ -139,7 +139,7 @@ func TestListRegistries(t *testing.T) {
 			ContainerID:       "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
 			State:             "running",
 			Labels:            map[string]string{"dev.tilt.ctlptl.role": "registry"},
-			Image:             "registry:2",
+			Image:             DefaultRegistryImageRef,
 			Env:               []string{"REGISTRY_STORAGE_DELETE_ENABLED=true", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
 		},
 	}, list.Items[0])
@@ -174,7 +174,7 @@ func TestListRegistries(t *testing.T) {
 			Networks:          []string{"bridge", "kind"},
 			ContainerID:       "d62f2587ff7b03858f144d3cf83c789578a6d6403f8b82a459ab4e317917cd42",
 			State:             "running",
-			Image:             "registry:2",
+			Image:             DefaultRegistryImageRef,
 			Env:               []string{"REGISTRY_STORAGE_DELETE_ENABLED=true", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
 		},
 	}, list.Items[2])
@@ -202,7 +202,7 @@ func TestGetRegistry(t *testing.T) {
 			ContainerID:       "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
 			State:             "running",
 			Labels:            map[string]string{"dev.tilt.ctlptl.role": "registry"},
-			Image:             "registry:2",
+			Image:             DefaultRegistryImageRef,
 			Env:               []string{"REGISTRY_STORAGE_DELETE_ENABLED=true", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
 		},
 	}, registry)
@@ -215,10 +215,6 @@ func TestApplyDeadRegistry(t *testing.T) {
 	deadRegistry := kindRegistry()
 	deadRegistry.State = "dead"
 	f.docker.containers = []types.Container{deadRegistry}
-
-	f.docker.onCreate = func() {
-		f.docker.containers = []types.Container{kindRegistry()}
-	}
 
 	registry, err := f.c.Apply(context.Background(), &api.Registry{
 		TypeMeta: typeMeta,
@@ -239,10 +235,6 @@ func TestApplyLabels(t *testing.T) {
 	// because it doesn't have the labels we want.
 	f.docker.containers = []types.Container{kindRegistry()}
 
-	f.docker.onCreate = func() {
-		f.docker.containers = []types.Container{kindRegistry()}
-	}
-
 	registry, err := f.c.Apply(context.Background(), &api.Registry{
 		TypeMeta: typeMeta,
 		Name:     "kind-registry",
@@ -258,7 +250,7 @@ func TestApplyLabels(t *testing.T) {
 			"dev.tilt.ctlptl.role": "registry",
 		}, config.Labels)
 		assert.Equal(t, "kind-registry", config.Hostname)
-		assert.Equal(t, "docker.io/library/registry:2", config.Image)
+		assert.Equal(t, DefaultRegistryImageRef, config.Image)
 		assert.Equal(t, []string{"REGISTRY_STORAGE_DELETE_ENABLED=true"}, config.Env)
 	}
 }
@@ -272,11 +264,6 @@ func TestPreservePort(t *testing.T) {
 	existingRegistry.Ports[0].PublicPort = 5010
 	f.docker.containers = []types.Container{existingRegistry}
 
-	// Running a command makes the registry come alive!
-	f.docker.onCreate = func() {
-		f.docker.containers = []types.Container{kindRegistry()}
-	}
-
 	registry, err := f.c.Apply(context.Background(), &api.Registry{
 		TypeMeta: typeMeta,
 		Name:     "kind-registry",
@@ -289,7 +276,7 @@ func TestPreservePort(t *testing.T) {
 	if assert.NotNil(t, config) {
 		assert.Equal(t, map[string]string{"dev.tilt.ctlptl.role": "registry"}, config.Labels)
 		assert.Equal(t, "kind-registry", config.Hostname)
-		assert.Equal(t, "docker.io/library/registry:2", config.Image)
+		assert.Equal(t, DefaultRegistryImageRef, config.Image)
 	}
 }
 
@@ -301,15 +288,11 @@ func TestCustomImage(t *testing.T) {
 	// because it doesn't have the image we want.
 	f.docker.containers = []types.Container{kindRegistry()}
 
-	f.docker.onCreate = func() {
-		f.docker.containers = []types.Container{kindRegistry()}
-	}
-
 	// ensure stable w/o image change
 	_, err := f.c.Apply(context.Background(), &api.Registry{
 		TypeMeta: typeMeta,
 		Name:     "kind-registry",
-		Image:    "registry:2",
+		Image:    DefaultRegistryImageRef,
 	})
 	if assert.NoError(t, err) {
 		assert.Nil(t, f.docker.lastCreateConfig, "Registry should not have been re-created")
@@ -330,6 +313,26 @@ func TestCustomImage(t *testing.T) {
 		assert.Equal(t, "kind-registry", config.Hostname)
 		assert.Equal(t, "fake.tilt.dev/different-registry-image:latest", config.Image)
 	}
+
+	// Apply a config with new labels,
+	// ensure image is not changed.
+	registry, err = f.c.Apply(context.Background(), &api.Registry{
+		TypeMeta: typeMeta,
+		Name:     "kind-registry",
+		Labels:   map[string]string{"extra-label": "ctlptl"},
+	})
+	if assert.NoError(t, err) {
+		assert.Equal(t, "running", registry.Status.State)
+	}
+	config = f.docker.lastCreateConfig
+	if assert.NotNil(t, config) {
+		assert.Equal(t, map[string]string{
+			"dev.tilt.ctlptl.role": "registry",
+			"extra-label":          "ctlptl",
+		}, config.Labels)
+		assert.Equal(t, "kind-registry", config.Hostname)
+		assert.Equal(t, "fake.tilt.dev/different-registry-image:latest", config.Image)
+	}
 }
 
 func TestCustomEnv(t *testing.T) {
@@ -340,15 +343,11 @@ func TestCustomEnv(t *testing.T) {
 	// because it doesn't have the image we want.
 	f.docker.containers = []types.Container{kindRegistry()}
 
-	f.docker.onCreate = func() {
-		f.docker.containers = []types.Container{kindRegistry()}
-	}
-
 	// ensure stable w/o image change
 	_, err := f.c.Apply(context.Background(), &api.Registry{
 		TypeMeta: typeMeta,
 		Name:     "kind-registry",
-		Image:    "registry:2",
+		Image:    DefaultRegistryImageRef,
 	})
 	if assert.NoError(t, err) {
 		assert.Nil(t, f.docker.lastCreateConfig, "Registry should not have been re-created")
@@ -358,7 +357,7 @@ func TestCustomEnv(t *testing.T) {
 	registry, err := f.c.Apply(context.Background(), &api.Registry{
 		TypeMeta: typeMeta,
 		Name:     "kind-registry",
-		Image:    "registry:2",
+		Image:    DefaultRegistryImageRef,
 		Env:      []string{"REGISTRY_STORAGE_DELETE_ENABLED=false"},
 	})
 	if assert.NoError(t, err) {
@@ -368,7 +367,7 @@ func TestCustomEnv(t *testing.T) {
 	if assert.NotNil(t, config) {
 		assert.Equal(t, map[string]string{"dev.tilt.ctlptl.role": "registry"}, config.Labels)
 		assert.Equal(t, "kind-registry", config.Hostname)
-		assert.Equal(t, "registry:2", config.Image)
+		assert.Equal(t, DefaultRegistryImageRef, config.Image)
 		assert.Equal(t, []string{"REGISTRY_STORAGE_DELETE_ENABLED=false"}, config.Env)
 	}
 }
@@ -390,7 +389,6 @@ type fakeDocker struct {
 	lastRemovedContainer string
 	lastCreateConfig     *container.Config
 	lastCreateHostConfig *container.HostConfig
-	onCreate             func()
 }
 
 type objectNotFoundError struct {
@@ -432,7 +430,7 @@ func (d *fakeDocker) ContainerInspect(ctx context.Context, containerID string) (
 					Cmd:             []string{"/etc/docker/registry/config.yml"},
 					Healthcheck:     (*container.HealthConfig)(nil),
 					ArgsEscaped:     false,
-					Image:           "docker.io/library/registry:2",
+					Image:           DefaultRegistryImageRef,
 					Volumes:         map[string]struct{}{"/var/lib/registry": struct{}{}},
 					WorkingDir:      "",
 					Entrypoint:      []string{"/entrypoint.sh"},
@@ -483,9 +481,11 @@ func (d *fakeDocker) ContainerCreate(ctx context.Context, config *container.Conf
 	containerName string) (container.CreateResponse, error) {
 	d.lastCreateConfig = config
 	d.lastCreateHostConfig = hostConfig
-	if d.onCreate != nil {
-		d.onCreate()
-	}
+
+	c := kindRegistry()
+	c.Image = config.Image
+	d.containers = []types.Container{c}
+
 	return container.CreateResponse{}, nil
 }
 func (d *fakeDocker) ContainerStart(ctx context.Context, containerID string,

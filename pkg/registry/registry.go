@@ -64,10 +64,6 @@ func FillDefaults(registry *api.Registry) {
 	if registry.Name == "" {
 		registry.Name = "ctlptl-registry"
 	}
-
-	if registry.Image == "" {
-		registry.Image = DefaultRegistryImageRef
-	}
 }
 
 type socatController interface {
@@ -212,7 +208,11 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 		// If the port has changed, let's delete the registry and recreate it.
 		needsDelete = true
 	}
-	if !imagesRefsEqual(existing.Status.Image, desired.Image) {
+	// If the desired image is different
+	// from the existing image, we need
+	// to delete the registry and recreate it.
+	if existing.Status.Image != "" && desired.Image != "" &&
+		!imagesRefsEqual(existing.Status.Image, desired.Image) {
 		needsDelete = true
 	}
 	if existing.Status.State != containerStateRunning {
@@ -284,13 +284,15 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 		return nil, err
 	}
 
+	image := c.imageConfig(existing, desired)
+
 	err = dctr.Run(
 		ctx,
 		c.dockerCLI,
 		desired.Name,
 		&container.Config{
 			Hostname:     desired.Name,
-			Image:        desired.Image,
+			Image:        image,
 			ExposedPorts: exposedPorts,
 			Labels:       c.labelConfigs(existing, desired),
 			Env:          desired.Env,
@@ -375,6 +377,21 @@ func (c *Controller) labelConfigs(existing *api.Registry, desired *api.Registry)
 	}
 
 	return newLabels
+}
+
+// Compute the image to ContainerCreate() call
+func (c *Controller) imageConfig(existing *api.Registry, desired *api.Registry) string {
+	// Desired image takes precedence.
+	if desired.Image != "" {
+		return desired.Image
+	}
+
+	// Preserve existing image when possible.
+	if existing.Status.Image != "" {
+		return existing.Status.Image
+	}
+
+	return DefaultRegistryImageRef
 }
 
 func (c *Controller) maybeCreateForwarder(ctx context.Context, port int) error {
