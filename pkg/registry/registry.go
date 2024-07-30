@@ -407,7 +407,7 @@ func (c *Controller) maybeCreateForwarder(ctx context.Context, port int) error {
 func (c *Controller) registryContainers(ctx context.Context) ([]types.Container, error) {
 	containers := make(map[string]types.Container)
 
-	roleContainers, err := c.dockerCLI.Client().ContainerList(ctx, types.ContainerListOptions{
+	roleContainers, err := c.dockerCLI.Client().ContainerList(ctx, container.ListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("label", fmt.Sprintf("%s=registry", docker.ContainerLabelRole))),
 		All: true,
@@ -419,7 +419,7 @@ func (c *Controller) registryContainers(ctx context.Context) ([]types.Container,
 		containers[roleContainers[i].ID] = roleContainers[i]
 	}
 
-	ancestorContainers, err := c.dockerCLI.Client().ContainerList(ctx, types.ContainerListOptions{
+	ancestorContainers, err := c.dockerCLI.Client().ContainerList(ctx, container.ListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("ancestor", DefaultRegistryImageRef)),
 		All: true,
@@ -453,7 +453,7 @@ func (c *Controller) Delete(ctx context.Context, name string) error {
 		return fmt.Errorf("container not running registry: %s", name)
 	}
 
-	return c.dockerCLI.Client().ContainerRemove(ctx, registry.Status.ContainerID, types.ContainerRemoveOptions{
+	return c.dockerCLI.Client().ContainerRemove(ctx, registry.Status.ContainerID, container.RemoveOptions{
 		Force: true,
 	})
 }

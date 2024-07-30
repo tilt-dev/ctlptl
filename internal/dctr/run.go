@@ -10,8 +10,10 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	registrytypes "github.com/docker/docker/api/types/registry"
+	"github.com/docker/docker/api/types/system"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/registry"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
@@ -23,16 +25,16 @@ import (
 // Docker Container client.
 type Client interface {
 	DaemonHost() string
-	ImagePull(ctx context.Context, image string, options types.ImagePullOptions) (io.ReadCloser, error)
+	ImagePull(ctx context.Context, image string, options image.PullOptions) (io.ReadCloser, error)
 
-	ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error)
+	ContainerList(ctx context.Context, options container.ListOptions) ([]types.Container, error)
 	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
-	ContainerRemove(ctx context.Context, id string, options types.ContainerRemoveOptions) error
+	ContainerRemove(ctx context.Context, id string, options container.RemoveOptions) error
 	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.CreateResponse, error)
-	ContainerStart(ctx context.Context, containerID string, options types.ContainerStartOptions) error
+	ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error
 
 	ServerVersion(ctx context.Context) (types.Version, error)
-	Info(ctx context.Context) (types.Info, error)
+	Info(ctx context.Context) (system.Info, error)
 	NetworkConnect(ctx context.Context, networkID, containerID string, config *network.EndpointSettings) error
 	NetworkDisconnect(ctx context.Context, networkID, containerID string, force bool) error
 }
@@ -51,7 +53,7 @@ func (c *realCLI) Client() Client {
 }
 
 func (c *realCLI) AuthInfo(ctx context.Context, repoInfo *registry.RepositoryInfo, cmdName string) (string, types.RequestPrivilegeFunc, error) {
-	authConfig := command.ResolveAuthConfig(ctx, c.cli, repoInfo.Index)
+	authConfig := command.ResolveAuthConfig(c.cli.ConfigFile(), repoInfo.Index)
 	requestPrivilege := command.RegistryAuthenticationPrivilegedFunc(c.cli, repoInfo.Index, cmdName)
 
 	auth, err := registrytypes.EncodeAuthConfig(authConfig)
@@ -97,18 +99,18 @@ func NewAPIClient(streams genericclioptions.IOStreams) (Client, error) {
 
 // A simplified remove-container-if-necessary helper.
 func RemoveIfNecessary(ctx context.Context, c Client, name string) error {
-	container, err := c.ContainerInspect(ctx, name)
+	co, err := c.ContainerInspect(ctx, name)
 	if err != nil {
 		if client.IsErrNotFound(err) {
 			return nil
 		}
 		return err
 	}
-	if container.ContainerJSONBase == nil {
+	if co.ContainerJSONBase == nil {
 		return nil
 	}
 
-	return c.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{
+	return c.ContainerRemove(ctx, co.ID, container.RemoveOptions{
 		Force: true,
 	})
 }
@@ -123,7 +125,7 @@ func Run(ctx context.Context, cli CLI, name string, config *container.Config, ho
 		return nil
 	} else if err == nil {
 		// The service exists, but is not running
-		err := c.ContainerRemove(ctx, name, types.ContainerRemoveOptions{Force: true})
+		err := c.ContainerRemove(ctx, name, container.RemoveOptions{Force: true})
 		if err != nil {
 			return fmt.Errorf("creating %s: %v", name, err)
 		}
@@ -149,24 +151,24 @@ func Run(ctx context.Context, cli CLI, name string, config *container.Config, ho
 	}
 
 	id := resp.ID
-	err = c.ContainerStart(ctx, id, types.ContainerStartOptions{})
+	err = c.ContainerStart(ctx, id, container.StartOptions{})
 	if err != nil {
 		return fmt.Errorf("starting %s: %v", name, err)
 	}
 	return nil
 }
 
-func pull(ctx context.Context, cli CLI, image string) error {
+func pull(ctx context.Context, cli CLI, img string) error {
 	c := cli.Client()
 
-	ref, err := reference.ParseNormalizedNamed(image)
+	ref, err := reference.ParseNormalizedNamed(img)
 	if err != nil {
-		return fmt.Errorf("could not parse image %q: %v", image, err)
+		return fmt.Errorf("could not parse image %q: %v", img, err)
 	}
 
 	repoInfo, err := registry.ParseRepositoryInfo(ref)
 	if err != nil {
-		return fmt.Errorf("could not parse registry for %q: %v", image, err)
+		return fmt.Errorf("could not parse registry for %q: %v", img, err)
 	}
 
 	encodedAuth, requestPrivilege, err := cli.AuthInfo(ctx, repoInfo, "pull")
@@ -174,12 +176,12 @@ func pull(ctx context.Context, cli CLI, image string) error {
 		return fmt.Errorf("could not authenticate: %v", err)
 	}
 
-	resp, err := c.ImagePull(ctx, image, types.ImagePullOptions{
+	resp, err := c.ImagePull(ctx, img, image.PullOptions{
 		RegistryAuth:  encodedAuth,
 		PrivilegeFunc: requestPrivilege,
 	})
 	if err != nil {
-		return fmt.Errorf("pulling image %s: %v", image, err)
+		return fmt.Errorf("pulling image %s: %v", img, err)
 	}
 	defer resp.Close()
 
