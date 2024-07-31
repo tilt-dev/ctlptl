@@ -11,7 +11,9 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/system"
 	"github.com/docker/docker/registry"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
@@ -449,7 +451,7 @@ func (d *fakeDocker) ContainerInspect(ctx context.Context, containerID string) (
 	return types.ContainerJSON{}, objectNotFoundError{"container", containerID}
 }
 
-func (d *fakeDocker) ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error) {
+func (d *fakeDocker) ContainerList(ctx context.Context, options container.ListOptions) ([]types.Container, error) {
 	var result []types.Container
 	for _, c := range d.containers {
 		if options.Filters.Contains("ancestor") {
@@ -466,13 +468,13 @@ func (d *fakeDocker) ContainerList(ctx context.Context, options types.ContainerL
 	return result, nil
 }
 
-func (d *fakeDocker) ContainerRemove(ctx context.Context, id string, options types.ContainerRemoveOptions) error {
+func (d *fakeDocker) ContainerRemove(ctx context.Context, id string, options container.RemoveOptions) error {
 	d.lastRemovedContainer = id
 	return nil
 }
 
 func (d *fakeDocker) ImagePull(ctx context.Context, image string,
-	options types.ImagePullOptions) (io.ReadCloser, error) {
+	options image.PullOptions) (io.ReadCloser, error) {
 	return nil, nil
 }
 
@@ -489,14 +491,14 @@ func (d *fakeDocker) ContainerCreate(ctx context.Context, config *container.Conf
 	return container.CreateResponse{}, nil
 }
 func (d *fakeDocker) ContainerStart(ctx context.Context, containerID string,
-	options types.ContainerStartOptions) error {
+	options container.StartOptions) error {
 	return nil
 }
 func (d *fakeDocker) ServerVersion(ctx context.Context) (types.Version, error) {
 	return types.Version{}, nil
 }
-func (d *fakeDocker) Info(ctx context.Context) (types.Info, error) {
-	return types.Info{}, nil
+func (d *fakeDocker) Info(ctx context.Context) (system.Info, error) {
+	return system.Info{}, nil
 }
 func (d *fakeDocker) NetworkConnect(ctx context.Context, networkID, containerID string, config *network.EndpointSettings) error {
 	return nil

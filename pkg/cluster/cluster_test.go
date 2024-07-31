@@ -11,7 +11,9 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/system"
 	dockerregistry "github.com/docker/docker/registry"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
@@ -606,34 +608,34 @@ func (c *fakeDockerClient) ServerVersion(ctx context.Context) (types.Version, er
 	return types.Version{}, nil
 }
 
-func (c *fakeDockerClient) Info(ctx context.Context) (types.Info, error) {
+func (c *fakeDockerClient) Info(ctx context.Context) (system.Info, error) {
 	if !c.started {
-		return types.Info{}, fmt.Errorf("not started")
+		return system.Info{}, fmt.Errorf("not started")
 	}
 
-	return types.Info{NCPU: c.ncpu}, nil
+	return system.Info{NCPU: c.ncpu}, nil
 }
 
 func (c *fakeDockerClient) ContainerInspect(ctx context.Context, id string) (types.ContainerJSON, error) {
 	return types.ContainerJSON{}, nil
 }
 
-func (d *fakeDockerClient) ContainerRemove(ctx context.Context, id string, options types.ContainerRemoveOptions) error {
+func (d *fakeDockerClient) ContainerRemove(ctx context.Context, id string, options container.RemoveOptions) error {
 	return nil
 }
 
-func (d *fakeDockerClient) ImagePull(ctx context.Context, image string, options types.ImagePullOptions) (io.ReadCloser, error) {
+func (d *fakeDockerClient) ImagePull(ctx context.Context, image string, options image.PullOptions) (io.ReadCloser, error) {
 	return nil, nil
 }
 
-func (d *fakeDockerClient) ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error) {
+func (d *fakeDockerClient) ContainerList(ctx context.Context, options container.ListOptions) ([]types.Container, error) {
 	return nil, nil
 }
 
 func (d *fakeDockerClient) ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.CreateResponse, error) {
 	return container.CreateResponse{}, nil
 }
-func (d *fakeDockerClient) ContainerStart(ctx context.Context, containerID string, options types.ContainerStartOptions) error {
+func (d *fakeDockerClient) ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error {
 	return nil
 }
 
