@@ -19,6 +19,7 @@ import (
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
+	"go.opentelemetry.io/otel/sdk/resource"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
@@ -66,7 +67,8 @@ func (c *realCLI) AuthInfo(ctx context.Context, repoInfo *registry.RepositoryInf
 func NewCLI(streams genericclioptions.IOStreams) (CLI, error) {
 	dockerCli, err := command.NewDockerCli(
 		command.WithOutputStream(streams.Out),
-		command.WithErrorStream(streams.ErrOut))
+		command.WithErrorStream(streams.ErrOut),
+		command.WithResource(resource.Empty()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new docker API: %v", err)
 	}
