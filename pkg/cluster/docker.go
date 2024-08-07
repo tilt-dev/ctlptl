@@ -3,11 +3,29 @@ package cluster
 import (
 	"context"
 	"os"
-
-	"github.com/docker/docker/pkg/stringid"
+	"regexp"
 
 	"github.com/tilt-dev/ctlptl/internal/dctr"
 )
+
+const (
+	shortLen = 12
+)
+
+var (
+	validShortID = regexp.MustCompile("^[a-f0-9]{12}$")
+)
+
+// IsShortID determines if id has the correct format and length for a short ID.
+// It checks the IDs length and if it consists of valid characters for IDs (a-f0-9).
+//
+// Deprecated: this function is no longer used, and will be removed in the next release.
+func isShortID(id string) bool {
+	if len(id) != shortLen {
+		return false
+	}
+	return validShortID.MatchString(id)
+}
 
 type detectInContainer interface {
 	insideContainer(ctx context.Context) string
@@ -37,7 +55,7 @@ func insideContainer(ctx context.Context, client dctr.Client) string {
 		return ""
 	}
 
-	if !stringid.IsShortID(containerID) {
+	if !isShortID(containerID) {
 		return ""
 	}
 
