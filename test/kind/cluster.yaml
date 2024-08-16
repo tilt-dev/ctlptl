@@ -3,4 +3,4 @@ kind: Cluster
 name: kind-ctlptl-test-cluster
 product: kind
 registry: ctlptl-test-registry
-kubernetesVersion: v1.27.0
+kubernetesVersion: v1.31.0
