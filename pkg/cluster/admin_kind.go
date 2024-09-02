@@ -187,7 +187,19 @@ func (a *kindAdmin) applyContainerdPatchRegistryApiV2(ctx context.Context, desir
 	if err != nil {
 		return errors.Wrap(err, "configuring registry")
 	}
-	return applyContainerdPatchRegistryApiV2(ctx, a.runner, a.iostreams, nodes, desired, registry)
+	filtered := []string{}
+	for _, node := range nodes {
+		if strings.HasSuffix(node, "external-load-balancer") {
+			// Ignore the external load balancers.
+			// These load-balance traffic to the control plane nodes.
+			// They don't need registry configuration.
+			continue
+		}
+		filtered = append(filtered, node)
+	}
+
+	return applyContainerdPatchRegistryApiV2(ctx, a.runner, a.iostreams,
+		filtered, desired, registry)
 }
 
 func (a *kindAdmin) getNodes(ctx context.Context, cluster string) ([]string, error) {
