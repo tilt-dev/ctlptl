@@ -314,7 +314,7 @@ func (c DockerDesktopClient) settings(ctx context.Context) (map[string]interface
 		{
 			client: c.backendClient,
 			method: "GET",
-			url:    "http://localhost/app/settings",
+			url:    "http://localhost/app/settings?format=grouped",
 		},
 		{
 			client: c.backendNativeClient,
