@@ -147,6 +147,7 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 		return errors.Wrap(err, "creating kind cluster")
 	}
 
+	args = append(args, desired.KindExtraCreateArguments...)
 	args = append(args, "--config", "-")
 
 	iostreams := a.iostreams

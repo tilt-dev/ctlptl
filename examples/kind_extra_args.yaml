@@ -1,0 +1,14 @@
+# Creates a kind cluster with a registry.
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+product: kind
+registry: ctlptl-registry
+kindExtraCreateArguments:
+# Example 1: Pass --wait to `kind create cluster` to wait for the control plane to be ready.
+- "--wait=2m"
+# Example 2: Pass --retain to `kind create cluster` to keep the containers around.
+# This is super useful for debugging cluster creation issues.
+- "--retain"
+# Example 3: Pass --verbosity=3 to `kind create cluster` to get more verbose output.
+- # This is also super useful for debugging cluster creation issues
+- "--verbosity=3"

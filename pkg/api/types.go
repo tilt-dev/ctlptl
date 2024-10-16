@@ -62,6 +62,9 @@ type Cluster struct {
 	// wins over one specified in the Kind config.
 	KindV1Alpha4Cluster *v1alpha4.Cluster `json:"kindV1Alpha4Cluster,omitempty" yaml:"kindV1Alpha4Cluster,omitempty"`
 
+	// Extra command line arguments passed to Kind create CLI. Only applicable to clusters with the product: kind.
+	KindExtraCreateArguments []string `json:"kindExtraCreateArguments,omitempty" yaml:"kindExtraCreateArguments,omitempty"`
+
 	// The Minikube cluster config. Only applicable for clusters with product: minikube.
 	Minikube *MinikubeCluster `json:"minikube,omitempty" yaml:"minikube,omitempty"`
 
