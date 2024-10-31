@@ -25,7 +25,7 @@ golangci-lint: $(GOLANGCILINT)
 	$(GOPATH)/bin/golangci-lint run --verbose --timeout=120s
 
 $(GOLANGCILINT):
-	(cd /; GO111MODULE=on GOPROXY="direct" GOSUMDB=off go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.2)
+	(cd /; GO111MODULE=on GOPROXY="direct" GOSUMDB=off go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0)
 
 BUILDER=buildx-multiarch
 

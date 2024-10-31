@@ -28,10 +28,6 @@ func dockerDesktopBackendNativeSocketPaths() ([]string, error) {
 }
 
 func dialDockerDesktop(socketPath string) (net.Conn, error) {
-	if runtime.GOOS == "windows" {
-		return nil, fmt.Errorf("Cannot dial docker-desktop on %s", runtime.GOOS)
-	}
-
 	return net.Dial("unix", socketPath)
 }
 
