@@ -5,19 +5,19 @@ orbs:
 jobs:
   build:
     docker:
-      - image: cimg/go:1.22
+      - image: cimg/go:1.23
     steps:
       - checkout
       - run: go get -v -t -d ./...
       - run: go test -v ./...
-      - run: cd .. && go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.58.2
+      - run: cd .. && go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
       - run: make golangci-lint
       - slack/notify-on-failure:
           only_for_branches: main
 
   e2e-remote-docker:
     docker:
-      - image: docker/tilt-ctlptl-ci@sha256:a91e3b6672e43b406eadcc79faa973c414694e877166968f4bd71a0bc966232a
+      - image: docker/tilt-ctlptl-ci@sha256:76da5ebbf0feeb4ecea2fec80e43145d6697d126d533e3a7e109ca79e6ca1119
     steps:
       - checkout
       - setup_remote_docker
@@ -32,9 +32,9 @@ jobs:
       - kubernetes/install-kubectl
       - run: |
           set -ex
-          wget https://golang.org/dl/go1.22.0.linux-amd64.tar.gz
+          wget https://golang.org/dl/go1.23.0.linux-amd64.tar.gz
           sudo rm -fR /usr/local/go
-          sudo tar -C /usr/local -xzf go1.22.0.linux-amd64.tar.gz
+          sudo tar -C /usr/local -xzf go1.23.0.linux-amd64.tar.gz
       - run: |
           set -ex
           export MINIKUBE_VERSION=v1.32.0
@@ -60,14 +60,14 @@ jobs:
 
   release-dry-run:
     docker:
-      - image: golang:1.22-bookworm
+      - image: golang:1.23-bookworm
     steps:
       - checkout
       - setup_remote_docker
       # https://discuss.circleci.com/t/arm-version-of-remote-docker/41624
       - run: ssh remote-docker "sudo apt-get update; sudo apt-get install -y qemu-user-static binfmt-support"
       - run: git fetch --tags
-      - run: go install github.com/goreleaser/goreleaser@latest
+      - run: go install github.com/goreleaser/goreleaser/v2@latest
       - run: |
           set -e
           pushd /tmp
@@ -87,20 +87,20 @@ jobs:
           rm -rf /var/lib/apt/lists/*
 
           popd
-      - run: goreleaser --debug --clean --skip-publish --snapshot
+      - run: goreleaser --verbose --clean --skip=publish --snapshot
       - slack/notify-on-failure:
           only_for_branches: main
 
   release:
     docker:
-      - image: golang:1.22-bookworm
+      - image: golang:1.23-bookworm
     steps:
       - checkout
       - setup_remote_docker
       # https://discuss.circleci.com/t/arm-version-of-remote-docker/41624
       - run: ssh remote-docker "sudo apt-get update; sudo apt-get install -y qemu-user-static binfmt-support"
       - run: git fetch --tags
-      - run: go install github.com/goreleaser/goreleaser@latest
+      - run: go install github.com/goreleaser/goreleaser/v2@latest
       - run: |
           set -e
           pushd /tmp

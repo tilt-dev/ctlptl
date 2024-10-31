@@ -9,7 +9,7 @@
 # Similar to the release image (which contains everything BUT the build
 # toolchain)
 
-FROM golang:1.22-bookworm
+FROM golang:1.23-bookworm
 
 RUN apt update && apt install -y curl ca-certificates liblz4-tool rsync socat gpg
 
@@ -28,7 +28,7 @@ RUN set -exu \
   && apt install -y docker-ce-cli=5:25.0.3-1~debian.12~bookworm docker-buildx-plugin
 
 # Install kubectl client
-ENV KUBECTL_VERSION=v1.29.1
+ENV KUBECTL_VERSION=v1.31.0
 RUN curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
     && curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256" \
     && echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check \
