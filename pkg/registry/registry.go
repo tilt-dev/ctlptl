@@ -149,7 +149,11 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 		}
 		sort.Strings(networks)
 
-		listenAddress, hostPort, containerPort := c.ipAndPortsFrom(container.Ports)
+		var warnings []string
+		listenAddress, hostPort, containerPort, err := c.ipAndPortsFrom(container.Ports)
+		if err != nil {
+			warnings = append(warnings, fmt.Sprintf("Unexpected registry ports: %+v", container.Ports))
+		}
 
 		registry := &api.Registry{
 			TypeMeta: typeMeta,
@@ -167,6 +171,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 				Labels:            container.Labels,
 				Image:             container.Image,
 				Env:               env,
+				Warnings:          warnings,
 			},
 		}
 
@@ -181,13 +186,13 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 	}, nil
 }
 
-func (c *Controller) ipAndPortsFrom(ports []types.Port) (listenAddress string, hostPort int, containerPort int) {
+func (c *Controller) ipAndPortsFrom(ports []types.Port) (listenAddress string, hostPort int, containerPort int, err error) {
 	for _, port := range ports {
 		if port.PrivatePort == 5000 {
-			return port.IP, int(port.PublicPort), int(port.PrivatePort)
+			return port.IP, int(port.PublicPort), int(port.PrivatePort), nil
 		}
 	}
-	return "unknown", 0, 0
+	return "", 0, 0, fmt.Errorf("could not find registry port")
 }
 
 // Compare the desired registry against the existing registry, and reconcile

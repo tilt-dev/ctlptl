@@ -267,6 +267,11 @@ func (in *RegistryStatus) DeepCopyInto(out *RegistryStatus) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.Warnings != nil {
+		in, out := &in.Warnings, &out.Warnings
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
