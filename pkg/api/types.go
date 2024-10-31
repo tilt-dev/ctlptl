@@ -245,6 +245,9 @@ type RegistryStatus struct {
 
 	// Image for the running container.
 	Image string `json:"image,omitempty" yaml:"image,omitempty"`
+
+	// Warnings that occurred when reporting the registry status.
+	Warnings []string `json:"warnings,omitempty" yaml:"warnings,omitempty"`
 }
 
 // RegistryList is a list of Registrys.

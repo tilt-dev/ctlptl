@@ -112,6 +112,35 @@ func kindRegistryCustomImage() types.Container {
 	}
 }
 
+func registryBadPorts() types.Container {
+	return types.Container{
+		ID:      "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
+		Names:   []string{"/kind-registry"},
+		Image:   DefaultRegistryImageRef,
+		ImageID: "sha256:2d4f4b5309b1e41b4f83ae59b44df6d673ef44433c734b14c1c103ebca82c116",
+		Command: "/entrypoint.sh /etc/docker/registry/config.yml",
+		Created: 1603483645,
+		Labels:  map[string]string{"dev.tilt.ctlptl.role": "registry"},
+		Ports: []types.Port{
+			types.Port{IP: "127.0.0.1", PrivatePort: 5001, PublicPort: 5002, Type: "tcp"},
+		},
+		SizeRw:     0,
+		SizeRootFs: 0,
+		State:      "running",
+		Status:     "Up 2 hours",
+		NetworkSettings: &types.SummaryNetworkSettings{
+			Networks: map[string]*network.EndpointSettings{
+				"bridge": &network.EndpointSettings{
+					IPAddress: "172.0.1.2",
+				},
+				"kind": &network.EndpointSettings{
+					IPAddress: "172.0.1.3",
+				},
+			},
+		},
+	}
+}
+
 func TestListRegistries(t *testing.T) {
 	f := newFixture(t)
 	defer f.TearDown()
@@ -180,6 +209,38 @@ func TestListRegistries(t *testing.T) {
 			Env:               []string{"REGISTRY_STORAGE_DELETE_ENABLED=true", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
 		},
 	}, list.Items[2])
+}
+
+func TestListRegistries_badPorts(t *testing.T) {
+	f := newFixture(t)
+	defer f.TearDown()
+
+	regWithoutLabels := kindRegistryLoopback()
+	regWithoutLabels.Labels = nil
+
+	f.docker.containers = []types.Container{registryBadPorts()}
+
+	list, err := f.c.List(context.Background(), ListOptions{})
+	require.NoError(t, err)
+
+	require.Len(t, list.Items, 1)
+	assert.Equal(t, api.Registry{
+		TypeMeta: typeMeta,
+		Name:     "kind-registry",
+		Status: api.RegistryStatus{
+			CreationTimestamp: metav1.Time{Time: time.Unix(1603483645, 0)},
+			IPAddress:         "172.0.1.2",
+			Networks:          []string{"bridge", "kind"},
+			ContainerID:       "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
+			State:             "running",
+			Labels:            map[string]string{"dev.tilt.ctlptl.role": "registry"},
+			Image:             DefaultRegistryImageRef,
+			Env:               []string{"REGISTRY_STORAGE_DELETE_ENABLED=true", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
+			Warnings: []string{
+				"Unexpected registry ports: [{IP:127.0.0.1 PrivatePort:5001 PublicPort:5002 Type:tcp}]",
+			},
+		},
+	}, list.Items[0])
 }
 
 func TestGetRegistry(t *testing.T) {
