@@ -37,7 +37,7 @@ jobs:
           sudo tar -C /usr/local -xzf go1.23.0.linux-amd64.tar.gz
       - run: |
           set -ex
-          export MINIKUBE_VERSION=v1.32.0
+          export MINIKUBE_VERSION=v1.34.0
           curl -fLo ./minikube-linux-amd64 "https://github.com/kubernetes/minikube/releases/download/${MINIKUBE_VERSION}/minikube-linux-amd64"
           chmod +x ./minikube-linux-amd64
           sudo mv ./minikube-linux-amd64 /usr/local/bin/minikube
