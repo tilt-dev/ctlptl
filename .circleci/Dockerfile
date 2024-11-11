@@ -35,7 +35,7 @@ RUN curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubec
     && install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
 # install Kind
-ENV KIND_VERSION=v0.24.0
+ENV KIND_VERSION=v0.25.0
 RUN set -exu \
   && curl -fLo ./kind-linux-amd64 "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64" \
   && chmod +x ./kind-linux-amd64 \
