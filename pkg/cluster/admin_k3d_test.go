@@ -27,7 +27,7 @@ func TestK3DStartFlagsV4(t *testing.T) {
 
 	err = f.a.Create(ctx, &api.Cluster{
 		Name: "k3d-my-cluster",
-	}, &api.Registry{Name: "my-reg"})
+	}, &api.Registry{Name: "my-reg"}, []*api.Registry{})
 	assert.NoError(t, err)
 	assert.Equal(t, []string{
 		"k3d", "cluster", "create", "my-cluster",
@@ -50,7 +50,7 @@ func TestK3DStartFlagsV5(t *testing.T) {
 				Network: "bar",
 			},
 		},
-	}, &api.Registry{Name: "my-reg"})
+	}, &api.Registry{Name: "my-reg"}, []*api.Registry{})
 	require.NoError(t, err)
 	assert.Equal(t, []string{
 		"k3d", "cluster", "create", "my-cluster",
@@ -82,7 +82,7 @@ func TestK3DV1alpha5File(t *testing.T) {
 				Network: "bar",
 			},
 		},
-	}, &api.Registry{Name: "my-reg"})
+	}, &api.Registry{Name: "my-reg"}, []*api.Registry{})
 	require.NoError(t, err)
 	assert.Equal(t, []string{
 		"k3d", "cluster", "create", "my-cluster",
@@ -106,7 +106,7 @@ func TestK3DV1alpha4FileOnOldVersions(t *testing.T) {
 	ctx := context.Background()
 	err := f.a.Create(ctx, &api.Cluster{
 		Name: "k3d-my-cluster",
-	}, &api.Registry{Name: "my-reg"})
+	}, &api.Registry{Name: "my-reg"}, []*api.Registry{})
 	require.NoError(t, err)
 	assert.Equal(t, []string{
 		"k3d", "cluster", "create", "my-cluster",

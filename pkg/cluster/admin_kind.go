@@ -56,7 +56,7 @@ func (a *kindAdmin) EnsureInstalled(ctx context.Context) error {
 	return nil
 }
 
-func (a *kindAdmin) kindClusterConfig(desired *api.Cluster, registry *api.Registry, registryAPI containerdRegistryAPI) *v1alpha4.Cluster {
+func (a *kindAdmin) kindClusterConfig(ctx context.Context, desired *api.Cluster, registry *api.Registry, pullThroughRegistries []*api.Registry, registryAPI containerdRegistryAPI) (*v1alpha4.Cluster, error) {
 	kindConfig := desired.KindV1Alpha4Cluster
 	if kindConfig == nil {
 		kindConfig = &v1alpha4.Cluster{}
@@ -84,10 +84,20 @@ func (a *kindAdmin) kindClusterConfig(desired *api.Cluster, registry *api.Regist
 			kindConfig.ContainerdConfigPatches = append(kindConfig.ContainerdConfigPatches, patch)
 		}
 	}
-	return kindConfig
+
+	for _, reg := range pullThroughRegistries {
+		if reg.Proxy != nil && reg.Proxy.RemoteURL != "" {
+			patch := fmt.Sprintf(`[plugins."io.containerd.grpc.v1.cri".registry.mirrors."%s"]
+  endpoint = ["http://%s:%d"]
+`, reg.Proxy.RemoteURL, reg.Name, reg.Status.ContainerPort)
+			kindConfig.ContainerdConfigPatches = append(kindConfig.ContainerdConfigPatches, patch)
+		}
+	}
+
+	return kindConfig, nil
 }
 
-func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *api.Registry) error {
+func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *api.Registry, pullThroughRegistries []*api.Registry) error {
 	klog.V(3).Infof("Creating cluster with config:\n%+v\n---\n", desired)
 	if registry != nil {
 		klog.V(3).Infof("Initializing cluster with registry config:\n%+v\n---\n", registry)
@@ -139,7 +149,10 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 		args = append(args, "--image", node)
 	}
 
-	kindConfig := a.kindClusterConfig(desired, registry, registryAPI)
+	kindConfig, err := a.kindClusterConfig(ctx, desired, registry, pullThroughRegistries, registryAPI)
+	if err != nil {
+		return errors.Wrap(err, "creating kind cluster")
+	}
 	buf := bytes.NewBuffer(nil)
 	encoder := yaml.NewEncoder(buf)
 	err = encoder.Encode(kindConfig)

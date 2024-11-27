@@ -731,7 +731,7 @@ func newFakeAdmin(config *clientcmdapi.Config, fakeK8s *fake.Clientset) *fakeAdm
 
 func (a *fakeAdmin) EnsureInstalled(ctx context.Context) error { return nil }
 
-func (a *fakeAdmin) Create(ctx context.Context, config *api.Cluster, registry *api.Registry) error {
+func (a *fakeAdmin) Create(ctx context.Context, config *api.Cluster, registry *api.Registry, registries []*api.Registry) error {
 	a.created = config.DeepCopy()
 	a.createdRegistry = registry.DeepCopy()
 	a.config.Contexts[config.Name] = &clientcmdapi.Context{Cluster: config.Name}

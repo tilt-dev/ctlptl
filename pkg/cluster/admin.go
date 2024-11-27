@@ -18,7 +18,7 @@ type Admin interface {
 	//
 	// Make a best effort attempt to delete any resources that might block creation
 	// of the cluster.
-	Create(ctx context.Context, desired *api.Cluster, registry *api.Registry) error
+	Create(ctx context.Context, desired *api.Cluster, registry *api.Registry, pullThroughRegistries []*api.Registry) error
 
 	// Infers the LocalRegistryHosting that this admin will try to configure.
 	LocalRegistryHosting(ctx context.Context, desired *api.Cluster, registry *api.Registry) (*localregistry.LocalRegistryHostingV1, error)

@@ -152,6 +152,7 @@ func Run(ctx context.Context, cli CLI, name string, config *container.Config, ho
 
 	id := resp.ID
 	err = c.ContainerStart(ctx, id, container.StartOptions{})
+
 	if err != nil {
 		return fmt.Errorf("starting %s: %v", name, err)
 	}

@@ -668,6 +668,30 @@ func (c *Controller) ensureRegistryExistsForCluster(ctx context.Context, desired
 	})
 }
 
+// Get the pull-through registries for the given cluster.
+func (c *Controller) pullThroughRegistries(ctx context.Context, desired *api.Cluster) ([]*api.Registry, error) {
+	regCtl, err := c.registryController(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter for all the registries that are in the desired.PullThroughRegistries list.
+	pullThroughRegistries := make([]*api.Registry, 0)
+	allRegistries, err := regCtl.List(ctx, registry.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	for _, reg := range allRegistries.Items {
+		for _, desiredRegName := range desired.PullThroughRegistries {
+			if reg.Name == desiredRegName {
+				pullThroughRegistries = append(pullThroughRegistries, &reg)
+			}
+		}
+	}
+
+	return pullThroughRegistries, nil
+}
+
 // Compare the desired cluster against the existing cluster, and reconcile
 // the two to match.
 func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Cluster, error) {
@@ -748,7 +772,14 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 		}
 	}
 
+	// Ensure the registry exists.
 	reg, err := c.ensureRegistryExistsForCluster(ctx, desired)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch the pull-through registries.
+	pullThroughRegistries, err := c.pullThroughRegistries(ctx, desired)
 	if err != nil {
 		return nil, err
 	}
@@ -758,7 +789,7 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Cluster) (*api.Clus
 		desired.Name != existingCluster.Name ||
 		desired.Product != existingCluster.Product
 	if needsCreate {
-		err := admin.Create(ctx, desired, reg)
+		err := admin.Create(ctx, desired, reg, pullThroughRegistries)
 		if err != nil {
 			return nil, err
 		}

@@ -16,7 +16,7 @@ import (
 func TestMinikubeStartFlags(t *testing.T) {
 	f := newMinikubeFixture()
 	ctx := context.Background()
-	err := f.a.Create(ctx, &api.Cluster{Name: "minikube", Minikube: &api.MinikubeCluster{StartFlags: []string{"--foo"}}}, nil)
+	err := f.a.Create(ctx, &api.Cluster{Name: "minikube", Minikube: &api.MinikubeCluster{StartFlags: []string{"--foo"}}}, nil, []*api.Registry{})
 	require.NoError(t, err)
 	assert.Equal(t, []string{
 		"minikube", "start",

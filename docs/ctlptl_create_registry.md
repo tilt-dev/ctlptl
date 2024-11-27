@@ -12,6 +12,7 @@ ctlptl create registry [name] [flags]
   ctlptl create registry ctlptl-registry
   ctlptl create registry ctlptl-registry --port=5000
   ctlptl create registry ctlptl-registry --port=5000 --listen-address 0.0.0.0
+  ctlptl create registry ctlptl-pull-through-registry --proxy-remote-url=https://registry-1.docker.io
 ```
 
 ### Options
@@ -25,6 +26,15 @@ ctlptl create registry [name] [flags]
       --port int                      The port to expose the registry on host. If not specified, chooses a random port
       --show-managed-fields           If true, keep the managedFields when printing objects in JSON or YAML format.
       --template string               Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
+```
+
+### Remote proxy options
+If `--remote-proxy-url` is specified, the registry is configured as a pull-through cache:
+```
+      --proxy-remote-url string       The remote URL for the pull-through proxy
+      --proxy-username string         The username for the pull-through proxy authentication
+      --proxy-password string         The password for the pull-through proxy authentication. 
+      --proxy-ttl string              The TTL for the pull-through proxy cache
 ```
 
 ### SEE ALSO

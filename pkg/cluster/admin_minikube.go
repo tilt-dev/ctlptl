@@ -78,10 +78,13 @@ func (a *minikubeAdmin) version(ctx context.Context) (semver.Version, error) {
 	return result, nil
 }
 
-func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, registry *api.Registry) error {
+func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, registry *api.Registry, pullThroughRegistries []*api.Registry) error {
 	klog.V(3).Infof("Creating cluster with config:\n%+v\n---\n", desired)
 	if registry != nil {
 		klog.V(3).Infof("Initializing cluster with registry config:\n%+v\n---\n", registry)
+	}
+	if len(pullThroughRegistries) > 0 {
+		return fmt.Errorf("ctlptl currently does not support connecting pull-through registries to docker-desktop")
 	}
 
 	v, err := a.version(ctx)

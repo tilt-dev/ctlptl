@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"regexp"
 	"sort"
@@ -155,10 +156,37 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 			warnings = append(warnings, fmt.Sprintf("Unexpected registry ports: %+v", container.Ports))
 		}
 
+		// Extract proxy settings from environment variables
+		var proxy *api.RegistryProxySpec
+		for _, envVar := range env {
+			if strings.HasPrefix(envVar, "REGISTRY_PROXY_REMOTEURL=") {
+				if proxy == nil {
+					proxy = &api.RegistryProxySpec{}
+				}
+				proxy.RemoteURL = strings.TrimPrefix(envVar, "REGISTRY_PROXY_REMOTEURL=")
+			} else if strings.HasPrefix(envVar, "REGISTRY_PROXY_USERNAME=") {
+				if proxy == nil {
+					proxy = &api.RegistryProxySpec{}
+				}
+				proxy.Username = strings.TrimPrefix(envVar, "REGISTRY_PROXY_USERNAME=")
+			} else if strings.HasPrefix(envVar, "REGISTRY_PROXY_PASSWORD=") {
+				if proxy == nil {
+					proxy = &api.RegistryProxySpec{}
+				}
+				proxy.Password = strings.TrimPrefix(envVar, "REGISTRY_PROXY_PASSWORD=")
+			} else if strings.HasPrefix(envVar, "REGISTRY_PROXY_TTL=") {
+				if proxy == nil {
+					proxy = &api.RegistryProxySpec{}
+				}
+				proxy.TTL = strings.TrimPrefix(envVar, "REGISTRY_PROXY_TTL=")
+			}
+		}
+
 		registry := &api.Registry{
 			TypeMeta: typeMeta,
 			Name:     name,
 			Port:     hostPort,
+			Proxy:    proxy,
 			Status: api.RegistryStatus{
 				CreationTimestamp: metav1.Time{Time: created},
 				ContainerID:       container.ID,
@@ -259,6 +287,29 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 		desiredEnvs["REGISTRY_STORAGE_DELETE_ENABLED"] = "true"
 		desired.Env = append(desired.Env, "REGISTRY_STORAGE_DELETE_ENABLED=true")
 	}
+
+	// Set proxy environment variables if Proxy is configured
+	if desired.Proxy != nil {
+		if desired.Proxy.RemoteURL != "" {
+			desired.Env = append(desired.Env, fmt.Sprintf("REGISTRY_PROXY_REMOTEURL=%s", desired.Proxy.RemoteURL))
+			desiredEnvs["REGISTRY_PROXY_REMOTEURL"] = desired.Proxy.RemoteURL
+		}
+		if desired.Proxy.Username != "" {
+			desired.Env = append(desired.Env, fmt.Sprintf("REGISTRY_PROXY_USERNAME=%s", desired.Proxy.Username))
+			desiredEnvs["REGISTRY_PROXY_USERNAME"] = desired.Proxy.Username
+		}
+		if desired.Proxy.Password != "" {
+			// Use the new method for environment variable replacement
+			password := expandEnvVariables(desired.Proxy.Password)
+			desired.Env = append(desired.Env, fmt.Sprintf("REGISTRY_PROXY_PASSWORD=%s", password))
+			desiredEnvs["REGISTRY_PROXY_PASSWORD"] = password
+		}
+		if desired.Proxy.TTL != "" {
+			desired.Env = append(desired.Env, fmt.Sprintf("REGISTRY_PROXY_TTL=%s", desired.Proxy.TTL))
+			desiredEnvs["REGISTRY_PROXY_TTL"] = desired.Proxy.TTL
+		}
+	}
+
 	if eq := reflect.DeepEqual(desiredEnvs, existingEnvs); !eq {
 		needsDelete = true
 	}
@@ -479,4 +530,12 @@ func imagesRefsEqual(a, b string) bool {
 	}
 
 	return aRef.String() == bRef.String()
+}
+
+// expandEnvVariables replaces both ${VAR_NAME} and $VAR_NAME with their environment variable values.
+func expandEnvVariables(input string) string {
+	// Use os.Expand to handle both ${VAR_NAME} and $VAR_NAME
+	return os.Expand(input, func(varName string) string {
+		return os.Getenv(varName)
+	})
 }

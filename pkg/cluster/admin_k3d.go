@@ -48,10 +48,13 @@ func (a *k3dAdmin) EnsureInstalled(ctx context.Context) error {
 	return nil
 }
 
-func (a *k3dAdmin) Create(ctx context.Context, desired *api.Cluster, registry *api.Registry) error {
+func (a *k3dAdmin) Create(ctx context.Context, desired *api.Cluster, registry *api.Registry, pullThroughRegistries []*api.Registry) error {
 	klog.V(3).Infof("Creating cluster with config:\n%+v\n---\n", desired)
 	if registry != nil {
 		klog.V(3).Infof("Initializing cluster with registry config:\n%+v\n---\n", registry)
+	}
+	if len(pullThroughRegistries) > 0 {
+		return fmt.Errorf("ctlptl currently does not support connecting pull-through registries to docker-desktop")
 	}
 
 	k3dV, err := a.version(ctx)

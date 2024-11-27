@@ -42,6 +42,13 @@ type Cluster struct {
 	// Not supported on all cluster products.
 	Registry string `json:"registry,omitempty" yaml:"registry,omitempty"`
 
+	// The name of pull-through registries to add to the cluster.
+	//
+	// These registries must already exist. `ctlptl` will fail if they don't.
+	//
+	// Not supported on all cluster products.
+	PullThroughRegistries []string `json:"pullThroughRegistries,omitempty" yaml:"pullThroughRegistries,omitempty"`
+
 	// The desired version of Kubernetes to run.
 	//
 	// Examples:
@@ -160,6 +167,15 @@ type ClusterList struct {
 	Items []Cluster `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+// RegistryProxySpec describes the configuration for a pull-through registry.
+// See: https://distribution.github.io/distribution/recipes/mirror/#run-a-registry-as-a-pull-through-cache
+type RegistryProxySpec struct {
+	RemoteURL string `json:"remoteURL,omitempty" yaml:"remoteURL,omitempty"`
+	Username  string `json:"username,omitempty" yaml:"username,omitempty"`
+	Password  string `json:"password,omitempty" yaml:"password,omitempty"`
+	TTL       string `json:"ttl,omitempty" yaml:"ttl,omitempty"`
+}
+
 // Cluster contains registry configuration.
 //
 // Currently designed for local registries on the host machine, but
@@ -200,6 +216,10 @@ type Registry struct {
 	//
 	// Defaults to `docker.io/library/registry:2`.
 	Image string `json:"image,omitempty" yaml:"image,omitempty"`
+
+	// Proxy configuration for a pull-through registry.
+	// If provided, the registry will be configured as a pull-through registry.
+	Proxy *RegistryProxySpec `json:"proxy,omitempty" yaml:"proxy,omitempty"`
 
 	// Most recently observed status of the registry.
 	// Populated by the system.

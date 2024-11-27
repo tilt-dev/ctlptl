@@ -38,7 +38,8 @@ func (o *CreateRegistryOptions) Command() *cobra.Command {
 		Short: "Create a registry with the given name",
 		Example: "  ctlptl create registry ctlptl-registry\n" +
 			"  ctlptl create registry ctlptl-registry --port=5000\n" +
-			"  ctlptl create registry ctlptl-registry --port=5000 --listen-address 0.0.0.0",
+			"  ctlptl create registry ctlptl-registry --port=5000 --listen-address 0.0.0.0\n" +
+			"  ctlptl create registry ctlptl-pull-through-registry --proxy-remote-url=https://registry-1.docker.io",
 		Run:  o.Run,
 		Args: cobra.ExactArgs(1),
 	}
@@ -52,6 +53,28 @@ func (o *CreateRegistryOptions) Command() *cobra.Command {
 		"The host's IP address to bind the container to. If not set defaults to 127.0.0.1")
 	cmd.Flags().StringVar(&o.Registry.Image, "image", registry.DefaultRegistryImageRef,
 		"Registry image to use")
+
+	// Initialize Proxy only if any proxy-related flag is set
+	var proxyRemoteURL, proxyUsername, proxyPassword, proxyTTL string
+	cmd.Flags().StringVar(&proxyRemoteURL, "proxy-remote-url", "",
+		"The remote URL for the pull-through proxy")
+	cmd.Flags().StringVar(&proxyUsername, "proxy-username", "",
+		"The username for the pull-through proxy authentication")
+	cmd.Flags().StringVar(&proxyPassword, "proxy-password", "",
+		"The password for the pull-through proxy authentication")
+	cmd.Flags().StringVar(&proxyTTL, "proxy-ttl", "",
+		"The TTL for the pull-through proxy cache")
+
+	cmd.PreRun = func(cmd *cobra.Command, args []string) {
+		if proxyRemoteURL != "" {
+			o.Registry.Proxy = &api.RegistryProxySpec{
+				RemoteURL: proxyRemoteURL,
+				Username:  proxyUsername,
+				Password:  proxyPassword,
+				TTL:       proxyTTL,
+			}
+		}
+	}
 
 	return cmd
 }

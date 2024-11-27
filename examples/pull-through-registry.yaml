@@ -1,0 +1,25 @@
+# Creates a registry called ctlptl-registry available on 127.0.0.1:5002
+apiVersion: ctlptl.dev/v1alpha1
+kind: Registry
+name: ctlptl-registry
+port: 5002
+listenAddress: 127.0.0.1
+---
+# Creates a pull-through registry called ctlptl-pull-through-registry available on 127.0.0.1:5003
+apiVersion: ctlptl.dev/v1alpha1
+kind: Registry
+name: ctlptl-pull-through-registry
+port: 5003
+listenAddress: 127.0.0.1
+proxy:
+  remoteURL: "https://registry-1.docker.io"
+  username: "my-username"
+  password: "$MY_PASSWORD_ENV"
+---
+# Create a Kind cluster with the pull-through registry
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+product: kind
+registry: ctlptl-registry
+pullThroughRegistries:
+  - ctlptl-pull-through-registry
