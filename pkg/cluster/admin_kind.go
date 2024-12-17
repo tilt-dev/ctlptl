@@ -84,6 +84,26 @@ func (a *kindAdmin) kindClusterConfig(desired *api.Cluster, registry *api.Regist
 			kindConfig.ContainerdConfigPatches = append(kindConfig.ContainerdConfigPatches, patch)
 		}
 	}
+
+	for _, reg := range desired.PullThroughRegistries {
+		// Add the registry to the list of mirrors.
+		patch := fmt.Sprintf(`[plugins."io.containerd.grpc.v1.cri".registry.mirrors."%s"]
+  endpoint = ["http://%s"]
+`, reg.RegistryFQDN, reg.RemoteURL)
+		kindConfig.ContainerdConfigPatches = append(kindConfig.ContainerdConfigPatches, patch)
+
+		// Specify the auth for the registry, if provided.
+		if reg.Username != "" || reg.Password != "" {
+			passwordValue := os.ExpandEnv(reg.Password)
+
+			patch := fmt.Sprintf(`[plugins."io.containerd.grpc.v1.cri".registry.configs."%s".auth]
+  username = "%s"
+  password = "%s"
+`, reg.RegistryFQDN, reg.Username, passwordValue)
+			kindConfig.ContainerdConfigPatches = append(kindConfig.ContainerdConfigPatches, patch)
+		}
+	}
+
 	return kindConfig
 }
 

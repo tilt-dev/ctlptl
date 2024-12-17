@@ -82,3 +82,39 @@ kind-control-plane2
 		"kind-control-plane2",
 	}, nodeExec)
 }
+
+func TestKindClusterConfigWithPullThroughRegistries(t *testing.T) {
+	iostreams := genericclioptions.IOStreams{
+		In:     os.Stdin,
+		Out:    os.Stdout,
+		ErrOut: os.Stderr,
+	}
+	runner := exec.NewFakeCmdRunner(func(argv []string) string {
+		return ""
+	})
+	a := newKindAdmin(iostreams, runner, &fakeDockerClient{})
+
+	desired := &api.Cluster{
+		PullThroughRegistries: []api.PullThroughRegistry{
+			{
+				RegistryFQDN: "example.com",
+				RemoteURL:    "example.com:5000",
+				Username:     "user",
+				Password:     "pass",
+			},
+		},
+	}
+
+	kindConfig := a.kindClusterConfig(desired, nil, containerdRegistryV2)
+
+	expectedMirror := `[plugins."io.containerd.grpc.v1.cri".registry.mirrors."example.com"]
+  endpoint = ["http://example.com:5000"]
+`
+	expectedAuth := `[plugins."io.containerd.grpc.v1.cri".registry.configs."example.com".auth]
+  username = "user"
+  password = "pass"
+`
+
+	assert.Contains(t, kindConfig.ContainerdConfigPatches, expectedMirror)
+	assert.Contains(t, kindConfig.ContainerdConfigPatches, expectedAuth)
+}
