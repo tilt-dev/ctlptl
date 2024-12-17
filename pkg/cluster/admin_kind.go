@@ -334,6 +334,12 @@ func (a *kindAdmin) getKindVersion(ctx context.Context) (string, error) {
 // This table must be built up manually from the Kind release notes each
 // time a new Kind version is released :\
 var kindK8sNodeTable = map[string]map[string]string{
+	"v0.26.0": {
+		"1.32": "kindest/node:v1.32.0@sha256:c48c62eac5da28cdadcf560d1d8616cfa6783b58f0d94cf63ad1bf49600cb027",
+		"1.31": "kindest/node:v1.31.4@sha256:2cb39f7295fe7eafee0842b1052a599a4fb0f8bcf3f83d96c7f4864c357c6c30",
+		"1.30": "kindest/node:v1.30.8@sha256:17cd608b3971338d9180b00776cb766c50d0a0b6b904ab4ff52fd3fc5c6369bf",
+		"1.29": "kindest/node:v1.29.12@sha256:62c0672ba99a4afd7396512848d6fc382906b8f33349ae68fb1dbfe549f70dec",
+	},
 	"v0.25.0": {
 		"1.31": "kindest/node:v1.31.2@sha256:18fbefc20a7113353c7b75b5c869d7145a6abd6269154825872dc59c1329912e",
 		"1.30": "kindest/node:v1.30.6@sha256:b6d08db72079ba5ae1f4a88a09025c0a904af3b52387643c285442afb05ab994",
