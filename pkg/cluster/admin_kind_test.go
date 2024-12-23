@@ -98,7 +98,7 @@ func TestKindClusterConfigWithPullThroughRegistries(t *testing.T) {
 		RegistryAuths: []api.RegistryAuth{
 			{
 				Host:     "example.com",
-				Endpoint: "example.com:5000",
+				Endpoint: "http://example.com:5000",
 				Username: "user",
 				Password: "pass",
 			},
@@ -110,7 +110,7 @@ func TestKindClusterConfigWithPullThroughRegistries(t *testing.T) {
 	expectedMirror := `[plugins."io.containerd.grpc.v1.cri".registry.mirrors."example.com"]
   endpoint = ["http://example.com:5000"]
 `
-	expectedAuth := `[plugins."io.containerd.grpc.v1.cri".registry.configs."example.com".auth]
+	expectedAuth := `[plugins."io.containerd.grpc.v1.cri".registry.configs."example.com:5000".auth]
   username = "user"
   password = "pass"
 `

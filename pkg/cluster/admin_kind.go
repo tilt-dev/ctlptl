@@ -90,7 +90,7 @@ func (a *kindAdmin) kindClusterConfig(desired *api.Cluster, registry *api.Regist
 		// Parse the endpoint
 		parsedEndpoint, err := url.Parse(reg.Endpoint)
 		if err != nil {
-			klog.Warningf("Failed to parse registry URL %s: %v", reg.Endpoint)
+			klog.Warningf("Failed to parse registry URL %s: %v", reg.Endpoint, err)
 			continue
 		}
 
