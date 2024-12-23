@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -67,7 +68,7 @@ func (a *kindAdmin) kindClusterConfig(desired *api.Cluster, registry *api.Regist
 	kindConfig.APIVersion = "kind.x-k8s.io/v1alpha4"
 
 	if registry != nil {
-		if registryAPI == containerdRegistryV2 {
+		if registryAPI == containerdRegistryV2 && len(desired.RegistryAuths) == 0 {
 			// Point to the registry config path.
 			// We'll add these files post-creation.
 			patch := `[plugins."io.containerd.grpc.v1.cri".registry]
@@ -85,21 +86,29 @@ func (a *kindAdmin) kindClusterConfig(desired *api.Cluster, registry *api.Regist
 		}
 	}
 
-	for _, reg := range desired.PullThroughRegistries {
+	for _, reg := range desired.RegistryAuths {
+		// Parse the endpoint
+		parsedEndpoint, err := url.Parse(reg.Endpoint)
+		if err != nil {
+			klog.Warningf("Failed to parse registry URL %s: %v", reg.Endpoint)
+			continue
+		}
+
 		// Add the registry to the list of mirrors.
 		patch := fmt.Sprintf(`[plugins."io.containerd.grpc.v1.cri".registry.mirrors."%s"]
-  endpoint = ["http://%s"]
-`, reg.RegistryFQDN, reg.RemoteURL)
+  endpoint = ["%s"]
+`, reg.Host, reg.Endpoint)
 		kindConfig.ContainerdConfigPatches = append(kindConfig.ContainerdConfigPatches, patch)
 
 		// Specify the auth for the registry, if provided.
 		if reg.Username != "" || reg.Password != "" {
+			usernameValue := os.ExpandEnv(reg.Username)
 			passwordValue := os.ExpandEnv(reg.Password)
 
 			patch := fmt.Sprintf(`[plugins."io.containerd.grpc.v1.cri".registry.configs."%s".auth]
   username = "%s"
   password = "%s"
-`, reg.RegistryFQDN, reg.Username, passwordValue)
+`, parsedEndpoint.Host, usernameValue, passwordValue)
 			kindConfig.ContainerdConfigPatches = append(kindConfig.ContainerdConfigPatches, patch)
 		}
 	}

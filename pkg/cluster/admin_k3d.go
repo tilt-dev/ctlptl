@@ -53,7 +53,7 @@ func (a *k3dAdmin) Create(ctx context.Context, desired *api.Cluster, registry *a
 	if registry != nil {
 		klog.V(3).Infof("Initializing cluster with registry config:\n%+v\n---\n", registry)
 	}
-	if len(desired.PullThroughRegistries) > 0 {
+	if len(desired.RegistryAuths) > 0 {
 		return fmt.Errorf("ctlptl currently does not support connecting pull-through registries to k3d")
 	}
 

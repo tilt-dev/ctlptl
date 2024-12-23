@@ -27,7 +27,7 @@ func (a *dockerDesktopAdmin) Create(ctx context.Context, desired *api.Cluster, r
 	if registry != nil {
 		return fmt.Errorf("ctlptl currently does not support connecting a registry to docker-desktop")
 	}
-	if len(desired.PullThroughRegistries) > 0 {
+	if len(desired.RegistryAuths) > 0 {
 		return fmt.Errorf("ctlptl currently does not support connecting pull-through registries to docker-desktop")
 	}
 

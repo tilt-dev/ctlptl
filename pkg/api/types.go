@@ -16,13 +16,13 @@ type TypeMeta struct {
 	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 }
 
-// PullThroughRegistry contains configuration for pull-through registries
-type PullThroughRegistry struct {
+// RegistryAuth contains configuration for pull-through registries
+type RegistryAuth struct {
 	// The FQDN of the registry (i.e. docker.io)
-	RegistryFQDN string `json:"registryFQDN,omitempty" yaml:"registryFQDN,omitempty"`
-    
-	// The RemoteURL of the registry (i.e. https://registry-1.docker.io)
-	RemoteURL string `json:"remoteURL,omitempty" yaml:"remoteURL,omitempty"`
+	Host string `json:"host,omitempty" yaml:"host,omitempty"`
+
+	// The Endpoint of the registry (i.e. https://registry-1.docker.io)
+	Endpoint string `json:"endpoint,omitempty" yaml:"endpoint,omitempty"`
 	Username string `json:"username,omitempty" yaml:"username,omitempty"`
 	Password string `json:"password,omitempty" yaml:"password,omitempty"`
 }
@@ -56,7 +56,7 @@ type Cluster struct {
 	// A list of pull-through registries to configure on the cluster.
 	//
 	// Not supported on all cluster products.
-	PullThroughRegistries []PullThroughRegistry `json:"pullThroughRegistries,omitempty" yaml:"pullThroughRegistries,omitempty"`
+	RegistryAuths []RegistryAuth `json:"registryAuths,omitempty" yaml:"registryAuths,omitempty"`
 
 	// The desired version of Kubernetes to run.
 	//

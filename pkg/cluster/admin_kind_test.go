@@ -95,12 +95,12 @@ func TestKindClusterConfigWithPullThroughRegistries(t *testing.T) {
 	a := newKindAdmin(iostreams, runner, &fakeDockerClient{})
 
 	desired := &api.Cluster{
-		PullThroughRegistries: []api.PullThroughRegistry{
+		RegistryAuths: []api.RegistryAuth{
 			{
-				RegistryFQDN: "example.com",
-				RemoteURL:    "example.com:5000",
-				Username:     "user",
-				Password:     "pass",
+				Host:     "example.com",
+				Endpoint: "example.com:5000",
+				Username: "user",
+				Password: "pass",
 			},
 		},
 	}
