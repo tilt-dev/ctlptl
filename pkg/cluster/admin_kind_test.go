@@ -105,7 +105,8 @@ func TestKindClusterConfigWithPullThroughRegistries(t *testing.T) {
 		},
 	}
 
-	kindConfig := a.kindClusterConfig(desired, nil, containerdRegistryV2)
+	kindConfig, err := a.kindClusterConfig(desired, nil, containerdRegistryV2)
+	assert.NoError(t, err)
 
 	expectedMirror := `[plugins."io.containerd.grpc.v1.cri".registry.mirrors."example.com"]
   endpoint = ["http://example.com:5000"]

@@ -57,7 +57,7 @@ func (a *kindAdmin) EnsureInstalled(ctx context.Context) error {
 	return nil
 }
 
-func (a *kindAdmin) kindClusterConfig(desired *api.Cluster, registry *api.Registry, registryAPI containerdRegistryAPI) *v1alpha4.Cluster {
+func (a *kindAdmin) kindClusterConfig(desired *api.Cluster, registry *api.Registry, registryAPI containerdRegistryAPI) (*v1alpha4.Cluster, error) {
 	kindConfig := desired.KindV1Alpha4Cluster
 	if kindConfig == nil {
 		kindConfig = &v1alpha4.Cluster{}
@@ -90,8 +90,7 @@ func (a *kindAdmin) kindClusterConfig(desired *api.Cluster, registry *api.Regist
 		// Parse the endpoint
 		parsedEndpoint, err := url.Parse(reg.Endpoint)
 		if err != nil {
-			klog.Warningf("Failed to parse registry URL %s: %v", reg.Endpoint, err)
-			continue
+			return nil, errors.Wrapf(err, "Error parsing registry endpoint: %s", reg.Endpoint)
 		}
 
 		// Add the registry to the list of mirrors.
@@ -113,7 +112,7 @@ func (a *kindAdmin) kindClusterConfig(desired *api.Cluster, registry *api.Regist
 		}
 	}
 
-	return kindConfig
+	return kindConfig, nil
 }
 
 func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *api.Registry) error {
@@ -168,7 +167,11 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 		args = append(args, "--image", node)
 	}
 
-	kindConfig := a.kindClusterConfig(desired, registry, registryAPI)
+	kindConfig, err := a.kindClusterConfig(desired, registry, registryAPI)
+	if err != nil {
+		return errors.Wrap(err, "generating kind config")
+	}
+
 	buf := bytes.NewBuffer(nil)
 	encoder := yaml.NewEncoder(buf)
 	err = encoder.Encode(kindConfig)
@@ -196,7 +199,7 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 			}
 		}
 
-		if registryAPI == containerdRegistryV2 {
+		if registryAPI == containerdRegistryV2 && len(desired.RegistryAuths) == 0 {
 			err = a.applyContainerdPatchRegistryApiV2(ctx, desired, registry)
 			if err != nil {
 				return err
