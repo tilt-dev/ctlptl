@@ -1,0 +1,15 @@
+# Creates a kind cluster with Kind's custom cluster config
+#
+apiVersion: ctlptl.dev/v1alpha1
+kind: Cluster
+product: kind
+registry: ctlptl-registry
+registryAuths:
+- host: docker.io
+  endpoint: https://registry-1.docker.io
+  username: <docker hub username>
+  password: <docker hub token>
+kindV1Alpha4Cluster:
+  name: my-cluster
+  nodes:
+  - role: control-plane

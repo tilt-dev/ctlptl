@@ -83,6 +83,9 @@ func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, regist
 	if registry != nil {
 		klog.V(3).Infof("Initializing cluster with registry config:\n%+v\n---\n", registry)
 	}
+	if len(desired.RegistryAuths) > 0 {
+		return fmt.Errorf("ctlptl currently does not support connecting pull-through registries to minikube")
+	}
 
 	v, err := a.version(ctx)
 	if err != nil {

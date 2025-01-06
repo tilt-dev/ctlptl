@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -56,7 +57,7 @@ func (a *kindAdmin) EnsureInstalled(ctx context.Context) error {
 	return nil
 }
 
-func (a *kindAdmin) kindClusterConfig(desired *api.Cluster, registry *api.Registry, registryAPI containerdRegistryAPI) *v1alpha4.Cluster {
+func (a *kindAdmin) kindClusterConfig(desired *api.Cluster, registry *api.Registry, registryAPI containerdRegistryAPI) (*v1alpha4.Cluster, error) {
 	kindConfig := desired.KindV1Alpha4Cluster
 	if kindConfig == nil {
 		kindConfig = &v1alpha4.Cluster{}
@@ -67,7 +68,7 @@ func (a *kindAdmin) kindClusterConfig(desired *api.Cluster, registry *api.Regist
 	kindConfig.APIVersion = "kind.x-k8s.io/v1alpha4"
 
 	if registry != nil {
-		if registryAPI == containerdRegistryV2 {
+		if registryAPI == containerdRegistryV2 && len(desired.RegistryAuths) == 0 {
 			// Point to the registry config path.
 			// We'll add these files post-creation.
 			patch := `[plugins."io.containerd.grpc.v1.cri".registry]
@@ -84,7 +85,34 @@ func (a *kindAdmin) kindClusterConfig(desired *api.Cluster, registry *api.Regist
 			kindConfig.ContainerdConfigPatches = append(kindConfig.ContainerdConfigPatches, patch)
 		}
 	}
-	return kindConfig
+
+	for _, reg := range desired.RegistryAuths {
+		// Parse the endpoint
+		parsedEndpoint, err := url.Parse(reg.Endpoint)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Error parsing registry endpoint: %s", reg.Endpoint)
+		}
+
+		// Add the registry to the list of mirrors.
+		patch := fmt.Sprintf(`[plugins."io.containerd.grpc.v1.cri".registry.mirrors."%s"]
+  endpoint = ["%s"]
+`, reg.Host, reg.Endpoint)
+		kindConfig.ContainerdConfigPatches = append(kindConfig.ContainerdConfigPatches, patch)
+
+		// Specify the auth for the registry, if provided.
+		if reg.Username != "" || reg.Password != "" {
+			usernameValue := os.ExpandEnv(reg.Username)
+			passwordValue := os.ExpandEnv(reg.Password)
+
+			patch := fmt.Sprintf(`[plugins."io.containerd.grpc.v1.cri".registry.configs."%s".auth]
+  username = "%s"
+  password = "%s"
+`, parsedEndpoint.Host, usernameValue, passwordValue)
+			kindConfig.ContainerdConfigPatches = append(kindConfig.ContainerdConfigPatches, patch)
+		}
+	}
+
+	return kindConfig, nil
 }
 
 func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *api.Registry) error {
@@ -139,7 +167,11 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 		args = append(args, "--image", node)
 	}
 
-	kindConfig := a.kindClusterConfig(desired, registry, registryAPI)
+	kindConfig, err := a.kindClusterConfig(desired, registry, registryAPI)
+	if err != nil {
+		return errors.Wrap(err, "generating kind config")
+	}
+
 	buf := bytes.NewBuffer(nil)
 	encoder := yaml.NewEncoder(buf)
 	err = encoder.Encode(kindConfig)
@@ -168,7 +200,7 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 			}
 		}
 
-		if registryAPI == containerdRegistryV2 {
+		if registryAPI == containerdRegistryV2 && len(desired.RegistryAuths) == 0 {
 			err = a.applyContainerdPatchRegistryApiV2(ctx, desired, registry)
 			if err != nil {
 				return err
