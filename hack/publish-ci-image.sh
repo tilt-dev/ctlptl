@@ -10,7 +10,7 @@ docker buildx build --builder=$BUILDER --pull --platform=linux/amd64,linux/arm64
 
 # add some bash code to pull the image and pull out the tag
 docker pull "$IMAGE_NAME"
-DIGEST="$(docker inspect --format '{{.RepoDigests}}' "$IMAGE_NAME" | tr -d '[]' | awk '{print $2}')"
+DIGEST="$(docker inspect --format '{{.RepoDigests}}' "$IMAGE_NAME" | tr -d '[]')"
 
 yq eval -i ".jobs.e2e-remote-docker.docker[0].image = \"$DIGEST\"" .circleci/config.yml
 
