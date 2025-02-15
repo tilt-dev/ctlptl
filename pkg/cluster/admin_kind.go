@@ -13,11 +13,12 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/docker/docker/errdefs"
 	"github.com/pkg/errors"
-	"github.com/tilt-dev/localregistry-go"
 	"gopkg.in/yaml.v3"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/kind/pkg/apis/config/v1alpha4"
+
+	"github.com/tilt-dev/localregistry-go"
 
 	"github.com/tilt-dev/ctlptl/internal/dctr"
 	cexec "github.com/tilt-dev/ctlptl/internal/exec"
@@ -366,6 +367,12 @@ func (a *kindAdmin) getKindVersion(ctx context.Context) (string, error) {
 // This table must be built up manually from the Kind release notes each
 // time a new Kind version is released :\
 var kindK8sNodeTable = map[string]map[string]string{
+	"v0.27.0": {
+		"1.32": "kindest/node:v1.32.2@sha256:f226345927d7e348497136874b6d207e0b32cc52154ad8323129352923a3142f",
+		"1.31": "kindest/node:v1.30.6@sha256:28b7cbb993dfe093c76641a0c95807637213c9109b761f1d422c2400e22b8e87",
+		"1.30": "kindest/node:v1.30.10@sha256:4de75d0e82481ea846c0ed1de86328d821c1e6a6a91ac37bf804e5313670e507",
+		"1.29": "kindest/node:v1.29.14@sha256:8703bd94ee24e51b778d5556ae310c6c0fa67d761fae6379c8e0bb480e6fea29",
+	},
 	"v0.26.0": {
 		"1.32": "kindest/node:v1.32.0@sha256:c48c62eac5da28cdadcf560d1d8616cfa6783b58f0d94cf63ad1bf49600cb027",
 		"1.31": "kindest/node:v1.31.4@sha256:2cb39f7295fe7eafee0842b1052a599a4fb0f8bcf3f83d96c7f4864c357c6c30",
