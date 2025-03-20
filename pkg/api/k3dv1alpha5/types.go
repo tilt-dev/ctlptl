@@ -37,6 +37,12 @@ type ObjectMeta struct {
 	Name string `mapstructure:"name,omitempty" yaml:"name,omitempty"`
 }
 
+type RegistryProxy struct {
+	RemoteURL string `yaml:"remoteURL"`
+	Username  string `yaml:"username,omitempty"`
+	Password  string `yaml:"password,omitempty"`
+}
+
 type VolumeWithNodeFilters struct {
 	Volume      string   `mapstructure:"volume" yaml:"volume,omitempty"`
 	NodeFilters []string `mapstructure:"nodeFilters" yaml:"nodeFilters,omitempty"`
@@ -62,12 +68,20 @@ type K3sArgWithNodeFilters struct {
 	NodeFilters []string `mapstructure:"nodeFilters" yaml:"nodeFilters,omitempty"`
 }
 
+type FileWithNodeFilters struct {
+	Source      string   `mapstructure:"source" yaml:"source,omitempty"`
+	Destination string   `mapstructure:"destination" yaml:"destination,omitempty"`
+	Description string   `mapstructure:"description" yaml:"description,omitempty"`
+	NodeFilters []string `mapstructure:"nodeFilters" yaml:"nodeFilters,omitempty"`
+}
+
 type SimpleConfigRegistryCreateConfig struct {
-	Name     string   `mapstructure:"name" yaml:"name,omitempty"`
-	Host     string   `mapstructure:"host" yaml:"host,omitempty"`
-	HostPort string   `mapstructure:"hostPort" yaml:"hostPort,omitempty"`
-	Image    string   `mapstructure:"image" yaml:"image,omitempty"`
-	Volumes  []string `mapstructure:"volumes" yaml:"volumes,omitempty"`
+	Name     string        `mapstructure:"name" yaml:"name,omitempty"`
+	Host     string        `mapstructure:"host" yaml:"host,omitempty"`
+	HostPort string        `mapstructure:"hostPort" yaml:"hostPort,omitempty"`
+	Image    string        `mapstructure:"image" yaml:"image,omitempty"`
+	Proxy    RegistryProxy `mapstructure:"proxy" yaml:"proxy,omitempty"`
+	Volumes  []string      `mapstructure:"volumes" yaml:"volumes,omitempty"`
 }
 
 // SimpleConfigOptionsKubeconfig describes the set of options referring to the kubeconfig during cluster creation.
@@ -144,6 +158,7 @@ type SimpleConfig struct {
 	Env          []EnvVarWithNodeFilters `mapstructure:"env" yaml:"env,omitempty"`
 	Registries   SimpleConfigRegistries  `mapstructure:"registries" yaml:"registries,omitempty"`
 	HostAliases  []SimpleConfigHostAlias `mapstructure:"hostAliases" yaml:"hostAliases,omitempty"`
+	Files        []FileWithNodeFilters   `mapstructure:"files" yaml:"files,omitempty"`
 }
 
 // SimpleExposureOpts provides a simplified syntax compared to the original k3d.ExposureOpts
