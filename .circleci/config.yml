@@ -5,18 +5,18 @@ orbs:
 jobs:
   build:
     docker:
-      - image: cimg/go:1.23
+      - image: cimg/go:1.24
     steps:
       - checkout
       - run: go get -v -t -d ./...
       - run: go test -v ./...
-      - run: cd .. && go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
+      - run: cd .. && go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
       - run: make golangci-lint
       - slack/notify-on-failure:
           only_for_branches: main
   e2e-remote-docker:
     docker:
-      - image: "docker/tilt-ctlptl-ci@sha256:52648a8a21b057c31f1970153285222fd1fcc89b78126143e3b5939b1364bece"
+      - image: "docker/tilt-ctlptl-ci@sha256:4bb1c8ca66157e1ea8dc63711666ca0a9f5a30d3f8dbe124315e76d447f93144"
     steps:
       - checkout
       - setup_remote_docker
@@ -30,9 +30,9 @@ jobs:
       - kubernetes/install-kubectl
       - run: |
           set -ex
-          wget https://golang.org/dl/go1.23.0.linux-amd64.tar.gz
+          wget https://golang.org/dl/go1.24.0.linux-amd64.tar.gz
           sudo rm -fR /usr/local/go
-          sudo tar -C /usr/local -xzf go1.23.0.linux-amd64.tar.gz
+          sudo tar -C /usr/local -xzf go1.24.0.linux-amd64.tar.gz
       - run: |
           set -ex
           export MINIKUBE_VERSION=v1.34.0
@@ -57,7 +57,7 @@ jobs:
           only_for_branches: main
   release-dry-run:
     docker:
-      - image: golang:1.23-bookworm
+      - image: golang:1.24-bookworm
     steps:
       - checkout
       - setup_remote_docker
@@ -89,7 +89,7 @@ jobs:
           only_for_branches: main
   release:
     docker:
-      - image: golang:1.23-bookworm
+      - image: golang:1.24-bookworm
     steps:
       - checkout
       - setup_remote_docker
