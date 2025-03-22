@@ -40,21 +40,21 @@ go install github.com/tilt-dev/ctlptl/cmd/ctlptl@latest
 On macOS:
 
 ```bash
-CTLPTL_VERSION="0.8.39"
+CTLPTL_VERSION="0.8.40"
 curl -fsSL https://github.com/tilt-dev/ctlptl/releases/download/v$CTLPTL_VERSION/ctlptl.$CTLPTL_VERSION.mac.x86_64.tar.gz | sudo tar -xzv -C /usr/local/bin ctlptl
 ```
 
 On Linux:
 
 ```bash
-CTLPTL_VERSION="0.8.39"
+CTLPTL_VERSION="0.8.40"
 curl -fsSL https://github.com/tilt-dev/ctlptl/releases/download/v$CTLPTL_VERSION/ctlptl.$CTLPTL_VERSION.linux.x86_64.tar.gz | sudo tar -xzv -C /usr/local/bin ctlptl
 ```
 
 On Windows:
 
 ```powershell
-$CTLPTL_VERSION = "0.8.39"
+$CTLPTL_VERSION = "0.8.40"
 Invoke-WebRequest "https://github.com/tilt-dev/ctlptl/releases/download/v$CTLPTL_VERSION/ctlptl.$CTLPTL_VERSION.windows.x86_64.zip" -OutFile "ctlptl.zip"
 Expand-Archive "ctlptl.zip" -DestinationPath "ctlptl"
 Move-Item -Force -Path "ctlptl\ctlptl.exe" -Destination "$home\bin\ctlptl.exe"
