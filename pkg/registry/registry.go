@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/distribution/reference"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
@@ -186,7 +185,7 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 	}, nil
 }
 
-func (c *Controller) ipAndPortsFrom(ports []types.Port) (listenAddress string, hostPort int, containerPort int, err error) {
+func (c *Controller) ipAndPortsFrom(ports []container.Port) (listenAddress string, hostPort int, containerPort int, err error) {
 	for _, port := range ports {
 		if port.PrivatePort == 5000 {
 			return port.IP, int(port.PublicPort), int(port.PrivatePort), nil
@@ -409,8 +408,8 @@ func (c *Controller) maybeCreateForwarder(ctx context.Context, port int) error {
 	return c.socat.ConnectRemoteDockerPort(ctx, port)
 }
 
-func (c *Controller) registryContainers(ctx context.Context) ([]types.Container, error) {
-	containers := make(map[string]types.Container)
+func (c *Controller) registryContainers(ctx context.Context) ([]container.Summary, error) {
+	containers := make(map[string]container.Summary)
 
 	roleContainers, err := c.dockerCLI.Client().ContainerList(ctx, container.ListOptions{
 		Filters: filters.NewArgs(
@@ -436,7 +435,7 @@ func (c *Controller) registryContainers(ctx context.Context) ([]types.Container,
 		containers[ancestorContainers[i].ID] = ancestorContainers[i]
 	}
 
-	result := make([]types.Container, 0, len(containers))
+	result := make([]container.Summary, 0, len(containers))
 	for _, c := range containers {
 		result = append(result, c)
 	}

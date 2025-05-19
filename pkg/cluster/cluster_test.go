@@ -13,13 +13,12 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
+	registrytypes "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/api/types/system"
 	dockerregistry "github.com/docker/docker/registry"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tilt-dev/clusterid"
-	"github.com/tilt-dev/localregistry-go"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +31,9 @@ import (
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/kind/pkg/apis/config/v1alpha4"
+
+	"github.com/tilt-dev/clusterid"
+	"github.com/tilt-dev/localregistry-go"
 
 	"github.com/tilt-dev/ctlptl/internal/dctr"
 	"github.com/tilt-dev/ctlptl/internal/exec"
@@ -584,7 +586,7 @@ func (c *fakeCLI) Client() dctr.Client {
 	return c.client
 }
 
-func (c *fakeCLI) AuthInfo(ctx context.Context, repoInfo *dockerregistry.RepositoryInfo, cmdName string) (string, types.RequestPrivilegeFunc, error) {
+func (c *fakeCLI) AuthInfo(ctx context.Context, repoInfo *dockerregistry.RepositoryInfo, cmdName string) (string, registrytypes.RequestAuthConfig, error) {
 	return "", nil, nil
 }
 
@@ -616,8 +618,8 @@ func (c *fakeDockerClient) Info(ctx context.Context) (system.Info, error) {
 	return system.Info{NCPU: c.ncpu}, nil
 }
 
-func (c *fakeDockerClient) ContainerInspect(ctx context.Context, id string) (types.ContainerJSON, error) {
-	return types.ContainerJSON{}, nil
+func (c *fakeDockerClient) ContainerInspect(ctx context.Context, id string) (container.InspectResponse, error) {
+	return container.InspectResponse{}, nil
 }
 
 func (d *fakeDockerClient) ContainerRemove(ctx context.Context, id string, options container.RemoveOptions) error {
@@ -628,7 +630,7 @@ func (d *fakeDockerClient) ImagePull(ctx context.Context, image string, options 
 	return nil, nil
 }
 
-func (d *fakeDockerClient) ContainerList(ctx context.Context, options container.ListOptions) ([]types.Container, error) {
+func (d *fakeDockerClient) ContainerList(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
 	return nil, nil
 }
 
