@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/command"
 	cliflags "github.com/docker/cli/cli/flags"
-	"github.com/distribution/reference"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
@@ -183,7 +183,9 @@ func pull(ctx context.Context, cli CLI, img string) error {
 	if err != nil {
 		return fmt.Errorf("pulling image %s: %v", img, err)
 	}
-	defer resp.Close()
+	defer func() {
+		_ = resp.Close()
+	}()
 
 	_, _ = io.Copy(io.Discard, resp)
 	return nil

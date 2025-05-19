@@ -48,7 +48,7 @@ func (o *CreateClusterOptions) Command() *cobra.Command {
 
 	cmd.SetOut(o.Out)
 	cmd.SetErr(o.ErrOut)
-	o.PrintFlags.AddFlags(cmd)
+	o.AddFlags(cmd)
 	cmd.Flags().StringVar(&o.Cluster.Registry, "registry",
 		o.Cluster.Registry, "Connect the cluster to the named registry")
 	cmd.Flags().StringVar(&o.Cluster.Name, "name",
@@ -117,7 +117,7 @@ func (o *CreateClusterOptions) run(controller clusterCreator, product string) er
 		return err
 	}
 
-	printer, err := o.PrintFlags.ToPrinter()
+	printer, err := o.ToPrinter()
 	if err != nil {
 		return err
 	}

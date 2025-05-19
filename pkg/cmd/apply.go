@@ -51,7 +51,7 @@ func (o *ApplyOptions) Command() *cobra.Command {
 
 func (o *ApplyOptions) Run(cmd *cobra.Command, args []string) {
 	if len(o.Filenames) == 0 {
-		fmt.Fprintf(o.ErrOut, "Expected source files with -f")
+		_, _ = fmt.Fprintf(o.ErrOut, "Expected source files with -f")
 		os.Exit(1)
 	}
 
@@ -72,7 +72,7 @@ func (o *ApplyOptions) run() error {
 
 	ctx := context.TODO()
 
-	printer, err := o.PrintFlags.ToPrinter()
+	printer, err := o.ToPrinter()
 	if err != nil {
 		return err
 	}

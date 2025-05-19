@@ -24,7 +24,9 @@ func Decode(v Interface) ([]runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer r.Close()
+	defer func() {
+		_ = r.Close()
+	}()
 
 	result, err := encoding.ParseStream(r)
 	if err != nil {

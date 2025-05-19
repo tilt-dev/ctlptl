@@ -12,11 +12,12 @@ import (
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
-	"github.com/tilt-dev/clusterid"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	klog "k8s.io/klog/v2"
+
+	"github.com/tilt-dev/clusterid"
 
 	"github.com/tilt-dev/ctlptl/internal/dctr"
 	cexec "github.com/tilt-dev/ctlptl/internal/exec"
@@ -217,7 +218,9 @@ func (m *minikubeMachine) CPUs(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 
 	decoder := json.NewDecoder(f)
 	settings := minikubeSettings{}

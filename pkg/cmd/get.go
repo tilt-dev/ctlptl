@@ -57,7 +57,7 @@ https://kubernetes.io/docs/reference/kubectl/cheatsheet/#formatting-output
 
 	cmd.SetOut(o.Out)
 	cmd.SetErr(o.ErrOut)
-	o.PrintFlags.AddFlags(cmd)
+	o.AddFlags(cmd)
 
 	cmd.Flags().BoolVar(&o.IgnoreNotFound, "ignore-not-found", o.IgnoreNotFound, "If the requested object does not exist the command will return exit code 0.")
 	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")

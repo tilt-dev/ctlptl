@@ -45,7 +45,7 @@ func (o *CreateRegistryOptions) Command() *cobra.Command {
 
 	cmd.SetOut(o.Out)
 	cmd.SetErr(o.ErrOut)
-	o.PrintFlags.AddFlags(cmd)
+	o.AddFlags(cmd)
 	cmd.Flags().IntVar(&o.Registry.Port, "port", o.Registry.Port,
 		"The port to expose the registry on host. If not specified, chooses a random port")
 	cmd.Flags().StringVar(&o.Registry.ListenAddress, "listen-address", o.Registry.ListenAddress,
@@ -99,7 +99,7 @@ func (o *CreateRegistryOptions) run(controller registryCreator, name string) err
 		return err
 	}
 
-	printer, err := o.PrintFlags.ToPrinter()
+	printer, err := o.ToPrinter()
 	if err != nil {
 		return err
 	}
