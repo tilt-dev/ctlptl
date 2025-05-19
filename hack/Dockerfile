@@ -37,7 +37,7 @@ RUN curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${TARGETARC
     && install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
 # Install Kind
-ENV KIND_VERSION=v0.27.0
+ENV KIND_VERSION=v0.28.0
 RUN set -exu \
   && KIND_URL="https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-$TARGETARCH" \
   && curl --silent --show-error --location --fail --retry 3 --output ./kind-linux-$TARGETARCH "$KIND_URL" \
