@@ -6,12 +6,13 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+
 	"github.com/tilt-dev/ctlptl/internal/exec"
 	"github.com/tilt-dev/ctlptl/pkg/api"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
-func applyContainerdPatchRegistryApiV2(
+func applyContainerdPatchRegistryAPIV2(
 	ctx context.Context, runner exec.CmdRunner, iostreams genericclioptions.IOStreams,
 	nodes []string, desired *api.Cluster, registry *api.Registry) error {
 	for _, node := range nodes {

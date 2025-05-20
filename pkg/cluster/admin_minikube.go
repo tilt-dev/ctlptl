@@ -11,9 +11,10 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/docker/docker/api/types/container"
 	"github.com/pkg/errors"
-	"github.com/tilt-dev/localregistry-go"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/klog/v2"
+
+	"github.com/tilt-dev/localregistry-go"
 
 	"github.com/tilt-dev/ctlptl/internal/dctr"
 	cexec "github.com/tilt-dev/ctlptl/internal/exec"
@@ -176,12 +177,12 @@ func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, regist
 		}
 
 		if registryAPI == containerdRegistryV2 {
-			err = a.applyContainerdPatchRegistryApiV2(ctx, desired, registry, networkMode)
+			err = a.applyContainerdPatchRegistryAPIV2(ctx, desired, registry, networkMode)
 			if err != nil {
 				return err
 			}
 		} else {
-			err = a.applyContainerdPatchRegistryApiV1(ctx, desired, registry, networkMode)
+			err = a.applyContainerdPatchRegistryAPIV1(ctx, desired, registry, networkMode)
 			if err != nil {
 				return err
 			}
@@ -256,19 +257,19 @@ func (a *minikubeAdmin) getNodes(ctx context.Context, name string) ([]string, er
 // localhost:[registry-port] or
 // [registry-name]:5000
 // by cloning the registry config created by minikube's --insecure-registry.
-func (a *minikubeAdmin) applyContainerdPatchRegistryApiV2(ctx context.Context, desired *api.Cluster, registry *api.Registry, networkMode container.NetworkMode) error {
+func (a *minikubeAdmin) applyContainerdPatchRegistryAPIV2(ctx context.Context, desired *api.Cluster, registry *api.Registry, networkMode container.NetworkMode) error {
 	nodes, err := a.getNodes(ctx, desired.Name)
 	if err != nil {
 		return errors.Wrap(err, "configuring minikube registry")
 	}
 
-	return applyContainerdPatchRegistryApiV2(ctx, a.runner, a.iostreams, nodes, desired, registry)
+	return applyContainerdPatchRegistryAPIV2(ctx, a.runner, a.iostreams, nodes, desired, registry)
 }
 
 // We still patch containerd so that the user can push/pull from localhost.
 // But note that this will NOT survive across minikube stop and start.
 // See https://github.com/tilt-dev/ctlptl/issues/180
-func (a *minikubeAdmin) applyContainerdPatchRegistryApiV1(ctx context.Context, desired *api.Cluster, registry *api.Registry, networkMode container.NetworkMode) error {
+func (a *minikubeAdmin) applyContainerdPatchRegistryAPIV1(ctx context.Context, desired *api.Cluster, registry *api.Registry, networkMode container.NetworkMode) error {
 	configPath := "/etc/containerd/config.toml"
 
 	nodes, err := a.getNodes(ctx, desired.Name)

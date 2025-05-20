@@ -67,7 +67,7 @@ kind-control-plane2
 	a := newKindAdmin(iostreams, runner, &fakeDockerClient{})
 	ctx := context.Background()
 
-	err := a.applyContainerdPatchRegistryApiV2(
+	err := a.applyContainerdPatchRegistryAPIV2(
 		ctx,
 		&api.Cluster{Name: "test-cluster"},
 		&api.Registry{Name: "test-registry"})

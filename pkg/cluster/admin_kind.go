@@ -202,7 +202,7 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 		}
 
 		if registryAPI == containerdRegistryV2 && len(desired.RegistryAuths) == 0 {
-			err = a.applyContainerdPatchRegistryApiV2(ctx, desired, registry)
+			err = a.applyContainerdPatchRegistryAPIV2(ctx, desired, registry)
 			if err != nil {
 				return err
 			}
@@ -216,7 +216,7 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 // localhost:[registry-port] or
 // [registry-name]:5000
 // by configuring containerd to rewrite the url.
-func (a *kindAdmin) applyContainerdPatchRegistryApiV2(ctx context.Context, desired *api.Cluster, registry *api.Registry) error {
+func (a *kindAdmin) applyContainerdPatchRegistryAPIV2(ctx context.Context, desired *api.Cluster, registry *api.Registry) error {
 	nodes, err := a.getNodes(ctx, desired.Name)
 	if err != nil {
 		return errors.Wrap(err, "configuring registry")
@@ -232,7 +232,7 @@ func (a *kindAdmin) applyContainerdPatchRegistryApiV2(ctx context.Context, desir
 		filtered = append(filtered, node)
 	}
 
-	return applyContainerdPatchRegistryApiV2(ctx, a.runner, a.iostreams,
+	return applyContainerdPatchRegistryAPIV2(ctx, a.runner, a.iostreams,
 		filtered, desired, registry)
 }
 

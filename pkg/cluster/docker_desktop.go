@@ -146,7 +146,7 @@ func (c DockerDesktopClient) ResetCluster(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	return nil
 }
 
@@ -214,10 +214,11 @@ func (c DockerDesktopClient) applySet(settings map[string]interface{}, key, newV
 
 	switch v := v.(type) {
 	case bool:
-		if newValue == "true" {
+		switch newValue {
+		case "true":
 			vParent[vParentKey] = true
 			return !v, nil
-		} else if newValue == "false" {
+		case "false":
 			vParent[vParentKey] = false
 			return v, nil
 		}
@@ -305,7 +306,7 @@ func (c DockerDesktopClient) writeSettings(ctx context.Context, settings map[str
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	return nil
 }
 
@@ -325,7 +326,9 @@ func (c DockerDesktopClient) settings(ctx context.Context) (map[string]interface
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	settings := make(map[string]interface{})
 	err = json.NewDecoder(resp.Body).Decode(&settings)
@@ -471,7 +474,7 @@ func (c DockerDesktopClient) tryRequest(label string, creq clientRequest) (*http
 		return nil, errors.Wrap(err, label)
 	}
 	if !status2xx(resp) {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return nil, withStatusCode{errors.Errorf("%s: status code %d", label, resp.StatusCode), resp.StatusCode}
 	}
 

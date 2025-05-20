@@ -1,0 +1,13 @@
+version: "2"
+linters:
+  settings:
+    staticcheck:
+      checks:
+        - all
+        - "-ST1005" # error strings should not be capitalized
+        - "-QF1001" # demorgan's law
+        - "-ST1021" # comment forms
+        - "-ST1020" # comment forms
+        - "-ST1000" # comment forms
+        - "-ST1016" # silly naming rules
+        - "-QF1007" # silly conditional rules
