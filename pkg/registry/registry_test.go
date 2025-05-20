@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
+	registrytypes "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/api/types/system"
 	"github.com/docker/docker/registry"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
@@ -25,8 +26,8 @@ import (
 	"github.com/tilt-dev/ctlptl/pkg/api"
 )
 
-func kindRegistry() types.Container {
-	return types.Container{
+func kindRegistry() container.Summary {
+	return container.Summary{
 		ID:      "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
 		Names:   []string{"/kind-registry"},
 		Image:   DefaultRegistryImageRef,
@@ -34,14 +35,14 @@ func kindRegistry() types.Container {
 		Command: "/entrypoint.sh /etc/docker/registry/config.yml",
 		Created: 1603483645,
 		Labels:  map[string]string{"dev.tilt.ctlptl.role": "registry"},
-		Ports: []types.Port{
-			types.Port{IP: "127.0.0.1", PrivatePort: 5000, PublicPort: 5001, Type: "tcp"},
+		Ports: []container.Port{
+			container.Port{IP: "127.0.0.1", PrivatePort: 5000, PublicPort: 5001, Type: "tcp"},
 		},
 		SizeRw:     0,
 		SizeRootFs: 0,
 		State:      "running",
 		Status:     "Up 2 hours",
-		NetworkSettings: &types.SummaryNetworkSettings{
+		NetworkSettings: &container.NetworkSettingsSummary{
 			Networks: map[string]*network.EndpointSettings{
 				"bridge": &network.EndpointSettings{
 					IPAddress: "172.0.1.2",
@@ -54,8 +55,8 @@ func kindRegistry() types.Container {
 	}
 }
 
-func kindRegistryLoopback() types.Container {
-	return types.Container{
+func kindRegistryLoopback() container.Summary {
+	return container.Summary{
 		ID:      "d62f2587ff7b03858f144d3cf83c789578a6d6403f8b82a459ab4e317917cd42",
 		Names:   []string{"/kind-registry-loopback"},
 		Image:   DefaultRegistryImageRef,
@@ -63,14 +64,14 @@ func kindRegistryLoopback() types.Container {
 		Command: "/entrypoint.sh /etc/docker/registry/config.yml",
 		Created: 1603483646,
 		Labels:  map[string]string{"dev.tilt.ctlptl.role": "registry"},
-		Ports: []types.Port{
-			types.Port{IP: "127.0.0.1", PrivatePort: 5000, PublicPort: 5001, Type: "tcp"},
+		Ports: []container.Port{
+			container.Port{IP: "127.0.0.1", PrivatePort: 5000, PublicPort: 5001, Type: "tcp"},
 		},
 		SizeRw:     0,
 		SizeRootFs: 0,
 		State:      "running",
 		Status:     "Up 2 hours",
-		NetworkSettings: &types.SummaryNetworkSettings{
+		NetworkSettings: &container.NetworkSettingsSummary{
 			Networks: map[string]*network.EndpointSettings{
 				"bridge": &network.EndpointSettings{
 					IPAddress: "172.0.1.2",
@@ -83,8 +84,8 @@ func kindRegistryLoopback() types.Container {
 	}
 }
 
-func kindRegistryCustomImage() types.Container {
-	return types.Container{
+func kindRegistryCustomImage() container.Summary {
+	return container.Summary{
 		ID:      "c7f123e65474f951c3bc4232c888616c0f9b1052c7ae706a3b6d4701bea6e90d",
 		Names:   []string{"/kind-registry-custom-image"},
 		Image:   "fake.tilt.dev/my-registry-image:latest",
@@ -92,14 +93,14 @@ func kindRegistryCustomImage() types.Container {
 		Command: "/entrypoint.sh /etc/docker/registry/config.yml",
 		Created: 1603483647,
 		Labels:  map[string]string{"dev.tilt.ctlptl.role": "registry"},
-		Ports: []types.Port{
-			types.Port{IP: "127.0.0.1", PrivatePort: 5000, PublicPort: 5001, Type: "tcp"},
+		Ports: []container.Port{
+			container.Port{IP: "127.0.0.1", PrivatePort: 5000, PublicPort: 5001, Type: "tcp"},
 		},
 		SizeRw:     0,
 		SizeRootFs: 0,
 		State:      "running",
 		Status:     "Up 2 hours",
-		NetworkSettings: &types.SummaryNetworkSettings{
+		NetworkSettings: &container.NetworkSettingsSummary{
 			Networks: map[string]*network.EndpointSettings{
 				"bridge": &network.EndpointSettings{
 					IPAddress: "172.0.1.2",
@@ -112,8 +113,8 @@ func kindRegistryCustomImage() types.Container {
 	}
 }
 
-func registryBadPorts() types.Container {
-	return types.Container{
+func registryBadPorts() container.Summary {
+	return container.Summary{
 		ID:      "a815c0ec15f1f7430bd402e3fffe65026dd692a1a99861a52b3e30ad6e253a08",
 		Names:   []string{"/kind-registry"},
 		Image:   DefaultRegistryImageRef,
@@ -121,14 +122,14 @@ func registryBadPorts() types.Container {
 		Command: "/entrypoint.sh /etc/docker/registry/config.yml",
 		Created: 1603483645,
 		Labels:  map[string]string{"dev.tilt.ctlptl.role": "registry"},
-		Ports: []types.Port{
-			types.Port{IP: "127.0.0.1", PrivatePort: 5001, PublicPort: 5002, Type: "tcp"},
+		Ports: []container.Port{
+			container.Port{IP: "127.0.0.1", PrivatePort: 5001, PublicPort: 5002, Type: "tcp"},
 		},
 		SizeRw:     0,
 		SizeRootFs: 0,
 		State:      "running",
 		Status:     "Up 2 hours",
-		NetworkSettings: &types.SummaryNetworkSettings{
+		NetworkSettings: &container.NetworkSettingsSummary{
 			Networks: map[string]*network.EndpointSettings{
 				"bridge": &network.EndpointSettings{
 					IPAddress: "172.0.1.2",
@@ -148,7 +149,7 @@ func TestListRegistries(t *testing.T) {
 	regWithoutLabels := kindRegistryLoopback()
 	regWithoutLabels.Labels = nil
 
-	f.docker.containers = []types.Container{kindRegistry(), regWithoutLabels, kindRegistryCustomImage()}
+	f.docker.containers = []container.Summary{kindRegistry(), regWithoutLabels, kindRegistryCustomImage()}
 
 	list, err := f.c.List(context.Background(), ListOptions{})
 	require.NoError(t, err)
@@ -218,7 +219,7 @@ func TestListRegistries_badPorts(t *testing.T) {
 	regWithoutLabels := kindRegistryLoopback()
 	regWithoutLabels.Labels = nil
 
-	f.docker.containers = []types.Container{registryBadPorts()}
+	f.docker.containers = []container.Summary{registryBadPorts()}
 
 	list, err := f.c.List(context.Background(), ListOptions{})
 	require.NoError(t, err)
@@ -247,7 +248,7 @@ func TestGetRegistry(t *testing.T) {
 	f := newFixture(t)
 	defer f.TearDown()
 
-	f.docker.containers = []types.Container{kindRegistry()}
+	f.docker.containers = []container.Summary{kindRegistry()}
 
 	registry, err := f.c.Get(context.Background(), "kind-registry")
 	require.NoError(t, err)
@@ -277,7 +278,7 @@ func TestApplyDeadRegistry(t *testing.T) {
 
 	deadRegistry := kindRegistry()
 	deadRegistry.State = "dead"
-	f.docker.containers = []types.Container{deadRegistry}
+	f.docker.containers = []container.Summary{deadRegistry}
 
 	registry, err := f.c.Apply(context.Background(), &api.Registry{
 		TypeMeta: typeMeta,
@@ -296,7 +297,7 @@ func TestApplyLabels(t *testing.T) {
 
 	// Make sure the previous registry is wiped out
 	// because it doesn't have the labels we want.
-	f.docker.containers = []types.Container{kindRegistry()}
+	f.docker.containers = []container.Summary{kindRegistry()}
 
 	registry, err := f.c.Apply(context.Background(), &api.Registry{
 		TypeMeta: typeMeta,
@@ -325,7 +326,7 @@ func TestPreservePort(t *testing.T) {
 	existingRegistry := kindRegistry()
 	existingRegistry.State = "dead"
 	existingRegistry.Ports[0].PublicPort = 5010
-	f.docker.containers = []types.Container{existingRegistry}
+	f.docker.containers = []container.Summary{existingRegistry}
 
 	registry, err := f.c.Apply(context.Background(), &api.Registry{
 		TypeMeta: typeMeta,
@@ -349,7 +350,7 @@ func TestCustomImage(t *testing.T) {
 
 	// Make sure the previous registry is wiped out
 	// because it doesn't have the image we want.
-	f.docker.containers = []types.Container{kindRegistry()}
+	f.docker.containers = []container.Summary{kindRegistry()}
 
 	// ensure stable w/o image change
 	_, err := f.c.Apply(context.Background(), &api.Registry{
@@ -404,7 +405,7 @@ func TestCustomEnv(t *testing.T) {
 
 	// Make sure the previous registry is wiped out
 	// because it doesn't have the image we want.
-	f.docker.containers = []types.Container{kindRegistry()}
+	f.docker.containers = []container.Summary{kindRegistry()}
 
 	// ensure stable w/o image change
 	_, err := f.c.Apply(context.Background(), &api.Registry{
@@ -443,12 +444,12 @@ func (c *fakeCLI) Client() dctr.Client {
 	return c.client
 }
 
-func (c *fakeCLI) AuthInfo(ctx context.Context, repoInfo *registry.RepositoryInfo, cmdName string) (string, types.RequestPrivilegeFunc, error) {
+func (c *fakeCLI) AuthInfo(ctx context.Context, repoInfo *registry.RepositoryInfo, cmdName string) (string, registrytypes.RequestAuthConfig, error) {
 	return "", nil, nil
 }
 
 type fakeDocker struct {
-	containers           []types.Container
+	containers           []container.Summary
 	lastRemovedContainer string
 	lastCreateConfig     *container.Config
 	lastCreateHostConfig *container.HostConfig
@@ -469,12 +470,12 @@ func (d *fakeDocker) DaemonHost() string {
 	return ""
 }
 
-func (d *fakeDocker) ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error) {
+func (d *fakeDocker) ContainerInspect(ctx context.Context, containerID string) (container.InspectResponse, error) {
 	for _, c := range d.containers {
 		if c.ID == containerID {
-			return types.ContainerJSON{
-				ContainerJSONBase: &types.ContainerJSONBase{
-					State: &types.ContainerState{
+			return container.InspectResponse{
+				ContainerJSONBase: &container.ContainerJSONBase{
+					State: &container.State{
 						Running: c.State == "running",
 					},
 				},
@@ -509,11 +510,11 @@ func (d *fakeDocker) ContainerInspect(ctx context.Context, containerID string) (
 		}
 	}
 
-	return types.ContainerJSON{}, objectNotFoundError{"container", containerID}
+	return container.InspectResponse{}, objectNotFoundError{"container", containerID}
 }
 
-func (d *fakeDocker) ContainerList(ctx context.Context, options container.ListOptions) ([]types.Container, error) {
-	var result []types.Container
+func (d *fakeDocker) ContainerList(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
+	var result []container.Summary
 	for _, c := range d.containers {
 		if options.Filters.Contains("ancestor") {
 			img, err := reference.ParseNormalizedNamed(c.Image)
@@ -547,7 +548,7 @@ func (d *fakeDocker) ContainerCreate(ctx context.Context, config *container.Conf
 
 	c := kindRegistry()
 	c.Image = config.Image
-	d.containers = []types.Container{c}
+	d.containers = []container.Summary{c}
 
 	return container.CreateResponse{}, nil
 }

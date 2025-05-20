@@ -27,8 +27,8 @@ type Client interface {
 	DaemonHost() string
 	ImagePull(ctx context.Context, image string, options image.PullOptions) (io.ReadCloser, error)
 
-	ContainerList(ctx context.Context, options container.ListOptions) ([]types.Container, error)
-	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
+	ContainerList(ctx context.Context, options container.ListOptions) ([]container.Summary, error)
+	ContainerInspect(ctx context.Context, containerID string) (container.InspectResponse, error)
 	ContainerRemove(ctx context.Context, id string, options container.RemoveOptions) error
 	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.CreateResponse, error)
 	ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error
@@ -41,7 +41,7 @@ type Client interface {
 
 type CLI interface {
 	Client() Client
-	AuthInfo(ctx context.Context, repoInfo *registry.RepositoryInfo, cmdName string) (string, types.RequestPrivilegeFunc, error)
+	AuthInfo(ctx context.Context, repoInfo *registry.RepositoryInfo, cmdName string) (string, registrytypes.RequestAuthConfig, error)
 }
 
 type realCLI struct {
@@ -52,7 +52,7 @@ func (c *realCLI) Client() Client {
 	return c.cli.Client()
 }
 
-func (c *realCLI) AuthInfo(ctx context.Context, repoInfo *registry.RepositoryInfo, cmdName string) (string, types.RequestPrivilegeFunc, error) {
+func (c *realCLI) AuthInfo(ctx context.Context, repoInfo *registry.RepositoryInfo, cmdName string) (string, registrytypes.RequestAuthConfig, error) {
 	authConfig := command.ResolveAuthConfig(c.cli.ConfigFile(), repoInfo.Index)
 	requestPrivilege := command.RegistryAuthenticationPrivilegedFunc(c.cli, repoInfo.Index, cmdName)
 
