@@ -64,7 +64,7 @@ jobs:
       # https://discuss.circleci.com/t/arm-version-of-remote-docker/41624
       - run: ssh remote-docker "sudo apt-get update; sudo apt-get install -y qemu-user-static binfmt-support"
       - run: git fetch --tags
-      - run: go install github.com/goreleaser/goreleaser/v2@latest
+      - run: go install github.com/goreleaser/goreleaser/v2@v2.4.4
       - run: |
           set -e
           pushd /tmp
@@ -96,7 +96,7 @@ jobs:
       # https://discuss.circleci.com/t/arm-version-of-remote-docker/41624
       - run: ssh remote-docker "sudo apt-get update; sudo apt-get install -y qemu-user-static binfmt-support"
       - run: git fetch --tags
-      - run: go install github.com/goreleaser/goreleaser/v2@latest
+      - run: go install github.com/goreleaser/goreleaser/v2@v2.4.4
       - run: |
           set -e
           pushd /tmp
