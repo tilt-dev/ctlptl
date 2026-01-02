@@ -11,7 +11,8 @@ import (
 	"strings"
 
 	"github.com/blang/semver/v4"
-	"github.com/docker/docker/errdefs"
+	"github.com/containerd/errdefs"
+	"github.com/moby/moby/client"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -195,7 +196,9 @@ func (a *kindAdmin) Create(ctx context.Context, desired *api.Cluster, registry *
 	if registry != nil {
 		if !a.inKindNetwork(registry, networkName) {
 			_, _ = fmt.Fprintf(a.iostreams.ErrOut, "   Connecting kind to registry %s\n", registry.Name)
-			err := a.dockerClient.NetworkConnect(ctx, networkName, registry.Name, nil)
+			_, err := a.dockerClient.NetworkConnect(ctx, networkName, client.NetworkConnectOptions{
+				Container: registry.Name,
+			})
 			if err != nil {
 				return errors.Wrap(err, "connecting registry")
 			}
@@ -309,9 +312,11 @@ func (a *kindAdmin) Delete(ctx context.Context, config *api.Cluster) error {
 }
 
 func (a *kindAdmin) ModifyConfigInContainer(ctx context.Context, cluster *api.Cluster, containerID string, dockerClient dctr.Client, configWriter configWriter) error {
-	err := dockerClient.NetworkConnect(ctx, kindNetworkName(), containerID, nil)
+	_, err := dockerClient.NetworkConnect(ctx, kindNetworkName(), client.NetworkConnectOptions{
+		Container: containerID,
+	})
 	if err != nil {
-		if !errdefs.IsForbidden(err) || !strings.Contains(err.Error(), "already exists") {
+		if !errdefs.IsPermissionDenied(err) || !strings.Contains(err.Error(), "already exists") {
 			return fmt.Errorf("error connecting to cluster network: %w", err)
 		}
 	}

@@ -9,7 +9,8 @@ import (
 	"strings"
 
 	"github.com/blang/semver/v4"
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 	"github.com/pkg/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/klog/v2"
@@ -166,11 +167,11 @@ func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, regist
 	}
 
 	if registry != nil {
-		container, err := a.dockerClient.ContainerInspect(ctx, clusterName)
+		container, err := a.dockerClient.ContainerInspect(ctx, clusterName, client.ContainerInspectOptions{})
 		if err != nil {
 			return errors.Wrap(err, "inspecting minikube cluster")
 		}
-		networkMode := container.HostConfig.NetworkMode
+		networkMode := container.Container.HostConfig.NetworkMode
 		err = a.ensureRegistryConnected(ctx, registry, networkMode)
 		if err != nil {
 			return err
@@ -195,7 +196,9 @@ func (a *minikubeAdmin) Create(ctx context.Context, desired *api.Cluster, regist
 // Minikube v0.15.0+ creates a unique network for each minikube cluster.
 func (a *minikubeAdmin) ensureRegistryConnected(ctx context.Context, registry *api.Registry, networkMode container.NetworkMode) error {
 	if networkMode.IsUserDefined() && !a.inRegistryNetwork(registry, networkMode) {
-		err := a.dockerClient.NetworkConnect(ctx, networkMode.UserDefined(), registry.Name, nil)
+		_, err := a.dockerClient.NetworkConnect(ctx, networkMode.UserDefined(), client.NetworkConnectOptions{
+			Container: registry.Name,
+		})
 		if err != nil {
 			return errors.Wrap(err, "connecting registry")
 		}
@@ -210,7 +213,10 @@ func (a *minikubeAdmin) ensureRegistryConnected(ctx context.Context, registry *a
 // https://github.com/tilt-dev/ctlptl/issues/144
 func (a *minikubeAdmin) ensureRegistryDisconnected(ctx context.Context, registry *api.Registry, networkMode container.NetworkMode) error {
 	if networkMode.IsUserDefined() && a.inRegistryNetwork(registry, networkMode) {
-		err := a.dockerClient.NetworkDisconnect(ctx, networkMode.UserDefined(), registry.Name, false)
+		_, err := a.dockerClient.NetworkDisconnect(ctx, networkMode.UserDefined(), client.NetworkDisconnectOptions{
+			Container: registry.Name,
+			Force:     false,
+		})
 		if err != nil {
 			return errors.Wrap(err, "disconnecting registry")
 		}
@@ -319,11 +325,11 @@ func (a *minikubeAdmin) inRegistryNetwork(registry *api.Registry, networkMode co
 }
 
 func (a *minikubeAdmin) LocalRegistryHosting(ctx context.Context, desired *api.Cluster, registry *api.Registry) (*localregistry.LocalRegistryHostingV1, error) {
-	container, err := a.dockerClient.ContainerInspect(ctx, desired.Name)
+	container, err := a.dockerClient.ContainerInspect(ctx, desired.Name, client.ContainerInspectOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "inspecting minikube cluster")
 	}
-	networkMode := container.HostConfig.NetworkMode
+	networkMode := container.Container.HostConfig.NetworkMode
 	networkHost := registry.Status.IPAddress
 	if networkMode.IsUserDefined() {
 		networkHost = registry.Name
