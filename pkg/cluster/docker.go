@@ -5,6 +5,8 @@ import (
 	"os"
 	"regexp"
 
+	"github.com/moby/moby/client"
+
 	"github.com/tilt-dev/ctlptl/internal/dctr"
 )
 
@@ -40,13 +42,13 @@ type detectInContainer interface {
 //     container
 //
 // Returns a non-empty string representing the container ID if inside a container.
-func insideContainer(ctx context.Context, client dctr.Client) string {
+func insideContainer(ctx context.Context, dockerClient dctr.Client) string {
 	// allows fake client to mock the result
-	if detect, ok := client.(detectInContainer); ok {
+	if detect, ok := dockerClient.(detectInContainer); ok {
 		return detect.insideContainer(ctx)
 	}
 
-	if client.DaemonHost() != "unix:///var/run/docker.sock" {
+	if dockerClient.DaemonHost() != "unix:///var/run/docker.sock" {
 		return ""
 	}
 
@@ -59,12 +61,12 @@ func insideContainer(ctx context.Context, client dctr.Client) string {
 		return ""
 	}
 
-	container, err := client.ContainerInspect(ctx, containerID)
+	container, err := dockerClient.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{})
 	if err != nil {
 		return ""
 	}
 
-	if !container.State.Running {
+	if !container.Container.State.Running {
 		return ""
 	}
 

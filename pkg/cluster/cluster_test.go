@@ -4,19 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
-	registrytypes "github.com/docker/docker/api/types/registry"
-	"github.com/docker/docker/api/types/system"
-	dockerregistry "github.com/docker/docker/registry"
-	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/distribution/reference"
+	"github.com/moby/moby/api/types/system"
+	"github.com/moby/moby/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -586,8 +580,8 @@ func (c *fakeCLI) Client() dctr.Client {
 	return c.client
 }
 
-func (c *fakeCLI) AuthInfo(ctx context.Context, repoInfo *dockerregistry.RepositoryInfo, cmdName string) (string, registrytypes.RequestAuthConfig, error) {
-	return "", nil, nil
+func (c *fakeCLI) AuthInfo(ctx context.Context, ref reference.Reference, cmdName string) (string, error) {
+	return "", nil
 }
 
 type fakeDockerClient struct {
@@ -602,53 +596,53 @@ func (c *fakeDockerClient) DaemonHost() string {
 	return c.host
 }
 
-func (c *fakeDockerClient) ServerVersion(ctx context.Context) (types.Version, error) {
+func (c *fakeDockerClient) ServerVersion(ctx context.Context, options client.ServerVersionOptions) (client.ServerVersionResult, error) {
 	if !c.started {
-		return types.Version{}, fmt.Errorf("not started")
+		return client.ServerVersionResult{}, fmt.Errorf("not started")
 	}
 
-	return types.Version{}, nil
+	return client.ServerVersionResult{}, nil
 }
 
-func (c *fakeDockerClient) Info(ctx context.Context) (system.Info, error) {
+func (c *fakeDockerClient) Info(ctx context.Context, options client.InfoOptions) (client.SystemInfoResult, error) {
 	if !c.started {
-		return system.Info{}, fmt.Errorf("not started")
+		return client.SystemInfoResult{}, fmt.Errorf("not started")
 	}
 
-	return system.Info{NCPU: c.ncpu}, nil
+	return client.SystemInfoResult{Info: system.Info{NCPU: c.ncpu}}, nil
 }
 
-func (c *fakeDockerClient) ContainerInspect(ctx context.Context, id string) (container.InspectResponse, error) {
-	return container.InspectResponse{}, nil
+func (c *fakeDockerClient) ContainerInspect(ctx context.Context, id string, options client.ContainerInspectOptions) (client.ContainerInspectResult, error) {
+	return client.ContainerInspectResult{}, nil
 }
 
-func (d *fakeDockerClient) ContainerRemove(ctx context.Context, id string, options container.RemoveOptions) error {
-	return nil
+func (d *fakeDockerClient) ContainerRemove(ctx context.Context, id string, options client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
+	return client.ContainerRemoveResult{}, nil
 }
 
-func (d *fakeDockerClient) ImagePull(ctx context.Context, image string, options image.PullOptions) (io.ReadCloser, error) {
+func (d *fakeDockerClient) ImagePull(ctx context.Context, image string, options client.ImagePullOptions) (client.ImagePullResponse, error) {
 	return nil, nil
 }
 
-func (d *fakeDockerClient) ContainerList(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
-	return nil, nil
+func (d *fakeDockerClient) ContainerList(ctx context.Context, options client.ContainerListOptions) (client.ContainerListResult, error) {
+	return client.ContainerListResult{}, nil
 }
 
-func (d *fakeDockerClient) ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, containerName string) (container.CreateResponse, error) {
-	return container.CreateResponse{}, nil
+func (d *fakeDockerClient) ContainerCreate(ctx context.Context, options client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+	return client.ContainerCreateResult{}, nil
 }
-func (d *fakeDockerClient) ContainerStart(ctx context.Context, containerID string, options container.StartOptions) error {
-	return nil
+func (d *fakeDockerClient) ContainerStart(ctx context.Context, containerID string, options client.ContainerStartOptions) (client.ContainerStartResult, error) {
+	return client.ContainerStartResult{}, nil
 }
 
-func (d *fakeDockerClient) NetworkConnect(ctx context.Context, networkID, containerID string, config *network.EndpointSettings) error {
+func (d *fakeDockerClient) NetworkConnect(ctx context.Context, networkID string, options client.NetworkConnectOptions) (client.NetworkConnectResult, error) {
 	d.networks = append(d.networks, networkID)
-	return nil
+	return client.NetworkConnectResult{}, nil
 }
 
-func (d *fakeDockerClient) NetworkDisconnect(ctx context.Context, networkID, containerID string, force bool) error {
+func (d *fakeDockerClient) NetworkDisconnect(ctx context.Context, networkID string, options client.NetworkDisconnectOptions) (client.NetworkDisconnectResult, error) {
 	if len(d.networks) == 0 {
-		return nil
+		return client.NetworkDisconnectResult{}, nil
 	}
 	networks := []string{}
 	for _, n := range d.networks {
@@ -657,7 +651,7 @@ func (d *fakeDockerClient) NetworkDisconnect(ctx context.Context, networkID, con
 		}
 	}
 	d.networks = networks
-	return nil
+	return client.NetworkDisconnectResult{}, nil
 }
 
 func (d *fakeDockerClient) insideContainer(ctx context.Context) string {
