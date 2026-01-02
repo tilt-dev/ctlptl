@@ -15,8 +15,6 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
-	"github.com/tilt-dev/clusterid"
-	"github.com/tilt-dev/localregistry-go"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +31,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
+
+	"github.com/tilt-dev/clusterid"
+	"github.com/tilt-dev/localregistry-go"
 
 	"github.com/tilt-dev/ctlptl/internal/dctr"
 	"github.com/tilt-dev/ctlptl/internal/exec"
@@ -979,8 +980,6 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Cluste
 
 	for i, name := range names {
 		ct := c.config.Contexts[name]
-		name := name
-		i := i
 		g.Go(func() error {
 			cluster := &api.Cluster{
 				TypeMeta: typeMeta,

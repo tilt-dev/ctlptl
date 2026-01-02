@@ -27,7 +27,6 @@ func TestIsLocalDockerHost(t *testing.T) {
 		dockerHostTestCase{"unix:///Users/USER/.docker/run/docker.sock", true, true},
 	}
 	for i, c := range cases {
-		c := c
 		t.Run(fmt.Sprintf("%s-%d", t.Name(), i), func(t *testing.T) {
 			assert.Equal(t, c.localDaemon, IsLocalHost(c.host))
 			assert.Equal(t, c.dockerDesktop, IsLocalDockerEngineHost(c.host))
@@ -55,7 +54,6 @@ func TestIsLocalDockerDesktop(t *testing.T) {
 		dockerDesktopTestCase{"unix:///Users/USER/.docker/desktop/docker.sock", "linux", true},
 	}
 	for i, c := range cases {
-		c := c
 		t.Run(fmt.Sprintf("%s-%d", t.Name(), i), func(t *testing.T) {
 			assert.Equal(t, c.expected, IsLocalDockerDesktop(c.host, c.os))
 		})
