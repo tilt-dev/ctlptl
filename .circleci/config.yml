@@ -24,7 +24,7 @@ jobs:
       - run: test/kind/e2e.sh
   e2e:
     machine:
-      image: ubuntu-2204:2023.04.2
+      image: ubuntu-2204:2025.09.1
     steps:
       - checkout
       - kubernetes/install-kubectl
