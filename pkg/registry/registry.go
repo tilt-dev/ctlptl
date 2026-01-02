@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"fmt"
+	"net/netip"
 	"reflect"
 	"regexp"
 	"sort"
@@ -10,10 +11,9 @@ import (
 	"time"
 
 	"github.com/distribution/reference"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/go-connections/nat"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 	"github.com/phayes/freeport"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -129,13 +129,13 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 		name := strings.TrimPrefix(container.Names[0], "/")
 		created := time.Unix(container.Created, 0)
 
-		inspect, err := c.dockerCLI.Client().ContainerInspect(ctx, container.ID)
+		inspect, err := c.dockerCLI.Client().ContainerInspect(ctx, container.ID, client.ContainerInspectOptions{})
 		if err != nil {
 			return nil, err
 		}
-		env := inspect.Config.Env
+		env := inspect.Container.Config.Env
 		netSummary := container.NetworkSettings
-		ipAddress := ""
+		var ipAddress netip.Addr
 		networks := []string{}
 		if netSummary != nil {
 			for network := range netSummary.Networks {
@@ -161,12 +161,12 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 			Status: api.RegistryStatus{
 				CreationTimestamp: metav1.Time{Time: created},
 				ContainerID:       container.ID,
-				IPAddress:         ipAddress,
+				IPAddress:         ipAddress.String(),
 				HostPort:          hostPort,
 				ListenAddress:     listenAddress,
 				ContainerPort:     containerPort,
 				Networks:          networks,
-				State:             container.State,
+				State:             string(container.State),
 				Labels:            container.Labels,
 				Image:             container.Image,
 				Env:               env,
@@ -185,10 +185,10 @@ func (c *Controller) List(ctx context.Context, options ListOptions) (*api.Regist
 	}, nil
 }
 
-func (c *Controller) ipAndPortsFrom(ports []container.Port) (listenAddress string, hostPort int, containerPort int, err error) {
+func (c *Controller) ipAndPortsFrom(ports []container.PortSummary) (listenAddress string, hostPort int, containerPort int, err error) {
 	for _, port := range ports {
 		if port.PrivatePort == 5000 {
-			return port.IP, int(port.PublicPort), int(port.PrivatePort), nil
+			return port.IP.String(), int(port.PublicPort), int(port.PrivatePort), nil
 		}
 	}
 	return "", 0, 0, fmt.Errorf("could not find registry port")
@@ -319,7 +319,7 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 }
 
 // Compute the ports to ContainerCreate() call
-func (c *Controller) portConfigs(existing *api.Registry, desired *api.Registry) (map[nat.Port]struct{}, map[nat.Port][]nat.PortBinding, int, error) {
+func (c *Controller) portConfigs(existing *api.Registry, desired *api.Registry) (network.PortSet, network.PortMap, int, error) {
 	// Preserve existing address by default
 	hostPort := existing.Status.HostPort
 	listenAddress := existing.Status.ListenAddress
@@ -347,14 +347,18 @@ func (c *Controller) portConfigs(existing *api.Registry, desired *api.Registry) 
 		listenAddress = "127.0.0.1"
 	}
 
-	port := nat.Port("5000/tcp")
-	portSet := map[nat.Port]struct{}{
+	hostIP, err := netip.ParseAddr(listenAddress)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("parsing listen address %q: %v", listenAddress, err)
+	}
+	port := network.MustParsePort("5000/tcp")
+	portSet := network.PortSet{
 		port: struct{}{},
 	}
-	portMap := map[nat.Port][]nat.PortBinding{
-		port: []nat.PortBinding{
+	portMap := network.PortMap{
+		port: []network.PortBinding{
 			{
-				HostIP:   listenAddress,
+				HostIP:   hostIP,
 				HostPort: fmt.Sprintf("%d", hostPort),
 			},
 		},
@@ -411,28 +415,30 @@ func (c *Controller) maybeCreateForwarder(ctx context.Context, port int) error {
 func (c *Controller) registryContainers(ctx context.Context) ([]container.Summary, error) {
 	containers := make(map[string]container.Summary)
 
-	roleContainers, err := c.dockerCLI.Client().ContainerList(ctx, container.ListOptions{
-		Filters: filters.NewArgs(
-			filters.Arg("label", fmt.Sprintf("%s=registry", docker.ContainerLabelRole))),
-		All: true,
+	filters := client.Filters{}
+	filters.Add("label", fmt.Sprintf("%s=registry", docker.ContainerLabelRole))
+	roleContainers, err := c.dockerCLI.Client().ContainerList(ctx, client.ContainerListOptions{
+		Filters: filters,
+		All:     true,
 	})
 	if err != nil {
 		return nil, err
 	}
-	for i := range roleContainers {
-		containers[roleContainers[i].ID] = roleContainers[i]
+	for _, c := range roleContainers.Items {
+		containers[c.ID] = c
 	}
 
-	ancestorContainers, err := c.dockerCLI.Client().ContainerList(ctx, container.ListOptions{
-		Filters: filters.NewArgs(
-			filters.Arg("ancestor", DefaultRegistryImageRef)),
-		All: true,
+	filters = client.Filters{}
+	filters.Add("ancestor", DefaultRegistryImageRef)
+	ancestorContainers, err := c.dockerCLI.Client().ContainerList(ctx, client.ContainerListOptions{
+		Filters: filters,
+		All:     true,
 	})
 	if err != nil {
 		return nil, err
 	}
-	for i := range ancestorContainers {
-		containers[ancestorContainers[i].ID] = ancestorContainers[i]
+	for _, c := range ancestorContainers.Items {
+		containers[c.ID] = c
 	}
 
 	result := make([]container.Summary, 0, len(containers))
@@ -457,9 +463,10 @@ func (c *Controller) Delete(ctx context.Context, name string) error {
 		return fmt.Errorf("container not running registry: %s", name)
 	}
 
-	return c.dockerCLI.Client().ContainerRemove(ctx, registry.Status.ContainerID, container.RemoveOptions{
+	_, err = c.dockerCLI.Client().ContainerRemove(ctx, registry.Status.ContainerID, client.ContainerRemoveOptions{
 		Force: true,
 	})
+	return err
 }
 
 // imageRefsEqual returns true of the normalized versions of the refs are equal.
