@@ -19,6 +19,8 @@ import (
 
 	"github.com/tilt-dev/clusterid"
 
+	"github.com/moby/moby/client"
+
 	"github.com/tilt-dev/ctlptl/internal/dctr"
 	cexec "github.com/tilt-dev/ctlptl/internal/exec"
 	"github.com/tilt-dev/ctlptl/pkg/api"
@@ -82,15 +84,15 @@ func NewDockerMachine(ctx context.Context, client dctr.Client, iostreams generic
 }
 
 func (m *dockerMachine) CPUs(ctx context.Context) (int, error) {
-	info, err := m.dockerClient.Info(ctx)
+	info, err := m.dockerClient.Info(ctx, client.InfoOptions{})
 	if err != nil {
 		return 0, err
 	}
-	return info.NCPU, nil
+	return info.Info.NCPU, nil
 }
 
 func (m *dockerMachine) EnsureExists(ctx context.Context) error {
-	_, err := m.dockerClient.ServerVersion(ctx)
+	_, err := m.dockerClient.ServerVersion(ctx, client.ServerVersionOptions{})
 	if err == nil {
 		return nil
 	}
@@ -113,7 +115,7 @@ func (m *dockerMachine) EnsureExists(ctx context.Context) error {
 	dur := 60 * time.Second
 	_, _ = fmt.Fprintf(m.iostreams.ErrOut, "Waiting %s for Docker Desktop to boot...\n", duration.ShortHumanDuration(dur))
 	err = wait.PollUntilContextTimeout(ctx, time.Second, dur, true, func(ctx context.Context) (bool, error) {
-		_, err := m.dockerClient.ServerVersion(ctx)
+		_, err := m.dockerClient.ServerVersion(ctx, client.ServerVersionOptions{})
 		isSuccess := err == nil
 		return isSuccess, nil
 	})
@@ -173,7 +175,7 @@ func (m *dockerMachine) Restart(ctx context.Context, desired, existing *api.Clus
 			m.sleep(2 * time.Second)
 
 			err = wait.PollUntilContextTimeout(ctx, time.Second, dur, true, func(ctx context.Context) (bool, error) {
-				_, err := m.dockerClient.ServerVersion(ctx)
+				_, err := m.dockerClient.ServerVersion(ctx, client.ServerVersionOptions{})
 				isSuccess := err == nil
 				return isSuccess, nil
 			})
