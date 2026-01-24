@@ -512,7 +512,7 @@ func newFixture(t *testing.T) *fixture {
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 		},
 	}
-	fakeK8s := fake.NewSimpleClientset(node, ns)
+	fakeK8s := fake.NewClientset(node, ns)
 	clientLoader := clientLoader(func(restConfig *rest.Config) (kubernetes.Interface, error) {
 		return fakeK8s, nil
 	})
