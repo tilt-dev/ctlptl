@@ -6,7 +6,7 @@ require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/containerd/errdefs v1.0.0
 	github.com/distribution/reference v0.6.0
-	github.com/docker/cli v29.1.3+incompatible
+	github.com/docker/cli v29.2.0+incompatible
 	github.com/google/go-cmp v0.7.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/moby/moby/api v1.52.0
