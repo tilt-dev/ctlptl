@@ -384,6 +384,18 @@ func (c *Controller) labelConfigs(existing *api.Registry, desired *api.Registry)
 		newLabels[k] = v
 	}
 
+	// Workaround for a Docker desktop bug where the labels
+	// affect networking behavior, and break the explicit networking settings.
+	// https://github.com/docker/desktop-feedback/issues/276
+	//
+	// We want to make sure these magic labels aren't
+	// copied from the existing container.
+	for k := range newLabels {
+		if strings.HasPrefix(k, "desktop.docker.io") {
+			delete(newLabels, k)
+		}
+	}
+
 	return newLabels
 }
 
