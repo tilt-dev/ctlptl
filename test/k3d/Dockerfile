@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.24-alpine
+FROM golang:alpine
 RUN apk update && apk add bash git curl tar
 ENV CGO_ENABLED=0
 ENV KO_VERSION=0.14.1
