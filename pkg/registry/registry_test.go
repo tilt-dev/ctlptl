@@ -314,6 +314,30 @@ func TestApplyLabels(t *testing.T) {
 	}
 }
 
+func TestStripDesktopLabels(t *testing.T) {
+	f := newFixture(t)
+	defer f.TearDown()
+
+	// Make sure the previous registry is wiped out
+	// because it doesn't have the labels we want.
+	f.docker.containers = []container.Summary{kindRegistry()}
+
+	registry, err := f.c.Apply(context.Background(), &api.Registry{
+		TypeMeta: typeMeta,
+		Name:     "kind-registry",
+		Labels:   map[string]string{"desktop.docker.io/label": "should-be-stripped"},
+	})
+	if assert.NoError(t, err) {
+		assert.Equal(t, "running", registry.Status.State)
+	}
+	config := f.docker.lastCreateConfig
+	if assert.NotNil(t, config) {
+		assert.Equal(t, map[string]string{
+			"dev.tilt.ctlptl.role": "registry",
+		}, config.Labels)
+	}
+}
+
 func TestPreservePort(t *testing.T) {
 	f := newFixture(t)
 	defer f.TearDown()
