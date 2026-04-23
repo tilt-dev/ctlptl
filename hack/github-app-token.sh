@@ -46,4 +46,8 @@ token=$(curl -sSL --request POST \
 --header "Accept: application/vnd.github+json" \
 --header "Authorization: Bearer $JWT" \
 --header "X-GitHub-Api-Version: 2026-03-10" | jq -r '.token')
+if [[ "$token" == "" ]]; then
+    echo "Failed to get token" >&2
+    exit 1
+fi
 echo "$token"
