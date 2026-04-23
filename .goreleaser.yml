@@ -48,7 +48,7 @@ brews:
     name: homebrew-tap
   commit_author:
     name: Tilt Dev
-    email: hi@tilt.dev
+    email: tilt-team@docker.com
   url_template: "https://github.com/tilt-dev/ctlptl/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
   homepage: "https://ctlptl.dev/"
   description: "Making local Kubernetes clusters easy to set up and tear down"
@@ -75,7 +75,7 @@ scoops:
     name: scoop-bucket
   commit_author:
     name: Tilt Dev
-    email: hi@tilt.dev
+    email: tilt-team@docker.com
   commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
   homepage: "https://ctlptl.dev/"
   description: "Making local Kubernetes clusters easy to set up and tear down"
@@ -85,7 +85,6 @@ dockers:
   goarch: amd64
   image_templates:
     - "tiltdev/ctlptl:{{ .Tag }}-amd64"
-    - "docker/tilt-ctlptl:{{ .Tag }}-amd64"
   dockerfile: hack/Dockerfile
   use: buildx
   build_flag_templates:
@@ -103,7 +102,6 @@ dockers:
   goarm: ''
   image_templates:
     - "tiltdev/ctlptl:{{ .Tag }}-arm64"
-    - "docker/tilt-ctlptl:{{ .Tag }}-arm64"
   dockerfile: hack/Dockerfile
   use: buildx
   build_flag_templates:
@@ -125,14 +123,6 @@ docker_manifests:
   image_templates:
   - tiltdev/{{ .ProjectName }}:{{ .Tag }}-amd64
   - tiltdev/{{ .ProjectName }}:{{ .Tag }}-arm64
-- name_template: docker/tilt-{{ .ProjectName }}:{{ .Tag }}
-  image_templates:
-  - docker/tilt-{{ .ProjectName }}:{{ .Tag }}-amd64
-  - docker/tilt-{{ .ProjectName }}:{{ .Tag }}-arm64
-- name_template: docker/tilt-{{ .ProjectName }}:latest
-  image_templates:
-  - docker/tilt-{{ .ProjectName }}:{{ .Tag }}-amd64
-  - docker/tilt-{{ .ProjectName }}:{{ .Tag }}-arm64
 
 
 # Uncomment these lines if you want to experiment with other

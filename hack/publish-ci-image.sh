@@ -3,7 +3,7 @@
 set -euo pipefail
 
 BUILDER=buildx-multiarch
-IMAGE_NAME=docker/tilt-ctlptl-ci
+IMAGE_NAME=tiltdev/ctlptl-ci
 
 docker buildx inspect $BUILDER || docker buildx create --name=$BUILDER --driver=docker-container --driver-opt=network=host
 docker buildx build --builder=$BUILDER --pull --platform=linux/amd64,linux/arm64 --push -t "$IMAGE_NAME" -f .circleci/Dockerfile .

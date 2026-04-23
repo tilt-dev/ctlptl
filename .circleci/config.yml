@@ -16,7 +16,7 @@ jobs:
           only_for_branches: main
   e2e-remote-docker:
     docker:
-      - image: "docker/tilt-ctlptl-ci@sha256:5616dcc986f2bac09a4c2f8f3b9f95b0480de947fc3816da7ea94046410ff2c8"
+      - image: "tiltdev/ctlptl-ci@sha256:e3aa0b3666645820821254b06dbaf6def4fe8dca7c3418aa032440e89167c1ae"
     steps:
       - checkout
       - setup_remote_docker
