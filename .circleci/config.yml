@@ -116,6 +116,7 @@ jobs:
           rm -rf /var/lib/apt/lists/*
 
           popd
+      - run: echo "export GITHUB_TOKEN=$(./hack/github-app-token.sh)" >> "$BASH_ENV"
       - run: ./hack/release.sh
       - slack/status:
           mentions: "nick"
@@ -137,7 +138,7 @@ workflows:
     jobs:
       - release:
           context:
-            - Tilt Release CLI Context
+            - Tilt Github Context
             - Tilt Docker Login Context
           filters:
             branches:
