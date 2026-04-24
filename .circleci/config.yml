@@ -5,7 +5,7 @@ orbs:
 jobs:
   build:
     docker:
-      - image: cimg/go:1.25
+      - image: cimg/go:1.26
     steps:
       - checkout
       - run: go get -v -t -d ./...
@@ -16,7 +16,7 @@ jobs:
           only_for_branches: main
   e2e-remote-docker:
     docker:
-      - image: "tiltdev/ctlptl-ci@sha256:e3aa0b3666645820821254b06dbaf6def4fe8dca7c3418aa032440e89167c1ae"
+      - image: "tiltdev/ctlptl-ci@sha256:4a9ae01ae9c55e810911727a53784785fe8160b47b2cde7c0b2931a422fc564a"
     steps:
       - checkout
       - setup_remote_docker
@@ -30,9 +30,9 @@ jobs:
       - kubernetes/install-kubectl
       - run: |
           set -ex
-          wget https://golang.org/dl/go1.25.0.linux-amd64.tar.gz
+          wget https://golang.org/dl/go1.26.0.linux-amd64.tar.gz
           sudo rm -fR /usr/local/go
-          sudo tar -C /usr/local -xzf go1.25.0.linux-amd64.tar.gz
+          sudo tar -C /usr/local -xzf go1.26.0.linux-amd64.tar.gz
       - run: |
           set -ex
           export MINIKUBE_VERSION=v1.34.0
@@ -57,7 +57,7 @@ jobs:
           only_for_branches: main
   release-dry-run:
     docker:
-      - image: golang:1.25-bookworm
+      - image: golang:1.26-bookworm
     steps:
       - checkout
       - setup_remote_docker
@@ -90,7 +90,7 @@ jobs:
           only_for_branches: main
   release:
     docker:
-      - image: golang:1.25-bookworm
+      - image: golang:1.26-bookworm
     steps:
       - checkout
       - setup_remote_docker

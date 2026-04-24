@@ -9,7 +9,7 @@
 # Similar to the release image (which contains everything BUT the build
 # toolchain)
 
-FROM golang:1.25-bookworm
+FROM golang:1.26-bookworm
 
 RUN apt update && apt install -y curl ca-certificates liblz4-tool rsync socat gpg
 
