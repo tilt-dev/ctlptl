@@ -19,7 +19,7 @@ ctlptl create registry [name] [flags]
 ```
       --allow-missing-template-keys   If true, ignore any errors in templates when a field or map key is missing in the template. Only applies to golang and jsonpath output formats. (default true)
   -h, --help                          help for registry
-      --image string                  Registry image to use (default "docker.io/library/registry:2")
+      --image string                  Registry image to use (default "docker.io/library/registry:3")
       --listen-address string         The host's IP address to bind the container to. If not set defaults to 127.0.0.1
   -o, --output string                 Output format. One of: (json, yaml, kyaml, name, go-template, go-template-file, template, templatefile, jsonpath, jsonpath-as-json, jsonpath-file).
       --port int                      The port to expose the registry on host. If not specified, chooses a random port
