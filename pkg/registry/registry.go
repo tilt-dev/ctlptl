@@ -33,7 +33,7 @@ var (
 	groupResource = schema.GroupResource{Group: "ctlptl.dev", Resource: "registries"}
 )
 
-const DefaultRegistryImageRef = "docker.io/library/registry:2" // The registry everyone uses.
+const DefaultRegistryImageRef = "docker.io/library/registry:3" // The registry everyone uses.
 
 // https://github.com/moby/moby/blob/v20.10.3/api/types/types.go#L313
 const containerStateRunning = "running"

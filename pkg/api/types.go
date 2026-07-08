@@ -218,7 +218,7 @@ type Registry struct {
 	// Can be used to provide an alternate image or use a different registry
 	// than Docker Hub.
 	//
-	// Defaults to `docker.io/library/registry:2`.
+	// Defaults to `docker.io/library/registry:3`.
 	Image string `json:"image,omitempty" yaml:"image,omitempty"`
 
 	// Most recently observed status of the registry.
