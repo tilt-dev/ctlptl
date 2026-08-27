@@ -60,6 +60,15 @@ jobs:
       - image: golang:1.26-bookworm
     steps:
       - checkout
+      - run:
+          name: Skip unless release config changed
+          command: |
+            git fetch origin main
+            if git diff --quiet origin/main...HEAD -- .goreleaser.yml hack/release.sh; then
+              echo "no release config changes; skipping dry run"
+              circleci-agent step halt
+              exit 0
+            fi
       - setup_remote_docker
       # https://discuss.circleci.com/t/arm-version-of-remote-docker/41624
       - run: ssh remote-docker "sudo apt-get update; sudo apt-get install -y qemu-user-static binfmt-support"
