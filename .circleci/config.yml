@@ -16,7 +16,7 @@ jobs:
           only_for_branches: main
   e2e-remote-docker:
     docker:
-      - image: "tiltdev/ctlptl-ci@sha256:652524fabdead5ee5e80904c6845971cc4f8a8ca6566040dcacf3965e8309852"
+      - image: "tiltdev/ctlptl-ci@sha256:2fc2808d85960f37af0ff0a872775b2549eff22759a9a3a202b812b137f537b7"
     steps:
       - checkout
       - setup_remote_docker
@@ -41,7 +41,7 @@ jobs:
           sudo mv ./minikube-linux-amd64 /usr/local/bin/minikube
       - run: |
           set -ex
-          export KIND_VERSION=v0.32.0
+          export KIND_VERSION=v0.33.0
           curl -fLo ./kind-linux-amd64 "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
           chmod +x ./kind-linux-amd64
           sudo mv ./kind-linux-amd64 /usr/local/bin/kind
