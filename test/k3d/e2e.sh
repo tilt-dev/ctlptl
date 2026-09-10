@@ -9,8 +9,18 @@ export DOCKER_BUILDKIT="1"
 
 cd $(dirname $(realpath $0))
 CLUSTER_NAME="k3d-ctlptl-test-cluster"
+REGISTRY_NAME="ctlptl-test-registry"
 ctlptl apply -f registry.yaml
 ctlptl apply -f cluster.yaml
+
+# Idempotence check
+source ../idempotence.sh
+REGISTRY_ID=$(registry_id "$REGISTRY_NAME")
+CLUSTER_ID=$(cluster_id "$CLUSTER_NAME")
+ctlptl apply -f registry.yaml
+ctlptl apply -f cluster.yaml
+assert_unchanged "registry $REGISTRY_NAME" "$REGISTRY_ID" "$(registry_id "$REGISTRY_NAME")"
+assert_unchanged "cluster $CLUSTER_NAME" "$CLUSTER_ID" "$(cluster_id "$CLUSTER_NAME")"
 
 # The ko-builder runs in an image tagged with the host as visible from the local machine.
 docker buildx build --load -t localhost:5005/ko-builder .
