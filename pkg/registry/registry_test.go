@@ -455,6 +455,30 @@ func TestCustomEnv(t *testing.T) {
 	}
 }
 
+func TestApplyIgnoresEnvBakedIntoTheImage(t *testing.T) {
+	f := newFixture(t)
+	defer f.TearDown()
+
+	// registry:3 sets OTEL_TRACES_EXPORTER=none in its image config, so the
+	// container's env carries a variable nobody asked ctlptl for. A bare spec
+	// must still match the container it created from that image.
+	f.docker.containers = []container.Summary{kindRegistry()}
+	f.docker.containerEnv = []string{
+		"REGISTRY_STORAGE_DELETE_ENABLED=true",
+		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+		"OTEL_TRACES_EXPORTER=none",
+	}
+
+	registry, err := f.c.Apply(context.Background(), &api.Registry{
+		TypeMeta: typeMeta,
+		Name:     "kind-registry",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, kindRegistry().ID, registry.Status.ContainerID)
+	assert.Equal(t, "", f.docker.lastRemovedContainer, "Registry should not have been deleted")
+	assert.Nil(t, f.docker.lastCreateConfig, "Registry should not have been re-created")
+}
+
 type fakeCLI struct {
 	client *fakeDocker
 }
@@ -472,6 +496,10 @@ type fakeDocker struct {
 	lastRemovedContainer string
 	lastCreateConfig     *container.Config
 	lastCreateHostConfig *container.HostConfig
+
+	// Env reported by ContainerInspect for every container; nil means the
+	// env of a registry created from a bare spec.
+	containerEnv []string
 }
 
 type objectNotFoundError struct {
@@ -490,6 +518,10 @@ func (d *fakeDocker) DaemonHost() string {
 }
 
 func (d *fakeDocker) ContainerInspect(ctx context.Context, containerID string, options client.ContainerInspectOptions) (client.ContainerInspectResult, error) {
+	env := d.containerEnv
+	if env == nil {
+		env = []string{"REGISTRY_STORAGE_DELETE_ENABLED=true", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
+	}
 	for _, c := range d.containers {
 		if c.ID == containerID {
 			return client.ContainerInspectResult{
@@ -508,7 +540,7 @@ func (d *fakeDocker) ContainerInspect(ctx context.Context, containerID string, o
 						Tty:         false,
 						OpenStdin:   false,
 						StdinOnce:   false,
-						Env:         []string{"REGISTRY_STORAGE_DELETE_ENABLED=true", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
+						Env:         env,
 						Cmd:         []string{"serve", "/etc/distribution/config.yml"},
 						Healthcheck: (*container.HealthConfig)(nil),
 						ArgsEscaped: false,

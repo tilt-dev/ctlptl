@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
-	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -258,8 +257,14 @@ func (c *Controller) Apply(ctx context.Context, desired *api.Registry) (*api.Reg
 		desiredEnvs["REGISTRY_STORAGE_DELETE_ENABLED"] = "true"
 		desired.Env = append(desired.Env, "REGISTRY_STORAGE_DELETE_ENABLED=true")
 	}
-	if eq := reflect.DeepEqual(desiredEnvs, existingEnvs); !eq {
-		needsDelete = true
+	// Only the env vars the spec asks for take part in the comparison. The
+	// container's env also carries whatever the image bakes in (registry:3
+	// sets OTEL_TRACES_EXPORTER=none), and a bare spec must keep matching a
+	// container it created from that image. Same rule as for labels above.
+	for key, value := range desiredEnvs {
+		if existingEnvs[key] != value {
+			needsDelete = true
+		}
 	}
 
 	if needsDelete && existing.Name != "" {
