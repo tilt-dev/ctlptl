@@ -8,8 +8,14 @@ set -exo pipefail
 export DOCKER_BUILDKIT="1"
 
 cd $(dirname $(realpath $0))
-CLUSTER_NAME="kind-ctlptl-test-cluster"
+CLUSTER_NAME="docker-desktop"
 ctlptl apply -f cluster.yaml
+
+# Idempotence check
+source ../idempotence.sh
+CLUSTER_ID=$(cluster_id "$CLUSTER_NAME")
+ctlptl apply -f cluster.yaml
+assert_unchanged "cluster $CLUSTER_NAME" "$CLUSTER_ID" "$(cluster_id "$CLUSTER_NAME")"
 
 # The ko-builder runs in an image tagged with the host as visible from the local machine.
 docker buildx build --load -t ko-builder .
